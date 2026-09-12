@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Entornos / secretos
+.env
+*.env.local
+
+# Docker
+*.log
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# Node (por si el frontend crece)
+node_modules/
