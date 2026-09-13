@@ -1,15 +1,20 @@
 ﻿import time
+import os
+import threading
 import schedule
+import uvicorn
 
 from db import get_connection, upsert_product
 from ingest import fetch_mercadolibre, fetch_amazon, fetch_tiktok
 from analysis import score_product
 from notifications import send_telegram_alert
 from init_db import init_database
+from api import app as api_app
 
 CATEGORY = "ropa"
 SEARCH_TERMS = ["remera hombre", "campera mujer", "zapatillas urbanas"]
 AMAZON_TAG = "jh0c35-20"
+
 
 def build_url(platform, title, product_url):
     if product_url and product_url != "#":
@@ -22,6 +27,12 @@ def build_url(platform, title, product_url):
     if platform == "tiktok":
         return f"https://www.tiktok.com/search?q={q}"
     return f"https://www.google.com/search?q={q}"
+
+
+def start_api_server():
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(api_app, host="0.0.0.0", port=port)
+
 
 def run_pipeline():
     print("⏳ Esperando a que la base de datos esté lista...")
@@ -43,7 +54,8 @@ def run_pipeline():
                 continue
             for product in products:
                 try:
-                    pid = upsert_product(conn, platform_name, CATEGORY, product)
+                    pid = upsert_product(
+                        conn, platform_name, CATEGORY, product)
                     product_ids.append(pid)
                 except Exception as e:
                     print(f"Error insertando producto: {e}")
@@ -67,7 +79,8 @@ def run_pipeline():
                 )
                 row = cur.fetchone()
                 if row:
-                    url = build_url(row["platform"], row["title"], row["product_url"])
+                    url = build_url(row["platform"],
+                                    row["title"], row["product_url"])
                     send_telegram_alert({
                         "title": row["title"],
                         "price": row["current_price"],
@@ -78,13 +91,13 @@ def run_pipeline():
     conn.close()
     print("== Ciclo completo ==")
 
+
 if __name__ == "__main__":
+    threading.Thread(target=start_api_server, daemon=True).start()
     init_database()
     run_pipeline()
 
-schedule.every(6).hours.do(run_pipeline)
-while True:
-    schedule.run_pending()
-    time.sleep (30)
-
-
+    schedule.every(6).hours.do(run_pipeline)
+    while True:
+        schedule.run_pending()
+        time.sleep(30)
