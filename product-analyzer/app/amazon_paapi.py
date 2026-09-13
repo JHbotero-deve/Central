@@ -1,11 +1,10 @@
-﻿import os
+import os
 import requests
 from bs4 import BeautifulSoup
 
-def fetch_amazon_products(keyword):
+def search_items(keyword):
     print(f"[Amazon Scraper] Buscando: {keyword}...")
     
-    # Headers para simular un navegador real y evitar bloqueos
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
         "Accept-Language": "en-US,en;q=0.9",
@@ -23,19 +22,28 @@ def fetch_amazon_products(keyword):
         soup = BeautifulSoup(response.text, "html.parser")
         products = []
         
-        # Buscamos los contenedores de productos
-        for item in soup.select(".s-result-item[data-component-type='s-search-result']"):
+        for index, item in enumerate(soup.select(".s-result-item[data-component-type='s-search-result']")):
             title_elem = item.select_one("h2 a span")
             price_elem = item.select_one(".a-price-whole")
             link_elem = item.select_one("h2 a")
             
             if title_elem and price_elem:
+                clean_price = price_elem.text.replace(',', '').replace('$', '').strip()
+                try:
+                    final_price = float(clean_price)
+                except:
+                    final_price = 0.0
+
                 products.append({
+                    "external_id": f"AMZ-{index}",
                     "title": title_elem.text.strip(),
-                    "price": price_elem.text.strip(),
-                    "url": "https://www.amazon.com" + link_elem['href'],
-                    "rating": "N/A", 
-                    "reviews": "N/A"
+                    "price": final_price,
+                    "image_url": None,
+                    "product_url": "https://www.amazon.com" + link_elem['href'],
+                    "currency": "USD",
+                    "rating": 0.0, 
+                    "reviews_count": 0,
+                    "sales_estimate": 0
                 })
         
         print(f"[Amazon Scraper] Encontrados {len(products)} productos.")
