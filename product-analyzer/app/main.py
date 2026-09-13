@@ -1,4 +1,3 @@
-import time
 import schedule
 
 from db import get_connection, upsert_product
@@ -9,11 +8,22 @@ from init_db import init_database
 
 CATEGORY = "ropa"
 SEARCH_TERMS = ["remera hombre", "campera mujer", "zapatillas urbanas"]
+AMAZON_TAG = "jh0c35-20"
 
+def build_url(platform, title, product_url):
+    if product_url and product_url != "#":
+        return product_url
+    q = title.replace(" ", "+")
+    if platform == "amazon":
+        return f"https://www.amazon.com/s?k={q}&tag={AMAZON_TAG}"
+    if platform == "mercadolibre":
+        return f"https://listado.mercadolibre.com.co/{title.replace(' ', '-')}"
+    if platform == "tiktok":
+        return f"https://www.tiktok.com/search?q={q}"
+    return f"https://www.google.com/search?q={q}"
 
 def run_pipeline():
-    import time
-    print('⏳ Esperando a que la base de datos esté lista...')
+    print("⏳ Esperando a que la base de datos esté lista...")
     time.sleep(5)
     print("== Iniciando ciclo de ingesta y análisis ==")
     conn = get_connection()
@@ -26,22 +36,17 @@ def run_pipeline():
             ("tiktok", fetch_tiktok),
         ]:
             try:
-                print(f"🔍 Buscando '{term}' en {platform_name}...")
                 products = fetch_fn(term)
-                if not products:
-                    print(f"⚠️ No se encontraron productos o API bloqueada en {platform_name} para '{term}'")
             except Exception as e:
-                print(f"❌ [{platform_name}] Error crítico trayendo '{term}': {e}")
+                print(f"[{platform_name}] error trayendo '{term}': {e}")
                 continue
-
             for product in products:
                 try:
                     pid = upsert_product(conn, platform_name, CATEGORY, product)
                     product_ids.append(pid)
                 except Exception as e:
-                    print(f"❌ Error insertando producto de {platform_name}: {e}")
+                    print(f"Error insertando producto: {e}")
 
-    # Calcular precio promedio de la categoría para el scoring
     with conn.cursor() as cur:
         cur.execute(
             "SELECT AVG(current_price) AS avg_price FROM products "
@@ -53,36 +58,30 @@ def run_pipeline():
     for pid in set(product_ids):
         score = score_product(conn, pid, avg_price)
         print(f"Producto {pid} -> opportunity_score = {score}")
-
-        if score >= 50: # Bajado de 90 a 50 para probar que las notificaciones funcionan
-            # Obtener detalles del producto para la alerta
+        if score >= 50:
             with conn.cursor() as cur:
-
                 cur.execute(
-                    "SELECT title, current_price, product_url FROM products WHERE id = %s",
+                    "SELECT p.title, p.current_price, p.product_url, pl.name AS platform FROM products p JOIN platforms pl ON pl.id = p.platform_id WHERE p.id = %s",
                     (pid,)
                 )
                 row = cur.fetchone()
                 if row:
-                    product_info = {
+                    url = build_url(row["platform"], row["title"], row["product_url"])
+                    send_telegram_alert({
                         "title": row["title"],
                         "price": row["current_price"],
-                        "url": row["product_url"],
+                        "url": url,
                         "score": round(score, 1)
-                    }
-                    send_telegram_alert(product_info)
+                    })
 
     conn.close()
     print("== Ciclo completo ==")
 
-
 if __name__ == "__main__":
-    from init_db import init_database
-    init_database()  # Inicializa las tablas
-    run_pipeline()  # corre una vez al iniciar
-# 3. Repetir cada 6 horas para mantener precios e histórico actualizados
-schedule.every(6).hours.do(run_pipeline)
+    init_database()
+    run_pipeline()
 
+schedule.every(6).hours.do(run_pipeline)
 while True:
     schedule.run_pending()
-    time.sleep(30)
+    time.sleep (30)
