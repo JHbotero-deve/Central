@@ -48,9 +48,10 @@ def run_pipeline():
         score = score_product(conn, pid, avg_price)
         print(f"Producto {pid} -> opportunity_score = {score}")
 
-        if score >= 90:
+        if score >= 50: # Bajado de 90 a 50 para probar que las notificaciones funcionan
             # Obtener detalles del producto para la alerta
             with conn.cursor() as cur:
+
                 cur.execute(
                     "SELECT title, current_price, product_url FROM products WHERE id = %s",
                     (pid,)

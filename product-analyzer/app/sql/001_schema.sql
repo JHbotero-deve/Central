@@ -3,6 +3,9 @@
 -- Plataformas: Mercado Libre, Amazon, TikTok Shop
 -- =========================================================
 
+-- Evitar errores de dependencias con vistas
+DROP VIEW IF EXISTS product_price_comparison;
+
 CREATE TABLE IF NOT EXISTS platforms (
     id          SERIAL PRIMARY KEY,
     name        VARCHAR(50) UNIQUE NOT NULL,   -- 'mercadolibre', 'amazon', 'tiktok'

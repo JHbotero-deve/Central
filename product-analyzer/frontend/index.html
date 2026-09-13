@@ -644,7 +644,16 @@
 </footer>
 
 <script>
-  const API_BASE = window.API_BASE || "http://localhost:8000";
+  // ==========================================================================
+  // CONFIGURACIÓN DE PRODUCCIÓN
+  // 1. Cuando despliegues tu API en Railway/Render, cambia "http://localhost:8000" 
+  //    por la URL pública que te la den (ej: https://api-prod.railway.app)
+  // ==========================================================================
+  const CONFIG = {
+    API_BASE: "http://localhost:8000", 
+    VERSION: "1.0.0",
+    DEBUG_MODE: true
+  };
 
   // ---------- Rareza / score ----------
 
@@ -685,9 +694,9 @@
     const statusEl = document.getElementById("conn-status");
     try {
       const [top, comparison, revenue] = await Promise.all([
-        fetch(`${API_BASE}/opportunities/top?limit=8`).then(r => r.json()),
-        fetch(`${API_BASE}/comparison?limit=25`).then(r => r.json()),
-        fetch(`${API_BASE}/monetize/revenue-summary`).then(r => r.json()),
+        fetch(`${CONFIG.API_BASE}/opportunities/top?limit=8`).then(r => r.json()),
+        fetch(`${CONFIG.API_BASE}/comparison?limit=25`).then(r => r.json()),
+        fetch(`${CONFIG.API_BASE}/monetize/revenue-summary`).then(r => r.json()),
       ]);
 
       statusEl.innerHTML = `<span class="status-dot status-live"></span>Conectado a la API`;

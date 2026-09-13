@@ -2,6 +2,9 @@
 -- Monetización: afiliados + dropshipping + suscripción SaaS
 -- =========================================================
 
+-- IMPORTANTE: Borramos la vista antes de alterar la tabla para evitar el error "cannot drop columns from view"
+DROP VIEW IF EXISTS product_price_comparison;
+
 -- Cómo se monetiza cada producto: por afiliado (comisión) o
 -- por dropshipping (vos comprás y revendés con margen)
 ALTER TABLE products ADD COLUMN IF NOT EXISTS monetization_type VARCHAR(20)

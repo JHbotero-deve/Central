@@ -1,0 +1,24 @@
+# Secretos y Configuración
+.env
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+*.class
+.venv/
+venv/
+ENV/
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+
+# Docker / Database
+db_data/
+postgresql-data/
+
+# OS
+.DS_Store
+Thumbs.db

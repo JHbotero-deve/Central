@@ -31,6 +31,7 @@ def init_database():
 
         for sql_file in sql_files:
             path_to_sql = os.path.join(os.path.dirname(__file__), sql_file)
+            print(f"Ejecutando {sql_file}...")
             with open(path_to_sql, 'r') as f:
                 sql_script = f.read()
                 cursor.execute(sql_script)
