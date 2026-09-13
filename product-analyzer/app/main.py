@@ -1,4 +1,4 @@
-import time
+﻿import time
 import schedule
 
 from db import get_connection, upsert_product
@@ -12,6 +12,9 @@ SEARCH_TERMS = ["remera hombre", "campera mujer", "zapatillas urbanas"]
 
 
 def run_pipeline():
+    import time
+    print('⏳ Esperando a que la base de datos esté lista...')
+    time.sleep(5)
     print("== Iniciando ciclo de ingesta y análisis ==")
     conn = get_connection()
     product_ids = []
@@ -76,3 +79,4 @@ schedule.every(6).hours.do(run_pipeline)
 while True:
     schedule.run_pending()
     time.sleep(30)
+

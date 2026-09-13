@@ -2,16 +2,15 @@
 -- Soporte de modelado 3D por producto
 -- =========================================================
 
--- URL a un modelo 3D real (.glb/.gltf), opcional. Si está vacío, el frontend
--- genera una vista 3D texturizada a partir de la foto del producto.
+-- Agregar columnas necesarias a la tabla products
 ALTER TABLE products ADD COLUMN IF NOT EXISTS model_url TEXT;
-
--- Forma de referencia para elegir la geometría del visor 3D cuando no hay
--- modelo real: 'garment' (remera/campera), 'footwear' (calzado), 'accessory'
 ALTER TABLE products ADD COLUMN IF NOT EXISTS model_shape VARCHAR(20) DEFAULT 'garment';
 
--- Actualiza la vista de comparación para incluir lo necesario para el visor 3D
-CREATE OR REPLACE VIEW product_price_comparison AS
+-- Borrar la vista antigua para evitar conflictos de nombres de columnas
+DROP VIEW IF EXISTS product_price_comparison;
+
+-- Crear la vista actualizada con soporte 3D
+CREATE VIEW product_price_comparison AS
 SELECT
     p.id,
     p.title,
@@ -24,5 +23,4 @@ SELECT
     p.model_shape
 FROM products p
 JOIN platforms pl ON pl.id = p.platform_id
-WHERE p.is_active = TRUE
-ORDER BY p.title, p.current_price ASC;
+WHERE p.is_active = TRUE;

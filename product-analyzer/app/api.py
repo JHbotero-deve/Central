@@ -2,11 +2,10 @@
 API REST para consultar los productos analizados.
 
 Endpoints principales:
-  GET /products                 -> lista productos (filtrable por categoría/plataforma)
-  GET /products/{product_id}    -> detalle de un producto + su histórico de precios
-  GET /comparison                -> compara el mismo tipo de producto entre plataformas
-  GET /opportunities/top         -> top productos por opportunity_score (los más
-                                     interesantes para promocionar/vender)
+GET /products                 -> lista productos (filtrable por categoría/plataforma)
+GET /products/{product_id}    -> detalle de un producto + su histórico de precios
+GET /comparison                -> compara el mismo tipo de producto entre plataformas
+GET /opportunities/top         -> top productos por opportunity_score (los m                                     interesantes para promocionar/vender)
 """
 
 from typing import Optional
@@ -49,9 +48,9 @@ def list_products(
     with conn.cursor() as cur:
         query = """
             SELECT p.id, p.title, pl.name AS platform, c.name AS category,
-                   p.current_price, p.currency, p.rating, p.reviews_count,
-                   p.sales_estimate, p.image_url, p.product_url, p.updated_at,
-                   p.model_url, p.model_shape
+                    p.current_price, p.currency, p.rating, p.reviews_count,
+                    p.sales_estimate, p.image_url, p.product_url, p.updated_at,
+                    p.model_url, p.model_shape
             FROM products p
             JOIN platforms pl ON pl.id = p.platform_id
             LEFT JOIN categories c ON c.id = p.category_id
@@ -161,9 +160,9 @@ def top_opportunities(limit: int = Query(20, le=100)):
         cur.execute(
             """
             SELECT p.id, p.title, pl.name AS platform, p.current_price,
-                   p.rating, s.price_score, s.demand_score, s.trend_score,
-                   s.opportunity_score, p.product_url, p.image_url,
-                   p.model_url, p.model_shape
+                    p.rating, s.price_score, s.demand_score, s.trend_score,
+                    s.opportunity_score, p.product_url, p.image_url,
+                    p.model_url, p.model_shape
             FROM product_scores s
             JOIN products p ON p.id = s.product_id
             JOIN platforms pl ON pl.id = p.platform_id

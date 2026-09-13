@@ -10,14 +10,13 @@ def get_connection():
         return psycopg2.connect(db_url, cursor_factory=RealDictCursor)
 
     return psycopg2.connect(
-        host=os.getenv("DB_HOST", "db"),
+        host=os.getenv("DB_HOST", "productos_db"),
         port=os.getenv("DB_PORT", "5432"),
         dbname=os.getenv("DB_NAME", "productos_db"),
         user=os.getenv("DB_USER", "productos_user"),
         password=os.getenv("DB_PASSWORD", "productos_pass"),
         cursor_factory=RealDictCursor,
     )
-
 
 def upsert_product(conn, platform_name: str, category_name: str, product: dict):
     """
