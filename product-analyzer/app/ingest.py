@@ -1,87 +1,28 @@
-headers = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-}
-response = requests.get(url, headers=headers)
-import os
-import requests
+﻿import os, requests, amazon_paapi, tiktok_shop
 
-import amazon_paapi
-import tiktok_shop
+MELI_URL = 'https://api.mercadolibre.com/sites/MCO/search'
 
-MELI_SEARCH_URL = "https://api.mercadolibre.com/sites/MLA/search"
+def get_meli_token():
+    r = requests.post('https://api.mercadolibre.com/oauth/token', data={'grant_type':'client_credentials','client_id':os.getenv('MELI_CLIENT_ID'),'client_secret':os.getenv('MELI_CLIENT_SECRET')})
+    if r.ok: return r.json().get('access_token')
+    print(f'[meli] token error: {r.text}')
+    return None
 
-
-def fetch_mercadolibre(query: str, limit: int = 20):
-    """Trae productos reales desde la API pública de Mercado Libre."""
-    params = {"q": query, "limit": limit}
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    }
-    resp = requests.get(MELI_SEARCH_URL, params=params, headers=headers, timeout=10)
+def fetch_mercadolibre(query, limit=20):
+    token = get_meli_token()
+    headers = {'Authorization': f'Bearer {token}'} if token else {'User-Agent': 'Mozilla/5.0'}
+    resp = requests.get(MELI_URL, params={'q':query,'limit':limit}, headers=headers, timeout=10)
     resp.raise_for_status()
-    data = resp.json()
+    return [{'external_id':i['id'],'title':i['title'],'image_url':i.get('thumbnail','').replace('-I.','-O.'),'product_url':i.get('permalink'),'price':i.get('price'),'currency':i.get('currency_id','COP'),'rating':None,'reviews_count':0,'sales_estimate':i.get('sold_quantity')} for i in resp.json().get('results',[])]
 
-    products = []
-    for item in data.get("results", []):
-        products.append({
-            "external_id": item["id"],
-            "title": item["title"],
-            "image_url": item.get("thumbnail"),
-            "product_url": item.get("permalink"),
-            "price": item.get("price"),
-            "currency": item.get("currency_id", "ARS"),
-            "rating": None,  # la búsqueda pública no siempre trae rating
-            "reviews_count": 0,
-            "sales_estimate": item.get("sold_quantity"),
-        })
-    return products
+def fetch_amazon(query):
+    if os.getenv('AMAZON_API_KEY') and os.getenv('AMAZON_PARTNER_TAG'):
+        try: return amazon_paapi.search_items(query)
+        except Exception as e: print(f'[amazon] {e}')
+    return [{'external_id':'B0EX1','title':f'[EJEMPLO] {query} Amazon','image_url':None,'product_url':f'https://www.amazon.com/s?k={query.replace(chr(32),chr(43))}&tag=jh0c35-20','price':150000.0,'currency':'COP','rating':4.3,'reviews_count':152,'sales_estimate':None}]
 
-
-def fetch_amazon(query: str):
-    """
-    Usa la API real de Amazon Creators API si están las credenciales completas
-    (AMAZON_CLIENT_ID, AMAZON_CLIENT_SECRET, AMAZON_PARTNER_TAG). Si faltan,
-    devuelve datos de ejemplo para poder probar el resto del pipeline.
-    """
-    if os.getenv("AMAZON_CLIENT_ID") and os.getenv("AMAZON_PARTNER_TAG"):
-        try:
-            return amazon_paapi.search_items(query)
-        except Exception as e:
-            print(f"[amazon] error con la API real, usando datos de ejemplo: {e}")
-
-    return [{
-        "external_id": "B0EXAMPLE1",
-        "title": f"[EJEMPLO] {query} - producto Amazon",
-        "image_url": None,
-        "product_url": "https://amazon.com/dp/B0EXAMPLE1",
-        "price": 24999.0,
-        "currency": "ARS",
-        "rating": 4.3,
-        "reviews_count": 152,
-        "sales_estimate": None,
-    }]
-
-
-def fetch_tiktok(query: str):
-    """
-    Usa la API real de TikTok Shop si están las credenciales completas
-    (TIKTOK_API_KEY, TIKTOK_API_SECRET, TIKTOK_ACCESS_TOKEN, TIKTOK_SHOP_CIPHER).
-    Si faltan, devuelve datos de ejemplo.
-    """
-    if os.getenv("TIKTOK_API_KEY") and os.getenv("TIKTOK_ACCESS_TOKEN") and os.getenv("TIKTOK_SHOP_CIPHER"):
-        try:
-            return tiktok_shop.search_products(query)
-        except Exception as e:
-            print(f"[tiktok] error con la API real, usando datos de ejemplo: {e}")
-
-    return [{
-        "external_id": "TT-EXAMPLE1",
-        "title": f"[EJEMPLO] {query} - producto TikTok Shop",
-        "image_url": None,
-        "product_url": "https://shop.tiktok.com/example",
-        "price": 21999.0,
-        "currency": "ARS",
-        "rating": 4.6,
-        "reviews_count": 89,
-        "sales_estimate": 340,
-    }]
+def fetch_tiktok(query):
+    if os.getenv('TIKTOK_API_KEY') and os.getenv('TIKTOK_ACCESS_TOKEN'):
+        try: return tiktok_shop.search_products(query)
+        except Exception as e: print(f'[tiktok] {e}')
+    return [{'external_id':'TT-EX1','title':f'[EJEMPLO] {query} TikTok','image_url':None,'product_url':'https://www.tiktok.com/shop','price':120000.0,'currency':'COP','rating':4.6,'reviews_count':89,'sales_estimate':340}]

@@ -756,7 +756,7 @@
     stopThree();
 
     const product = (window.__featured || []).find(p => p.id === productId) ||
-                     (window.__products || []).find(p => p.id === productId);
+                    (window.__products || []).find(p => p.id === productId);
     if (!product) return;
 
     const panel = document.getElementById("featured-viewer-panel");
