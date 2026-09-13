@@ -1,4 +1,4 @@
-﻿import time
+import time
 import schedule
 
 from db import get_connection, upsert_product
@@ -26,14 +26,20 @@ def run_pipeline():
             ("tiktok", fetch_tiktok),
         ]:
             try:
+                print(f"🔍 Buscando '{term}' en {platform_name}...")
                 products = fetch_fn(term)
+                if not products:
+                    print(f"⚠️ No se encontraron productos o API bloqueada en {platform_name} para '{term}'")
             except Exception as e:
-                print(f"[{platform_name}] error trayendo '{term}': {e}")
+                print(f"❌ [{platform_name}] Error crítico trayendo '{term}': {e}")
                 continue
 
             for product in products:
-                pid = upsert_product(conn, platform_name, CATEGORY, product)
-                product_ids.append(pid)
+                try:
+                    pid = upsert_product(conn, platform_name, CATEGORY, product)
+                    product_ids.append(pid)
+                except Exception as e:
+                    print(f"❌ Error insertando producto de {platform_name}: {e}")
 
     # Calcular precio promedio de la categoría para el scoring
     with conn.cursor() as cur:
@@ -80,4 +86,3 @@ schedule.every(6).hours.do(run_pipeline)
 while True:
     schedule.run_pending()
     time.sleep(30)
-
