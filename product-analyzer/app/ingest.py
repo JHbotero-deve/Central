@@ -1,13 +1,7 @@
-"""
-Ingesta de productos de moda desde las distintas plataformas.
-
-- Mercado Libre: usa su API pública de búsqueda (no requiere token para búsquedas simples).
-- Amazon: requiere credenciales de Product Advertising API (PAAPI5). Se deja el stub
-  listo; sin credenciales, devuelve datos de ejemplo para poder probar el pipeline.
-- TikTok Shop: requiere ser partner aprobado de TikTok Shop API. Igual que Amazon,
-  se deja el stub y datos de ejemplo.
-"""
-
+headers = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+}
+response = requests.get(url, headers=headers)
 import os
 import requests
 
