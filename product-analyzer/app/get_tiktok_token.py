@@ -1,4 +1,4 @@
-"""
+﻿"""
 Resuelve el paso de autorización OAuth de TikTok Shop para obtener el
 ACCESS_TOKEN y el SHOP_ID que van en el .env.
 
@@ -106,3 +106,4 @@ if __name__ == "__main__":
         if not args.code:
             raise SystemExit("Falta --code. Usá el valor que viene en la URL de redirección.")
         exchange_code_for_token(args.code)
+

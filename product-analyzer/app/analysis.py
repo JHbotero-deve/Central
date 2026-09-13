@@ -1,4 +1,4 @@
-"""
+﻿"""
 Motor de scoring "inteligente" para productos.
 
 Combina:
@@ -91,3 +91,4 @@ def score_product(conn, product_id: int, category_avg_price: float):
         )
     conn.commit()
     return opportunity_score
+

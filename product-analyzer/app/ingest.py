@@ -41,3 +41,4 @@ def fetch_tiktok(query):
         except Exception as e: print(f'[tiktok] {e}')
     return [{'external_id':'TT-EX1','title':f'[EJEMPLO] {query} TikTok','image_url':None,'product_url':'https://www.tiktok.com/shop','price':120000.0,'currency':'COP','rating':4.6,'reviews_count':89,'sales_estimate':340}]
 
+

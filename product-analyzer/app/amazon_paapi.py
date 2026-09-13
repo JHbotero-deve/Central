@@ -1,4 +1,4 @@
-import os
+﻿import os
 import requests
 from bs4 import BeautifulSoup
 
@@ -51,3 +51,4 @@ def search_items(keyword):
     except Exception as e:
         print(f"[Amazon Scraping Error] {e}")
         return []
+

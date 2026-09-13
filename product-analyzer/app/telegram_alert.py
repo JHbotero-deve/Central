@@ -1,4 +1,4 @@
-import os, requests
+﻿import os, requests
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN","8971234981:AAGkGxbIUT6mxF6HPnATp0SZr4No0XwuJn8")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID","6008260829")
@@ -24,3 +24,4 @@ def alert_high_score(product):
     score = round(product.get("opportunity_score",0))
     if score < SCORE_THRESHOLD: return
     send_message(f"🚨 <b>ALERTA — Score alto</b>\n\n📦 {product.get('title','')[:50]}\n🏆 {score} pts\n💰 ${product.get('current_price',0):,.0f}\n🛒 {product.get('platform','')}")
+

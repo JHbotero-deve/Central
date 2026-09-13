@@ -1,4 +1,4 @@
-import os
+﻿import os
 import requests
 from bs4 import BeautifulSoup
 
@@ -49,3 +49,4 @@ def search_products(keyword):
     except Exception as e:
         print(f"[TikTok Scraping Error] {e}")
         return []
+

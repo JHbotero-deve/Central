@@ -1,4 +1,4 @@
-import os
+﻿import os
 from dotenv import load_dotenv
 import requests
 from db import get_connection
@@ -65,3 +65,4 @@ if __name__ == '__main__':
     else:
         print("⚠️ RESULTADO: Hay fallas críticas. Por favor, revisa el archivo .env")
     print("-------------------------------------------")
+

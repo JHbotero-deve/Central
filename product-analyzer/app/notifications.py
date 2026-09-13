@@ -1,4 +1,4 @@
-import os
+﻿import os
 import requests
 
 def send_telegram_alert(product_info):
@@ -40,3 +40,4 @@ def send_telegram_alert(product_info):
     except Exception as e:
         print(f'[telegram] Error de conexión: {e}')
         return False
+

@@ -1,4 +1,4 @@
-"""
+﻿"""
 Endpoints de monetización: los tres canales conviven en la misma app.
 
   - Afiliados:     POST /monetize/click/{product_id}   -> registra el click y redirige
@@ -160,3 +160,4 @@ def revenue_summary():
         results = cur.fetchall()
     conn.close()
     return results
+

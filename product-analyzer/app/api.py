@@ -1,4 +1,4 @@
-"""
+﻿"""
 API REST para consultar los productos analizados.
 
 Endpoints principales:
@@ -174,3 +174,4 @@ def top_opportunities(limit: int = Query(20, le=100)):
         results = cur.fetchall()
     conn.close()
     return results
+

@@ -1,3 +1,4 @@
+﻿import time
 import schedule
 
 from db import get_connection, upsert_product
@@ -85,3 +86,5 @@ schedule.every(6).hours.do(run_pipeline)
 while True:
     schedule.run_pending()
     time.sleep (30)
+
+
