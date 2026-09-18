@@ -781,7 +781,7 @@
             ${platformTag(it.platform)}
             <span class="mono">★ ${it.rating ?? '—'}</span>
           </div>
-          <div class="loot-price">${formatPrice(it.current_price)}</div>
+          <div class="loot-price">${formatPrice(it.current_price, it.currency)}</div>
           <div class="loot-actions">
             <button class="btn btn-ghost btn-sm btn-block" onclick="openFeaturedViewer(${it.id})"><svg class="icon"><use href="#ic-cube"/></svg>Ver en 3D</button>
             <a class="btn btn-primary btn-sm btn-block" href="${it.product_url ? `${CONFIG.API_BASE}/monetize/click/${it.id}` : '#'}" target="_blank" rel="noopener" onclick="awardXP(20,'Primer salto','Seguiste un producto hasta la plataforma original.')">Ir al producto</a>
@@ -833,7 +833,7 @@
     document.getElementById("top-title").textContent = best.title;
     document.getElementById("top-score").textContent = `${Math.round(best.opportunity_score)} pts`;
     document.getElementById("top-meta").innerHTML =
-      `${platformTag(best.platform)} · ${formatPrice(best.current_price)} · rating ${best.rating ?? "—"}`;
+      `${platformTag(best.platform)} · ${formatPrice(best.current_price, best.currency)} · rating ${best.rating ?? "—"}`;
 
     const maxScore = Math.max(...items.map(i => i.opportunity_score));
     const list = document.getElementById("rank-list");
@@ -856,7 +856,7 @@
     list.innerHTML = rows.map(r => `
       <div class="rank-row" style="grid-template-columns: 1fr auto auto;">
         <div>${labels[r.channel] || r.channel}</div>
-        <div class="price">${formatPrice(r.total_revenue)}</div>
+        <div class="price">${formatPrice(r.total_revenue, r.currency || "COP")}</div>
         <div class="bar-track"><div class="bar-fill" style="width:${(r.total_revenue / maxRevenue) * 100}%"></div></div>
       </div>
     `).join("");
@@ -865,11 +865,15 @@
   function renderComparison(rows) {
     const body = document.getElementById("comparison-body");
     window.__products = rows;
+    if (!rows.length) {
+      body.innerHTML = '<tr><td colspan="5">No hay productos reales disponibles en este momento.</td></tr>';
+      return;
+    }
     body.innerHTML = rows.map(r => `
       <tr id="row-${r.id}">
         <td>${r.title}</td>
         <td>${platformTag(r.platform)}</td>
-        <td class="price">${formatPrice(r.current_price)}</td>
+        <td class="price">${formatPrice(r.current_price, r.currency)}</td>
         <td>${r.rating ?? "—"}</td>
         <td><button class="view3d-btn" id="btn-${r.id}" onclick="toggle3DViewer(${r.id})">Ver en 3D</button></td>
       </tr>
