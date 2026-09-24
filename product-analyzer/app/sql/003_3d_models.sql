@@ -6,6 +6,8 @@
 ALTER TABLE products ADD COLUMN IF NOT EXISTS model_url TEXT;
 ALTER TABLE products ADD COLUMN IF NOT EXISTS model_shape VARCHAR(20) DEFAULT 'garment';
 
+ALTER TABLE products ADD COLUMN IF NOT EXISTS affiliate_url TEXT;
+
 -- Borrar la vista antigua para evitar conflictos de nombres de columnas
 DROP VIEW IF EXISTS product_price_comparison;
 
@@ -19,6 +21,7 @@ SELECT
     p.currency,
     p.rating,
     p.product_url,
+    p.affiliate_url,
     p.image_url,
     p.model_url,
     p.model_shape
