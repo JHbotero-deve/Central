@@ -32,6 +32,7 @@ def fetch_mercadolibre(query: str, limit: int = 20) -> list[dict]:
                 "title": item.get("title"),
                 "image_url": (item.get("thumbnail") or "").replace("-I.", "-O."),
                 "product_url": item.get("permalink"),
+                "affiliate_url": item.get("permalink"),
                 "price": item.get("price"),
                 "currency": item.get("currency_id") or "COP",
                 "rating": None,
