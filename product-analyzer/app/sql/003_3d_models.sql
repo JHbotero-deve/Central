@@ -25,6 +25,3 @@ SELECT
 FROM products p
 JOIN platforms pl ON pl.id = p.platform_id
 WHERE p.is_active = TRUE;
-
--- Mantener separadas la URL original y la URL monetizada.
-ALTER TABLE products ADD COLUMN IF NOT EXISTS affiliate_url TEXT;
