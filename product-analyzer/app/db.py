@@ -1,5 +1,6 @@
 ﻿import os
 import psycopg2
+from urllib.parse import urlparse
 from psycopg2.extras import RealDictCursor
 
 
@@ -18,7 +19,20 @@ def get_connection():
         cursor_factory=RealDictCursor,
     )
 
+def _validate_product(platform_name: str, product: dict) -> None:
+    external_id = str(product.get("external_id") or "").strip()
+    title = str(product.get("title") or "").strip()
+    product_url = str(product.get("product_url") or "").strip()
+    price = product.get("price")
+    if not external_id or not title:
+        raise ValueError(f"{platform_name}: producto sin external_id o title")
+    if price is None or float(price) <= 0:
+        raise ValueError(f"{platform_name}: producto sin precio válido")
+    if not product_url.startswith(("https://", "http://")) or not urlparse(product_url).netloc:
+        raise ValueError(f"{platform_name}: producto sin URL canónica válida")
+
 def upsert_product(conn, platform_name: str, category_name: str, product: dict):
+    _validate_product(platform_name, product)
     """
     Inserta o actualiza un producto y guarda un punto en el histórico de precios.
     product debe tener: external_id, title, image_url, product_url,
@@ -36,14 +50,15 @@ def upsert_product(conn, platform_name: str, category_name: str, product: dict):
             """
             INSERT INTO products (
                 platform_id, category_id, external_id, title, image_url,
-                product_url, current_price, currency, rating, reviews_count,
+                product_url, affiliate_url, current_price, currency, rating, reviews_count,
                 sales_estimate, updated_at
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
             ON CONFLICT (platform_id, external_id)
             DO UPDATE SET
                 title = EXCLUDED.title,
                 image_url = COALESCE(EXCLUDED.image_url, products.image_url),
-                product_url = COALESCE(EXCLUDED.product_url, products.product_url),
+                product_url = EXCLUDED.product_url,
+                affiliate_url = COALESCE(EXCLUDED.affiliate_url, products.affiliate_url),
                 current_price = EXCLUDED.current_price,
                 currency = EXCLUDED.currency,
                 rating = EXCLUDED.rating,
@@ -55,7 +70,7 @@ def upsert_product(conn, platform_name: str, category_name: str, product: dict):
             """,
             (
                 platform_id, category_id, product["external_id"], product["title"],
-                product.get("image_url"), product.get("product_url"),
+                product.get("image_url"), product.get("product_url"), product.get("affiliate_url"),
                 product["price"], product.get("currency", "ARS"),
                 product.get("rating"), product.get("reviews_count", 0),
                 product.get("sales_estimate"),
