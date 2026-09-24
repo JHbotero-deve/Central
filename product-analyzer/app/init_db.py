@@ -6,7 +6,6 @@ def init_database():
     """Ejecuta los scripts SQL de inicialización."""
     conn = None
     try:
-        # Soporte para DATABASE_URL (Producción) o parámetros individuales (Local)
         db_url = os.getenv("DATABASE_URL")
         if db_url:
             conn = psycopg2.connect(db_url)
@@ -19,7 +18,6 @@ def init_database():
                 password=os.getenv("DB_PASSWORD", "productos_pass"),
             )
 
-        # Desactivamos el autocommit para manejar la transacción de forma manual
         conn.autocommit = False
         cursor = conn.cursor()
 
@@ -37,15 +35,14 @@ def init_database():
                 cursor.execute(sql_script)
                 print(f"✓ Ejecutado: {sql_file}")
 
-        # Si todo sale bien, guardamos los cambios de manera global
         conn.commit()
         print("✓ Base de datos inicializada correctamente")
 
     except Exception as e:
-        # Si algo falla, revertimos cualquier cambio parcial para mantener la consistencia
         if conn:
             conn.rollback()
         print(f"✗ Error al inicializar BD: {e}")
+        raise
 
     finally:
         if 'cursor' in locals() and cursor:
