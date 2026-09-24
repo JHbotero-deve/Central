@@ -83,11 +83,13 @@ CREATE TABLE IF NOT EXISTS product_scores (
 -- Vista de conveniencia: mismo producto (por título similar) comparado entre plataformas
 CREATE OR REPLACE VIEW product_price_comparison AS
 SELECT
+    p.id,
     p.title,
     pl.name AS platform,
     p.current_price,
     p.rating,
-    p.product_url
+    p.product_url,
+    p.affiliate_url
 FROM products p
 JOIN platforms pl ON pl.id = p.platform_id
 WHERE p.is_active = TRUE
