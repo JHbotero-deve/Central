@@ -82,14 +82,10 @@ def search_products(keyword: str, limit: int = 20) -> list[dict]:
         )
 
     raw_products = data.get("data", {}).get("products", [])
-    keyword_norm = keyword.casefold().strip()
     products = []
 
     for item in raw_products:
         title = str(item.get("title") or item.get("name") or "").strip()
-        if keyword_norm and keyword_norm not in title.casefold():
-            continue
-
         skus = item.get("skus") or []
         sku = skus[0] if skus else {}
         price_data = sku.get("price") or sku.get("sale_price") or {}
@@ -107,7 +103,8 @@ def search_products(keyword: str, limit: int = 20) -> list[dict]:
             image = first.get("url") if isinstance(first, dict) else first
 
         product_id = item.get("id") or item.get("product_id")
-        if not product_id or not title or price is None:
+        product_url = item.get("product_url") or item.get("detail_url")
+        if not product_id or not title or price is None or not product_url:
             continue
 
         products.append(
@@ -116,7 +113,8 @@ def search_products(keyword: str, limit: int = 20) -> list[dict]:
                 "title": title,
                 "price": float(price),
                 "image_url": image,
-                "product_url": item.get("product_url") or item.get("detail_url"),
+                "product_url": product_url,
+                "affiliate_url": item.get("affiliate_url") or product_url,
                 "currency": currency,
                 "rating": None,
                 "reviews_count": 0,
