@@ -881,7 +881,8 @@
         <td>${platformTag(r.platform)}</td>
         <td class="price">${formatPrice(r.current_price, r.currency)}</td>
         <td>${r.rating ?? "—"}</td>
-        <td><button class="view3d-btn" id="btn-${r.id}" onclick="toggle3DViewer(${r.id})">Ver en 3D</button></td>
+        <td><button class="view3d-btn" id="btn-${r.id}" onclick="toggle3DViewer(${r.id})">Ver en 3D</button>
+          ${r.product_url ? `<a class="view3d-btn" href="${r.product_url}" target="_blank" rel="noopener noreferrer">Producto real</a>` : ""}</td>
       </tr>
     `).join("");
   }
