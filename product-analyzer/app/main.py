@@ -1,5 +1,4 @@
 import time
-import time
 import os
 import threading
 import schedule
@@ -124,8 +123,8 @@ def run_pipeline():
 
 
 if __name__ == "__main__":
-    threading.Thread(target=start_api_server, daemon=True).start()
     init_database()
+    threading.Thread(target=start_api_server, daemon=True).start()
     run_pipeline()
 
     schedule.every(6).hours.do(run_pipeline)
