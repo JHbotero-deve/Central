@@ -28,7 +28,7 @@ app.include_router(monetization_router)
 # Habilitado abierto para poder conectar un frontend fácilmente; restringir en producción
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[origin.strip() for origin in os.getenv("ALLOWED_ORIGINS", "*").split(",") if origin.strip()],
+    allow_origins=[origin.strip() for origin in os.getenv("ALLOWED_ORIGINS", "http://localhost:3000").split(",") if origin.strip()],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -85,7 +85,7 @@ def list_products(
         query = """
             SELECT p.id, p.title, pl.name AS platform, c.name AS category,
                     p.current_price, p.currency, p.rating, p.reviews_count,
-                    p.sales_estimate, p.image_url, p.product_url, p.updated_at,
+                    p.sales_estimate, p.image_url, p.product_url, p.affiliate_url, p.updated_at,
                     p.model_url, p.model_shape
             FROM products p
             JOIN platforms pl ON pl.id = p.platform_id
@@ -197,7 +197,7 @@ def top_opportunities(limit: int = Query(20, le=100)):
             """
             SELECT p.id, p.title, pl.name AS platform, p.current_price, p.currency,
                     p.rating, s.price_score, s.demand_score, s.trend_score,
-                    s.opportunity_score, p.product_url, p.image_url,
+                    s.opportunity_score, p.product_url, p.affiliate_url, p.image_url,
                     p.model_url, p.model_shape
             FROM product_scores s
             JOIN products p ON p.id = s.product_id
