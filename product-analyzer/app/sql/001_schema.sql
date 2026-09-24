@@ -45,6 +45,7 @@ CREATE TABLE IF NOT EXISTS products (
     title           TEXT NOT NULL,
     image_url       TEXT,
     product_url     TEXT,
+    affiliate_url   TEXT,
     current_price   NUMERIC(12,2),
     currency        VARCHAR(10) DEFAULT 'ARS',
     rating          NUMERIC(3,2),
