@@ -28,7 +28,7 @@ def register_click(product_id: int, user_id: int | None = None):
     """
     conn = get_connection()
     with conn.cursor() as cur:
-        cur.execute("SELECT product_url FROM products WHERE id = %s", (product_id,))
+        cur.execute("SELECT product_url, affiliate_url FROM products WHERE id = %s", (product_id,))
         row = cur.fetchone()
         if not row or not row["product_url"]:
             conn.close()
@@ -40,7 +40,7 @@ def register_click(product_id: int, user_id: int | None = None):
         )
     conn.commit()
     conn.close()
-    return RedirectResponse(row["product_url"])
+    return RedirectResponse(row["affiliate_url"] or row["product_url"])
 
 
 @router.post("/click/{click_id}/confirm")
