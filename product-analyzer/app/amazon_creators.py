@@ -126,13 +126,20 @@ def search_items(keyword: str, item_count: int = 10) -> list[dict]:
         if amount is None:
             continue
 
+        asin = str(item.get("asin") or "").strip()
+        if not asin:
+            continue
+        detail_url = item.get("detailPageURL") or f"https://{marketplace}/dp/{asin}"
+        affiliate_url = detail_url + ("&" if "?" in detail_url else "?") + f"tag={partner_tag}"
+
         products.append(
             {
-                "external_id": item.get("asin"),
+                "external_id": asin,
                 "title": title.strip(),
                 "price": float(amount),
                 "image_url": image.get("url"),
-                "product_url": item.get("detailPageURL"),
+                "product_url": detail_url,
+                "affiliate_url": affiliate_url,
                 "currency": item_currency,
                 "rating": None,
                 "reviews_count": 0,
