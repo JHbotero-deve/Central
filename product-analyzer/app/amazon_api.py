@@ -326,7 +326,7 @@ def _search_amazon_web(keywords: str, limit: int = 10) -> list[dict[str, Any]]:
                 "detailPageURL": url,
                 "itemInfo": {"title": {"displayValue": title[:500]}},
                 "offersV2": {"listings": [{"price": {"amount": amount, "currency": "USD"}}]},
-                "images": {"primary": {"large": {"url": f"https://images-na.ssl-images-amazon.com/images/P/{asin}.01.LZZZZZZZ.jpg"}}},
+                "images": _fallback_images(url),
             })
             if len(products) >= min(max(limit, 1), 20):
                 break
@@ -335,6 +335,15 @@ def _search_amazon_web(keywords: str, limit: int = 10) -> list[dict[str, Any]]:
     except (requests.RequestException, ValueError) as exc:
         print(f"[amazon] fallback Bing error: {exc}")
         return []
+
+
+def _fallback_images(url: str) -> dict[str, Any]:
+    """Imagen real tomada de la pagina del producto; sin imagen si no se obtiene (nunca una URL inventada)."""
+    try:
+        img = _amazon_image_from_html(str(url))
+    except Exception:
+        img = None
+    return {"primary": {"large": {"url": img}}} if img else {}
 
 
 def search_products(keywords: str, limit: int = 10) -> list[dict[str, Any]]:

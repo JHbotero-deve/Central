@@ -52,9 +52,9 @@ def seed_catalog():
     seeded = {"amazon":0,"mercadolibre":0,"personal":0}
     try:
         for category, asin, title in AMAZON_PRODUCTS:
-            image=f"https://m.media-amazon.com/images/P/{asin}.01._SL1000_.jpg"
+            image=None  # sin URL inventada a partir del ASIN
             product={"external_id":asin,"title":title,"image_url":image,
-                     "gallery_urls":[image],"product_url":f"https://www.amazon.com/dp/{asin}",
+                     "gallery_urls":[],"product_url":f"https://www.amazon.com/dp/{asin}",
                      "price":None,"currency":"USD","rating":None,"reviews_count":0,
                      "source_metadata":{"import_method":"verified_catalog_seed","metadata_source":"public_amazon_listing"}}
             pid=upsert_product(conn,"amazon",category,product)

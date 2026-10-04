@@ -100,7 +100,7 @@ def _amazon_web_metadata(asin: str) -> dict:
         )
         response.raise_for_status()
         content = response.text
-        result = {"resolved_url": f"https://www.amazon.com/dp/{asin}", "image_url": f"https://images-na.ssl-images-amazon.com/images/P/{asin}.01.LZZZZZZZ.jpg"}
+        result = {"resolved_url": f"https://www.amazon.com/dp/{asin}", "image_url": None}
         title_match = re.search(r"<h2[^>]*>(.*?)</h2>|<h3[^>]*>(.*?)</h3>", content, re.I | re.S)
         if title_match:
             title = next((x for x in title_match.groups() if x), "")
@@ -115,7 +115,7 @@ def _amazon_web_metadata(asin: str) -> dict:
                 result["currency"] = "USD"
             except ValueError:
                 pass
-        result["gallery_urls"] = [result["image_url"]]
+        result["gallery_urls"] = []
         return result
     except (requests.RequestException, ValueError):
         return []
