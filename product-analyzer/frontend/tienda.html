@@ -103,7 +103,7 @@ let products=JSON.parse(localStorage.getItem("central_products_cache")||"[]");
 let cart=JSON.parse(localStorage.getItem("central_cart")||"[]");
 let filtered=[], active=null;
 
-function imageSrc(p){return p.image_url||((p.image_gallery||[]).find(Boolean)||"")}
+function imageSrc(p){return p.image_url||((p.image_gallery||[]).find(Boolean)||"")}function imageFallback(p){const src=imageSrc(p);if(!src)return "";if(src.includes("images-na.ssl-images-amazon.com/images/P/"))return src.replace("images-na.ssl-images-amazon.com/images/P/","m.media-amazon.com/images/P/");return src}
 function saveCart(){localStorage.setItem("central_cart",JSON.stringify(cart));renderCart()}
 function isOwn(p){return String(p.checkout_mode||"").toUpperCase()==="CENTRAL"||String(p.platform||"").toLowerCase()==="personal"}
 function externalUrl(p){return p.product_url||p.affiliate_url||""}
@@ -120,14 +120,14 @@ function applyFilter(){
   renderFeature();
   renderGrid();
 }
-function imageMarkup(p,cls="card-media"){const src=imageSrc(p);return src?'<img src="'+esc(src)+'" alt="'+esc(p.title)+'" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove();this.parentElement.querySelector(".no-image").hidden=false">':'<div class="no-image">Imagen no disponible</div>'}
+function imageMarkup(p,cls="card-media"){const src=imageSrc(p);return src?'<img src="'+esc(src)+'" alt="'+esc(p.title)+'" loading="lazy" onerror="if(this.dataset.fallback){this.remove();this.parentElement.querySelector(".no-image").hidden=false}else{this.dataset.fallback="1";this.src=imageFallback(p)}">':'<div class="no-image">Imagen no disponible</div>'}
 function renderFeature(){
   const p=filtered[0]||products[0];
   active=p||null;
   const media=$("featureMedia");
   if(!p){media.innerHTML='<span class="feature-empty">No hay productos publicados</span>';$("featureTitle").textContent="Catálogo Central";$("featureDescription").textContent="Publica un producto desde Administración para verlo aquí.";return}
   const src=imageSrc(p);
-  media.innerHTML=src?'<img class="feature-image" src="'+esc(src)+'" alt="'+esc(p.title)+'" referrerpolicy="no-referrer" onerror="this.remove();this.parentElement.innerHTML=\'<span class="feature-empty">Imagen no disponible</span>\'">':'<span class="feature-empty">Imagen no disponible</span>';
+  media.innerHTML=src?'<img class="feature-image" src="'+esc(src)+'" alt="'+esc(p.title)+'" onerror="if(this.dataset.fallback){this.remove();this.parentElement.innerHTML=\'<span class="feature-empty">Imagen no disponible</span>\'}else{this.dataset.fallback="1";this.src=imageFallback(p)}">':'<span class="feature-empty">Imagen no disponible</span>';
   $("featureSource").textContent="CENTRAL · "+String(p.platform||"producto").toUpperCase();
   $("featureTitle").textContent=p.title||"Producto";
   $("featureDescription").textContent=p.subtitle||p.description||"Producto publicado en Central.";
