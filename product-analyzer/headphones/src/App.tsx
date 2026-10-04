@@ -52,19 +52,18 @@ interface Product {
 interface Category {
   id: string;
   label: string;
-  emoji: string;
   accentGradient: string;
   glowColor: string;
 }
 
 // ─── Static config ──────────────────────────────────────────────
 const CATEGORIES: Category[] = [
-  { id: "zapatos",      label: "Zapatos",      emoji: "👟", accentGradient: "from-orange-500 to-red-600",   glowColor: "rgba(249,115,22,0.18)"  },
-  { id: "camisetas",    label: "Camisetas",    emoji: "👕", accentGradient: "from-purple-500 to-pink-600",  glowColor: "rgba(168,85,247,0.18)"  },
-  { id: "electronicos", label: "Electrónicos", emoji: "⚡", accentGradient: "from-blue-500 to-cyan-500",    glowColor: "rgba(59,130,246,0.18)"  },
-  { id: "accesorios",   label: "Accesorios",   emoji: "💎", accentGradient: "from-amber-500 to-yellow-500", glowColor: "rgba(245,158,11,0.18)"  },
-  { id: "hogar",        label: "Hogar",        emoji: "🏠", accentGradient: "from-teal-500 to-green-600",   glowColor: "rgba(20,184,166,0.18)"  },
-  { id: "otros",        label: "Otros",        emoji: "📦", accentGradient: "from-slate-400 to-slate-600",  glowColor: "rgba(100,116,139,0.18)" },
+  { id: "zapatos",      label: "Zapatos", accentGradient: "from-orange-500 to-red-600",   glowColor: "rgba(249,115,22,0.18)"  },
+  { id: "camisetas",    label: "Camisetas", accentGradient: "from-purple-500 to-pink-600",  glowColor: "rgba(168,85,247,0.18)"  },
+  { id: "electronicos", label: "Electrónicos", accentGradient: "from-blue-500 to-cyan-500",    glowColor: "rgba(59,130,246,0.18)"  },
+  { id: "accesorios",   label: "Accesorios", accentGradient: "from-amber-500 to-yellow-500", glowColor: "rgba(245,158,11,0.18)"  },
+  { id: "hogar",        label: "Hogar", accentGradient: "from-teal-500 to-green-600",   glowColor: "rgba(20,184,166,0.18)"  },
+  { id: "otros",        label: "Otros", accentGradient: "from-slate-400 to-slate-600",  glowColor: "rgba(100,116,139,0.18)" },
 ];
 
 const BG_THEMES = [
@@ -112,6 +111,7 @@ export default function App() {
   const [activeCatId, setActiveCatId] = useState("otros");
   const [activeProdId, setActiveProdId] = useState("");
   const [activeVarIdx, setActiveVarIdx] = useState(0);
+  const [tilt, setTilt] = useState({ x: 0, y: 0 });
   const [bgTheme, setBgTheme] = useState(() => {
     try { return localStorage.getItem("sp-bg") || "black"; } catch { return "black"; }
   });
@@ -139,9 +139,11 @@ export default function App() {
   const activeProd = catProducts.find(p => p.id === activeProdId) ?? catProducts[0];
   const activeVar = activeProd?.variants[activeVarIdx] ?? activeProd?.variants[0];
   const bgColor = BG_THEMES.find(t => t.id === bgTheme)?.color ?? "#000000";
-  const discount = activeProd
+  const discount = activeProd?.originalPrice > activeProd.basePrice && activeProd.originalPrice > 0
     ? Math.round(((activeProd.originalPrice - activeProd.basePrice) / activeProd.originalPrice) * 100)
     : 0;
+  const formatCOP = (value: number) =>
+    new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(value);
 
   // Manejadores de la tienda
   const goCat = (catId: string) => {
@@ -199,18 +201,23 @@ export default function App() {
   const cancelForm = () => { setForm(newEmptyForm()); setEditingId(null); setPanelTab("productos"); };
 
   const submitForm = () => {
-    if (!form.name.trim() || !form.variants.some(v => v.name && v.image)) return;
+    const basePrice = Number(form.basePrice);
+    const originalPrice = Number(form.originalPrice);
+    const rating = Number(form.rating);
+    const reviews = Number(form.reviews);
+    const variants = form.variants.filter(v => v.name.trim() && v.image.trim());
+    if (!form.name.trim() || !basePrice || basePrice < 1 || !variants.length) return;
     const prod: Product = {
       id: editingId ?? mkId(),
       name: form.name.trim(), brand: form.brand.trim(), description: form.description.trim(),
-      features: form.features.filter(f => f.trim()),
-      basePrice: parseFloat(form.basePrice) || 0,
-      originalPrice: parseFloat(form.originalPrice) || 0,
-      rating: parseFloat(form.rating) || 4.5,
-      reviews: parseInt(form.reviews) || 0,
+      features: form.features.map(f => f.trim()).filter(Boolean),
+      basePrice,
+      originalPrice: originalPrice > 0 ? originalPrice : basePrice,
+      rating: Number.isFinite(rating) ? Math.min(5, Math.max(0, rating)) : 4.5,
+      reviews: Number.isFinite(reviews) ? Math.max(0, Math.floor(reviews)) : 0,
       badge: form.badge.trim() || undefined,
       categoryId: form.categoryId,
-      variants: form.variants.filter(v => v.name && v.image),
+      variants,
       amazon: form.amazon.trim() || undefined,
       ml: form.ml.trim() || undefined,
       wompi: form.wompi.trim() || undefined,
@@ -283,7 +290,7 @@ export default function App() {
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-white/5 border-4 border-dashed border-white/40 backdrop-blur-sm rounded-none"
             >
-              <span className="text-7xl mb-4">📌</span>
+              <span className="text-7xl mb-4"></span>
               <p className="text-white text-2xl font-black">Suelta para publicar aquí</p>
               <p className="text-white/60 mt-2 text-sm">El producto aparecerá en la tienda</p>
             </motion.div>
@@ -317,7 +324,7 @@ export default function App() {
                       : "text-white/50 hover:text-white hover:bg-white/10"
                   }`}
                 >
-                  {cat.emoji} <span className="hidden sm:inline ml-1">{cat.label}</span>
+                  <span className="hidden sm:inline ml-1">{cat.label}</span>
                 </motion.button>
               ))}
             </div>
@@ -339,15 +346,15 @@ export default function App() {
           {catProducts.length === 0 ? (
             /* Empty state */
             <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
-              <div className="text-6xl mb-4">📦</div>
+              <div className="text-6xl mb-4"></div>
               <h2 className="text-2xl font-bold text-white/60 mb-2">Sin productos publicados</h2>
               <p className="text-white/40 text-sm max-w-xs">
-                Arrastra un producto desde el panel de la derecha para publicarlo aquí
+                Selecciona un producto publicado desde el panel para visualizarlo aquí
               </p>
               <div className="mt-6 flex items-center gap-2 text-white/30 text-sm">
-                <span>Panel</span>
+                <span>Panel de productos</span>
                 <ChevronRight size={14} />
-                <span>Arrastra a esta zona</span>
+                <span>Publicar producto</span>
               </div>
             </div>
           ) : activeProd ? (
@@ -383,15 +390,22 @@ export default function App() {
                     initial={{ opacity: 0, scale: 0.8, y: 30 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
                     transition={{ duration: 0.8, ease: "easeOut" }}
-                    className="relative z-10"
+                    className="relative z-10 [perspective:1200px]"
+                    onPointerMove={e => {
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      const x = (e.clientX - rect.left) / rect.width - 0.5;
+                      const y = (e.clientY - rect.top) / rect.height - 0.5;
+                      setTilt({ x: y * -10, y: x * 12 });
+                    }}
+                    onPointerLeave={() => setTilt({ x: 0, y: 0 })}
                   >
                     <motion.img
                       animate={{ y: [0, -12, 0], rotateZ: [0, 1, -1, 0] }}
                       transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
                       src={activeVar?.image}
                       alt={`${activeProd.name} – ${activeVar?.name}`}
-                      className="w-64 h-64 sm:w-72 sm:h-72 lg:w-[380px] lg:h-[380px] object-cover rounded-3xl"
-                      style={{ boxShadow: `0 40px 90px ${activeVar?.glow ?? "#888"}50, 0 12px 40px rgba(0,0,0,0.7)` }}
+                      className="w-64 h-64 sm:w-72 sm:h-72 lg:w-[380px] lg:h-[380px] object-cover rounded-3xl transition-transform duration-150"
+                      style={{ transform: `rotateX(${tilt.x}deg) rotateY(${tilt.y}deg)`, transformStyle: "preserve-3d", boxShadow: `0 40px 90px ${activeVar?.glow ?? "#888"}50, 0 12px 40px rgba(0,0,0,0.7)` }}
                     />
                   </motion.div>
                   <motion.div
@@ -590,7 +604,7 @@ export default function App() {
                       : "text-white/40 hover:text-white/70"
                   }`}
                 >
-                  {tab === "productos" ? "📦 Productos" : tab === "agregar" ? "✏️ Agregar" : "🎨 Tema"}
+                  {tab === "productos" ? " Productos" : tab === "agregar" ? "✏️ Agregar" : " Tema"}
                 </button>
               ))}
             </div>
@@ -618,7 +632,7 @@ export default function App() {
                   {CATEGORIES.filter(c => products.some(p => p.categoryId === c.id)).map(cat => (
                     <div key={cat.id} className="mb-1">
                       <p className="text-white/30 text-xs uppercase tracking-wider px-1 mb-1.5">
-                        {cat.emoji} {cat.label}
+                        {cat.label}
                       </p>
                       {products.filter(p => p.categoryId === cat.id).map(prod => (
                         <div
@@ -700,7 +714,7 @@ export default function App() {
                         className="w-full bg-gray-900 border border-white/15 rounded-xl px-3 py-2 text-sm text-white focus:border-white/40 outline-none transition-all"
                       >
                         {CATEGORIES.map(c => (
-                          <option key={c.id} value={c.id}>{c.emoji} {c.label}</option>
+                          <option key={c.id} value={c.id}>{c.label}</option>
                         ))}
                       </select>
                     </div>
@@ -732,20 +746,20 @@ export default function App() {
                   {/* Precios */}
                   <div className="flex gap-2">
                     <div className="flex flex-col gap-2 flex-1">
-                      <label className="text-white/60 text-xs font-semibold">Precio ($) *</label>
+                      <label className="text-white/60 text-xs font-semibold">Precio (COP) *</label>
                       <input
                         type="number" value={form.basePrice}
                         onChange={e => setForm(f => ({ ...f, basePrice: e.target.value }))}
-                        placeholder="Precio de venta"
+                        placeholder="Precio de venta en COP"
                         className="w-full bg-white/5 border border-white/15 rounded-xl px-3 py-2 text-sm text-white placeholder-white/30 focus:border-white/40 outline-none transition-all"
                       />
                     </div>
                     <div className="flex flex-col gap-2 flex-1">
-                      <label className="text-white/60 text-xs font-semibold">Precio original ($)</label>
+                      <label className="text-white/60 text-xs font-semibold">Precio original (COP)</label>
                       <input
                         type="number" value={form.originalPrice}
                         onChange={e => setForm(f => ({ ...f, originalPrice: e.target.value }))}
-                        placeholder="Precio original"
+                        placeholder="Precio de referencia en COP"
                         className="w-full bg-white/5 border border-white/15 rounded-xl px-3 py-2 text-sm text-white placeholder-white/30 focus:border-white/40 outline-none transition-all"
                       />
                     </div>
@@ -894,7 +908,7 @@ export default function App() {
                   <div className="flex gap-2 pt-1 pb-4">
                     <button
                       onClick={submitForm}
-                      disabled={!form.name.trim()}
+                      disabled={!form.name.trim() || !Number(form.basePrice) || !form.variants.some(v => v.name.trim() && v.image.trim())}
                       className="flex-1 bg-white text-black font-black text-sm py-3 rounded-2xl hover:bg-white/90 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
                     >
                       {editingId ? "Guardar cambios" : "Publicar producto"}
