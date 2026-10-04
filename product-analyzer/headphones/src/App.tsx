@@ -482,9 +482,9 @@ export default function App() {
 
                   {/* Price */}
                   <div className="flex items-baseline gap-3 flex-wrap">
-                    <span className="text-4xl font-black text-white">${activeProd.basePrice.toFixed(2)}</span>
+                    <span className="text-4xl font-black text-white">{formatCOP(activeProd.basePrice)}</span>
                     {activeProd.originalPrice > activeProd.basePrice && (
-                      <span className="text-white/35 line-through text-lg">${activeProd.originalPrice.toFixed(2)}</span>
+                      <span className="text-white/35 line-through text-lg">{formatCOP(activeProd.originalPrice)}</span>
                     )}
                     {discount > 0 && (
                       <span className={`text-xs font-black px-2 py-1 rounded-lg bg-gradient-to-r ${activeCat.accentGradient} text-white`}>
@@ -553,7 +553,7 @@ export default function App() {
                           <p className="text-white/40 text-xs font-semibold uppercase">{p.brand}</p>
                           <p className="text-white font-bold text-sm truncate">{p.name}</p>
                           <div className="flex items-center justify-between mt-1">
-                            <span className="text-white font-black text-sm">${p.basePrice}</span>
+                            <span className="text-white font-black text-sm">{formatCOP(p.basePrice)}</span>
                             {p.badge && (
                               <span className={`text-xs px-1.5 py-0.5 rounded-full bg-gradient-to-r ${activeCat.accentGradient} text-white font-semibold`}>
                                 {p.badge}
@@ -649,7 +649,7 @@ export default function App() {
                           />
                           <div className="flex-1 min-w-0">
                             <p className="text-white text-xs font-bold truncate">{prod.name}</p>
-                            <p className="text-white/40 text-xs">${prod.basePrice}</p>
+                            <p className="text-white/40 text-xs">{formatCOP(prod.basePrice)}</p>
                           </div>
                           <div className="flex items-center gap-1 shrink-0">
                             <button
