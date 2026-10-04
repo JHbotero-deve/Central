@@ -1,14 +1,33 @@
 """Central published-card API."""
 from typing import Optional
 import os
+import secrets
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Header
 from pydantic import BaseModel, Field
 
 from db import get_connection
 from notifications import send_telegram_publication
 
 router = APIRouter(tags=["publications"])
+
+# Campos internos de negocio: NO deben salir en la tienda pública
+CAMPOS_PRIVADOS = ("cost_price", "profit_amount", "profit_margin_pct", "opportunity_score")
+
+
+def es_admin(x_admin_key: Optional[str]) -> bool:
+    """True si la cabecera X-Admin-Key coincide con la variable de entorno ADMIN_API_KEY."""
+    clave = os.getenv("ADMIN_API_KEY", "")
+    if not clave or not x_admin_key:
+        return False
+    # compare_digest evita ataques de tiempo; se usa bytes para aceptar cualquier carácter
+    return secrets.compare_digest(x_admin_key.encode(), clave.encode())
+
+
+def verificar_admin(x_admin_key: Optional[str]) -> None:
+    """Corta la petición con 401 si no es administrador."""
+    if not es_admin(x_admin_key):
+        raise HTTPException(status_code=401, detail="No autorizado")
 
 
 class PublicationPayload(BaseModel):
@@ -27,7 +46,16 @@ class PublicationPayload(BaseModel):
 
 
 @router.get("/publications")
-def list_publications(limit: int = Query(20, ge=1, le=100), include_unpublished: bool = False):
+def list_publications(
+    limit: int = Query(20, ge=1, le=100),
+    include_unpublished: bool = False,
+    x_admin_key: Optional[str] = Header(default=None),
+):
+    admin = es_admin(x_admin_key)
+    # Los borradores solo los puede ver el administrador
+    if include_unpublished and not admin:
+        raise HTTPException(status_code=401, detail="No autorizado")
+
     conn = get_connection()
     try:
         with conn.cursor() as cur:
@@ -59,15 +87,22 @@ def list_publications(limit: int = Query(20, ge=1, le=100), include_unpublished:
                 slug = unicodedata.normalize("NFKD", row["title"] or "").encode("ascii", "ignore").decode().lower()
                 row["slug"] = re.sub(r"[^a-z0-9]+", "-", slug).strip("-")[:90] or "producto"
                 row["slug"] = row["slug"] + "-" + str(row["product_id"])
-                row["canonical_url"] = os.getenv("PUBLIC_STORE_URL", "https://central-7ykr.vercel.app").rstrip() + "/producto/" + row["slug"]
+                row["canonical_url"] = os.getenv("PUBLIC_STORE_URL", "https://central-7ykr.vercel.app").rstrip("/") + "/producto/" + row["slug"]
                 row["checkout_mode"] = "CENTRAL" if str(row["platform"]).lower() == "personal" else "EXTERNAL"
+
+            # Público: se quitan costos, ganancias y score internos
+            if not admin:
+                for row in rows:
+                    for campo in CAMPOS_PRIVADOS:
+                        row.pop(campo, None)
             return rows
     finally:
         conn.close()
 
 
 @router.post("/publications")
-def publish_card(payload: PublicationPayload):
+def publish_card(payload: PublicationPayload, x_admin_key: Optional[str] = Header(default=None)):
+    verificar_admin(x_admin_key)
     conn = get_connection()
     try:
         with conn.cursor() as cur:
@@ -154,7 +189,8 @@ def publish_card(payload: PublicationPayload):
 
 
 @router.patch("/publications/{publication_id}")
-def update_publication(publication_id: int, payload: PublicationPayload):
+def update_publication(publication_id: int, payload: PublicationPayload, x_admin_key: Optional[str] = Header(default=None)):
+    verificar_admin(x_admin_key)
     conn = get_connection()
     try:
         with conn.cursor() as cur:
@@ -222,7 +258,8 @@ def update_publication(publication_id: int, payload: PublicationPayload):
 
 
 @router.post("/publications/{publication_id}/telegram")
-def publish_publication_telegram(publication_id: int):
+def publish_publication_telegram(publication_id: int, x_admin_key: Optional[str] = Header(default=None)):
+    verificar_admin(x_admin_key)
     conn = get_connection()
     try:
         with conn.cursor() as cur:
