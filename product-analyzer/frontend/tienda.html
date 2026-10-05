@@ -17,7 +17,7 @@
 .hero{min-height:620px;display:grid;grid-template-columns:1fr 1fr;align-items:center;gap:34px;position:relative;overflow:hidden}.hero:before{content:"";position:absolute;inset:-20%;background:radial-gradient(circle at 72% 48%,rgba(255,138,0,.16),transparent 28%),radial-gradient(circle at 28% 30%,rgba(255,138,0,.07),transparent 30%);pointer-events:none}
 .kicker{font:800 10px "Space Grotesk";letter-spacing:.16em;text-transform:uppercase;color:var(--accent-ink)}.hero h1{font:500 clamp(48px,6.3vw,88px)/.9 "Space Grotesk";letter-spacing:-.07em;margin:14px 0 24px;max-width:760px}.hero h1 span{color:var(--dim)}.hero p{max-width:600px;color:var(--muted);font-size:15px}.hero-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:28px}.btn{min-height:44px;padding:11px 17px;border-radius:999px;border:1px solid var(--line);background:#fff;color:var(--text);font-size:11px;font-weight:800;display:inline-flex;align-items:center;justify-content:center}.btn.primary{background:var(--accent);border-color:var(--accent);color:#14171a}.btn:hover{transform:translateY(-1px)}
 .stage{height:500px;display:grid;place-items:center;position:relative}.stage:after{content:"";position:absolute;bottom:65px;width:300px;height:48px;border-radius:50%;background:rgba(20,23,26,.18);filter:blur(18px)}.stage-orbit{width:360px;height:360px;position:relative;display:grid;place-items:center}.ring{position:absolute;border:1px solid rgba(255,138,0,.4);border-radius:50%;width:330px;height:330px;transform:rotateX(68deg) rotateZ(18deg)}.ring.r2{width:260px;height:260px;border-color:rgba(20,23,26,.14);transform:rotateY(68deg) rotateZ(-24deg)}.central-mark{width:150px;height:150px;border-radius:42px;background:var(--accent);color:#14171a;display:grid;place-items:center;font:800 92px/1 "Space Grotesk";box-shadow:0 30px 60px rgba(20,23,26,.2),0 0 80px rgba(255,138,0,.2);position:relative;z-index:2}.stage-label{position:absolute;bottom:8px;right:0;padding:10px 12px;border:1px solid var(--line);background:rgba(255,255,255,.92);border-radius:8px;font-size:9px;color:var(--muted);z-index:3}.stage-label b{display:block;color:var(--text);font:800 12px "Space Grotesk";letter-spacing:.08em}.stage-label span{display:block;margin-top:2px;font-size:8px;letter-spacing:.12em}
-.toolbar{position:sticky;top:86px;z-index:30;display:grid;grid-template-columns:minmax(0,1fr) 210px auto;gap:9px;padding:8px;margin:0 0 26px;border:1px solid var(--line);border-radius:999px;background:rgba(255,253,248,.94);backdrop-filter:blur(18px);box-shadow:0 10px 30px rgba(20,23,26,.08)}.search,.select{min-width:0;height:44px;border:0;outline:0;background:var(--panel2);color:var(--text);padding:0 17px;border-radius:999px}.search::placeholder{color:var(--dim)}.select{appearance:auto}.count{display:flex;align-items:center;justify-content:center;padding:0 16px;color:var(--muted);white-space:nowrap;font-size:10px}
+.toolbar{position:sticky;top:86px;z-index:30;display:grid;grid-template-columns:minmax(0,1fr) 210px auto;gap:9px;padding:8px;margin:0 0 26px;border:1px solid var(--line);border-radius:999px;background:rgba(255,253,248,.94);backdrop-filter:blur(18px);box-shadow:0 10px 30px rgba(20,23,26,.08)}.search,.select{min-width:0;height:44px;border:0;outline:0;background:var(--panel2);color:var(--text);padding:0 17px;border-radius:999px}.search::placeholder{color:var(--dim)}.select{appearance:auto}.count{display:flex;align-items:center;justify-content:center;padding:0 16px;color:var(--muted);white-space:nowrap;font-size:10px}.sort{height:44px;border:0;outline:0;background:var(--panel2);color:var(--text);padding:0 14px;border-radius:999px}.sales-rail{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:0 0 24px}.sales-item{padding:16px 18px;border:1px solid var(--line);border-radius:16px;background:var(--panel)}.sales-item b{display:block;font:700 13px "Space Grotesk";margin-bottom:4px}.sales-item span{display:block;color:var(--muted);font-size:10px}.quick{display:flex;gap:8px;overflow:auto;padding:0 0 18px;scrollbar-width:none}.quick button{border:1px solid var(--line);background:var(--panel);color:var(--muted);border-radius:999px;padding:8px 13px;font-size:10px;font-weight:800;white-space:nowrap}.quick button.active{background:var(--text);border-color:var(--text);color:#fff}
 .categories{display:flex;gap:7px;overflow:auto;padding:0 0 18px;scrollbar-width:none}.categories::-webkit-scrollbar{display:none}.cat{border:1px solid var(--line);background:var(--panel);color:var(--muted);border-radius:999px;padding:8px 13px;font-size:10px;font-weight:700;white-space:nowrap}.cat.active{background:var(--accent);border-color:var(--accent);color:#14171a}
 .feature{display:grid;grid-template-columns:1.05fr .95fr;min-height:520px;border:1px solid var(--line);border-radius:25px;overflow:hidden;background:var(--panel);margin-bottom:24px;box-shadow:0 1px 2px rgba(20,23,26,.04)}.feature-media{min-height:520px;position:relative;display:grid;place-items:center;background:radial-gradient(circle at 50% 40%,#fff 0,#f1f3f6 55%,#e8ebef 100%);overflow:hidden}.feature-media:before,.feature-media:after{content:"";position:absolute;width:68%;aspect-ratio:1;border:1px solid rgba(255,138,0,.28);border-radius:50%}.feature-media:after{width:47%;border-color:rgba(20,23,26,.08)}.feature-image{width:min(76%,470px);height:min(430px,78%);object-fit:contain;position:relative;z-index:2;mix-blend-mode:multiply;border-radius:28px}.feature-empty{position:relative;z-index:2;color:var(--dim);font-size:10px;text-transform:uppercase;letter-spacing:.12em}.feature-info{padding:clamp(28px,5vw,70px);display:flex;flex-direction:column;justify-content:center}.source{color:var(--dim);font-size:9px;text-transform:uppercase;letter-spacing:.14em;font-weight:800}.feature-info h2{font:600 clamp(30px,4vw,52px)/.98 "Space Grotesk";letter-spacing:-.055em;margin:12px 0}.feature-info p{color:var(--muted);max-width:540px}.feature-price{font:800 26px "Space Grotesk";color:var(--text);margin:18px 0}.feature-meta{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}.pill{border:1px solid var(--line);background:var(--panel2);color:var(--muted);border-radius:999px;padding:6px 9px;font-size:9px}.variant-row{display:flex;gap:8px;margin:4px 0 18px}.variant{width:27px;height:27px;border-radius:50%;border:2px solid rgba(20,23,26,.15);background:#e6e9ed;cursor:pointer}.variant.active{outline:2px solid var(--accent);outline-offset:2px}
 
@@ -79,11 +79,9 @@
 </section>
 
 <div id="catalogo"></div>
-<div class="categories" id="categories"></div>
-<div class="toolbar">
+<div class="sales-rail"><div class="sales-item"><b>Compra real</b><span>Catálogo conectado a fuentes reales.</span></div><div class="sales-item"><b>Selección inteligente</b><span>Descubrimiento por señales disponibles.</span></div><div class="sales-item"><b>Precio en COP</b><span>Comparación rápida antes de comprar.</span></div><div class="sales-item"><b>Checkout seguro</b><span>Wompi para productos propios.</span></div></div><div class="quick" id="quick"><button class="active" data-mode="all">Todos</button><button data-mode="popular">Más relevantes</button><button data-mode="rated">Mejor valorados</button></div><div class="categories" id="categories"></div><div class="toolbar">
   <input class="search" id="search" placeholder="Buscar producto..." autocomplete="off">
-  <select class="select" id="category"><option value="">Todas las categorías</option></select>
-  <span class="count" id="count">Cargando catálogo…</span>
+  <select class="select" id="category"><option value="">Todas las categorías</option></select><select class="sort" id="sort"><option value="relevance">Orden: relevancia</option><option value="price-asc">Precio menor</option><option value="price-desc">Precio mayor</option><option value="rating">Valoración</option></select><span class="count" id="count">Cargando catálogo…</span>
 </div>
 
 <section class="feature" id="feature">
@@ -129,7 +127,7 @@ const slug=p=>p.slug||String(p.title||"producto").toLowerCase().normalize("NFD")
 const productUrl=p=>"/producto/"+esc(slug(p));
 let products=JSON.parse(localStorage.getItem("central_products_cache")||"[]");
 let cart=JSON.parse(localStorage.getItem("central_cart")||"[]");
-let filtered=[], active=null;
+let filtered=[], active=null, quickMode="all";
 
 function imageSrc(p){return p.image_url||((p.image_gallery||[]).find(Boolean)||"")}function imageFallback(p){const src=imageSrc(p);if(!src)return "";if(src.includes("images-na.ssl-images-amazon.com/images/P/"))return src.replace("images-na.ssl-images-amazon.com/images/P/","m.media-amazon.com/images/P/");return src}
 function saveCart(){localStorage.setItem("central_cart",JSON.stringify(cart));renderCart()}
@@ -141,9 +139,15 @@ function setCategories(){
   $("category").innerHTML='<option value="">Todas las categorías</option>'+cats.map(c=>'<option value="'+esc(c)+'">'+esc(c)+'</option>').join("");
   $("categories").innerHTML='<button class="cat active" data-cat="">Todos</button>'+cats.map(c=>'<button class="cat" data-cat="'+esc(c)+'">'+esc(c)+'</button>').join("");
 }
+function relevance(p){return Number(p.opportunity_score||0)*2+Number(p.rating||0)*10+Math.log10(Number(p.reviews_count||0)+1)*6+Math.log10(Number(p.sales_estimate||0)+1)*4}
 function applyFilter(){
-  const q=$("search").value.trim().toLowerCase(), c=$("category").value;
+  const q=$("search").value.trim().toLowerCase(), c=$("category").value, sort=$("sort").value;
   filtered=products.filter(p=>(!q||[p.title,p.subtitle,p.category,p.platform,p.external_id].some(v=>String(v||"").toLowerCase().includes(q)))&&(!c||p.category===c));
+  if(quickMode==="rated")filtered=filtered.filter(p=>Number(p.rating||0)>0);
+  if(quickMode==="popular")filtered.sort((a,b)=>relevance(b)-relevance(a));
+  if(sort==="price-asc")filtered.sort((a,b)=>Number(a.sale_price??a.current_price??Infinity)-Number(b.sale_price??b.current_price??Infinity));
+  if(sort==="price-desc")filtered.sort((a,b)=>Number(b.sale_price??b.current_price??-1)-Number(a.sale_price??a.current_price??-1));
+  if(sort==="rating")filtered.sort((a,b)=>Number(b.rating||0)-Number(a.rating||0));
   $("count").textContent=filtered.length+" producto"+(filtered.length===1?"":"s");
   renderFeature();
   renderGrid();
@@ -218,7 +222,7 @@ function imgFail(im){
 }
 document.addEventListener("error",e=>{const im=e.target;if(im.matches&&im.matches("img[data-fb]"))imgFail(im)},true);
 document.addEventListener("load",e=>{const im=e.target;if(im.matches&&im.matches("img[data-fb]")&&im.naturalWidth<=1)imgFail(im)},true);
-$("search").oninput=applyFilter;$("category").onchange=applyFilter;
+$("search").oninput=applyFilter;$("category").onchange=applyFilter;$("sort").onchange=applyFilter;$("quick").onclick=e=>{const b=e.target.closest("[data-mode]");if(!b)return;quickMode=b.dataset.mode;document.querySelectorAll("#quick button").forEach(x=>x.classList.toggle("active",x===b));applyFilter()};
 $("categories").onclick=e=>{const b=e.target.closest("[data-cat]");if(!b)return;$("category").value=b.dataset.cat;document.querySelectorAll(".cat").forEach(x=>x.classList.toggle("active",x===b));applyFilter()};
 document.addEventListener("click",e=>{
   const add=e.target.closest(".add"),minus=e.target.closest("[data-minus]"),plus=e.target.closest("[data-plus]"),rem=e.target.closest("[data-remove]");
