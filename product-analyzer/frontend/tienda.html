@@ -60,7 +60,7 @@
 <body>
 <div class="shell">
 <header class="topbar">
-  <a class="brand" href="/tienda"><span class="mark">C</span><span><b>CENTRAL</b><small>Commerce OS</small></span></a>
+  <a class="brand" href="/tienda"><span class="mark">C</span><span><b>CENTRAL</b><small>TIENDA</small></span></a>
   <div class="top-actions">
     <button class="top-btn" id="trackingBtn">Seguimiento</button><button class="top-btn primary" id="cartTop">Carrito · <span id="cartCountTop">0</span></button>
   </div>
@@ -70,7 +70,7 @@
   <div>
     <div class="kicker">CENTRAL · TIENDA</div>
     <h1>Tu catálogo.<br><span>Tu producto.</span><br>Tu Central.</h1>
-    <p>La tienda usa la experiencia visual creada en Figma Make, pero ahora conectada al catálogo real de Central. Productos propios y productos externos conviven sin depender de una fuente externa para que la tienda funcione.</p>
+    <p>Catálogo público de Central con productos seleccionados y publicados desde Central.</p>
     <div class="hero-actions"><a class="btn primary" href="#catalogo">Explorar productos</a></div>
   </div>
   <div class="stage">
@@ -89,7 +89,7 @@
   <div class="feature-info">
     <div class="source" id="featureSource">CENTRAL</div>
     <h2 id="featureTitle">Catálogo Central</h2>
-    <p id="featureDescription">Selecciona un producto para ver su información real.</p>
+    <p id="featureDescription">Información del producto seleccionado.</p>
     <div class="feature-meta" id="featureMeta"></div>
     <div class="variant-row" id="variants"></div>
     <div class="feature-price" id="featurePrice">Consultar</div>
@@ -97,7 +97,7 @@
   </div>
 </section>
 
-<section class="grid" id="grid"><div class="empty"><b>Cargando catálogo</b>Preparando los productos publicados en Central.</div></section>
+<section class="grid" id="grid"><div class="empty"><b>Cargando catálogo</b>Cargando productos publicados.</div></section>
 </div>
 
 <button class="cart-fab" id="cartBtn">Carrito · <span id="cartCount">0</span></button>
@@ -129,7 +129,7 @@ const API="/api", $=id=>document.getElementById(id);
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const money=(v,c="COP")=>{if(v==null||v==="")return"Consultar";try{return new Intl.NumberFormat("es-CO",{style:"currency",currency:String(c).toUpperCase()==="USD"?"USD":"COP",maximumFractionDigits:0}).format(Number(v))}catch{return String(v)}};
 const slug=p=>p.slug||String(p.title||"producto").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
-const productUrl=p=>"/producto/"+esc(slug(p));
+const productUrl=p=>"/producto/"+esc(slug(p))+"-"+esc(p.product_id||p.id||"");
 let products=JSON.parse(localStorage.getItem("central_products_cache")||"[]");
 let cart=JSON.parse(localStorage.getItem("central_cart")||"[]");
 let filtered=[], active=null, quickMode="all";
@@ -161,7 +161,7 @@ function renderFeature(){
   const p=filtered[0]||products[0];
   active=p||null;
   const media=$("featureMedia");
-  if(!p){media.innerHTML='<span class="feature-empty">No hay productos publicados</span>';$("featureTitle").textContent="Catálogo Central";$("featureDescription").textContent="Pronto habrá productos disponibles.";return}
+  if(!p){media.innerHTML='<span class="feature-empty">No hay productos publicados</span>';$("featureTitle").textContent="Catálogo Central";$("featureDescription").textContent="No hay productos publicados.";return}
   const src=imageSrc(p);
   media.innerHTML=src?'<img class="feature-image" src="'+esc(src)+'" alt="'+esc(p.title)+'" data-fb="'+esc(imageFallback(p))+'">':'<span class="feature-empty">Imagen no disponible</span>';
   $("featureSource").textContent="CENTRAL · "+String(p.platform||"producto").toUpperCase();
@@ -191,7 +191,7 @@ function card(p){
   return '<article class="card"><div class="card-media">'+(src?'<img src="'+esc(src)+'" alt="'+esc(p.title)+'" loading="lazy" referrerpolicy="no-referrer" data-fb="'+esc(imageFallback(p))+'"><div class="no-image" hidden>Imagen no disponible</div>':'<div class="no-image">Imagen no disponible</div>')+'<span class="badge">'+esc(p.platform||"Central")+'</span></div><div class="card-body"><div class="category">'+esc(p.category||"Producto")+'</div><h3>'+esc(p.title)+'</h3><small>'+esc(p.subtitle||"Producto publicado por Central")+'</small>'+(p.external_id?'<div class="ref">Ref. '+esc(p.external_id)+'</div>':'')+'<div class="card-price'+(ask?' ask':'')+'">'+esc(price)+'</div><div class="card-actions">'+main+'<a class="btn" href="'+productUrl(p)+'">Ficha</a></div></div></article>'
 }
 function renderGrid(){
-  $("grid").innerHTML=filtered.length?filtered.map(card).join(""):'<div class="empty"><b>No hay productos</b>Prueba con otra búsqueda o categoría.</div>';
+  $("grid").innerHTML=filtered.length?filtered.map(card).join(""):'<div class="empty"><b>No hay productos</b>No hay productos disponibles.</div>';
 }
 function addToCart(p){
   if(!isOwn(p))return;
@@ -205,7 +205,7 @@ function renderCart(){
   $("cartTotal").textContent=money(cart.reduce((n,x)=>n+Number(x.price)*Number(x.quantity),0),"COP");
 }
 async function load(){
-  const endpoints=[API+"/publications?limit=100","https://gracious-renewal-production-9f45.up.railway.app/api/v1/publications?limit=100"];
+  const endpoints=[API+"/publications?limit=100"];
   for(const endpoint of endpoints)try{
     const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),7000);
     const r=await fetch(endpoint,{cache:"no-store",signal:controller.signal});clearTimeout(timer);

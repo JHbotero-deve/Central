@@ -69,7 +69,6 @@ def ingest_amazon(conn) -> list[int]:
     print(f"[amazon] lote valido recibido desde Creators API: {len(products)}")
     for category, product in products:
         try:
-            product["source_metadata"]["seed_batch"] = f"amazon-renewal-{AMAZON_BATCH_SIZE}"
             ids.append(upsert_product(conn, "amazon", category, product))
             print(f"[amazon] {product['external_id']} -> {product['title']} | {product['currency']} {product['price']} | imagen=si")
         except Exception as exc:
@@ -144,9 +143,8 @@ def run_pipeline():
     finally:
         conn.close()
 
-    # La publicación de tarjetas es manual y única: Studio -> Publicar en Central.
-    # El worker solo ingesta, actualiza y puntúa productos; no crea tarjetas automáticamente.
-    print("[storefront] publicación automática desactivada; Studio es el único publicador.")
+    # La publicación de tarjetas es manual desde Central.
+    print("[storefront] publicación automática desactivada; Central controla las tarjetas publicadas.")
 
     if creator_configured():
         try:
@@ -157,64 +155,6 @@ def run_pipeline():
     else:
         print("[tiktok] integración no configurada; se conserva el ciclo principal.")
     print("== Ciclo completo ==")
-
-
-def publish_top_opportunities(limit=15):
-    """Publish exactly the best active Amazon products without requiring a score row."""
-    conn = get_connection()
-    try:
-        with conn.cursor() as cur:
-            cur.execute("""
-                SELECT p.id, p.title, p.current_price, p.image_url, p.product_url,
-                       p.currency, COALESCE(s.opportunity_score, 0) AS opportunity_score
-                FROM products p
-                LEFT JOIN product_scores s ON s.product_id = p.id
-                JOIN platforms pl ON pl.id = p.platform_id
-                WHERE p.is_active = TRUE AND pl.name = 'amazon'
-                ORDER BY COALESCE(s.opportunity_score, 0) DESC, p.updated_at DESC
-                LIMIT %s
-            """, (limit,))
-            products = cur.fetchall()
-
-            # La tienda automática del worker queda dedicada a Amazon.
-            cur.execute("""
-                UPDATE published_cards pc
-                SET is_published = FALSE, updated_at = NOW()
-                FROM products p
-                JOIN platforms pl ON pl.id = p.platform_id
-                WHERE pc.product_id = p.id
-                  AND pl.name <> 'amazon'
-                  AND pc.is_published = TRUE
-            """)
-
-            for p in products:
-                price = p["current_price"]
-                currency = p["currency"] or "COP"
-                price_display = f"{price:,.0f} {currency}" if price is not None else "Consultar"
-                cur.execute("""
-                    INSERT INTO published_cards (
-                        product_id, title, subtitle, price_display, image_url, product_url,
-                        sale_price, cost_price, profit_amount, profit_margin_pct,
-                        opportunity_score, footer, accent, is_published, published_at, updated_at
-                    ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,TRUE,NOW(),NOW())
-                    ON CONFLICT (product_id) DO UPDATE SET
-                        title=EXCLUDED.title, subtitle=EXCLUDED.subtitle,
-                        price_display=EXCLUDED.price_display,
-                        image_url=EXCLUDED.image_url, product_url=EXCLUDED.product_url,
-                        sale_price=EXCLUDED.sale_price, cost_price=EXCLUDED.cost_price,
-                        opportunity_score=EXCLUDED.opportunity_score,
-                        is_published=TRUE, published_at=NOW(), updated_at=NOW()
-                """, (
-                    p["id"], p["title"], "Producto real seleccionado por Central",
-                    price_display, p["image_url"], p["product_url"],
-                    price, price, 0, 0,
-                    p["opportunity_score"], "Disponible en Central", "#b6f23a"
-                ))
-
-        conn.commit()
-        print(f"== Tienda: {len(products)} productos Amazon reales publicados ==")
-    finally:
-        conn.close()
 
 
 def run_worker():
