@@ -47,7 +47,7 @@ def create_store_order(payload:StoreOrderPayload):
  finally: conn.close()
 
 @router.get("/orders")
-def list_store_orders(limit:int=Query(50,ge=1,le=200),_:None=Depends(require_admin_key))
+def list_store_orders(limit:int=Query(50,ge=1,le=200),_:None=Depends(require_admin_key)):
  conn=get_connection()
  try:
   with conn.cursor() as cur:
