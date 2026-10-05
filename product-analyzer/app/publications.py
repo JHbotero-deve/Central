@@ -59,7 +59,7 @@ def list_publications(
     conn = get_connection()
     try:
         with conn.cursor() as cur:
-            where = "" if include_unpublished else "AND pc.is_published = TRUE"
+            where = "" if include_unpublished else "AND pc.is_published = TRUE AND COALESCE(NULLIF(pc.image_url, ''), NULLIF(p.image_url, '')) IS NOT NULL AND COALESCE(NULLIF(pc.image_url, ''), NULLIF(p.image_url, '')) <> ''"
             cur.execute(
                 f"""
                 SELECT pc.id, pc.product_id, pc.title, pc.subtitle, pc.price_display,
@@ -122,12 +122,15 @@ def publish_card(payload: PublicationPayload, x_admin_key: Optional[str] = Heade
             if not product:
                 raise HTTPException(status_code=404, detail="Producto activo no encontrado")
 
+            canonical_image = product["image_url"] or ((product["image_gallery"] or [None])[0])
+            if not canonical_image:
+                raise HTTPException(status_code=422, detail="No se puede publicar un producto sin imagen real")
+
             # Fuentes externas: se publica la ficha original sin editar.
             # Producto personal: Studio sí puede editarlo antes de publicar.
             is_personal = str(product["platform"]).lower() == "personal"
             if not is_personal:
                 canonical_title = product["title"]
-                canonical_image = product["image_url"] or ((product["image_gallery"] or [None])[0])
                 canonical_url = product["affiliate_url"] or product["product_url"]
                 canonical_price = product["current_price"]
                 payload = payload.model_copy(update={
@@ -211,11 +214,15 @@ def update_publication(publication_id: int, payload: PublicationPayload, x_admin
             if not current:
                 raise HTTPException(status_code=404, detail="Publicación no encontrada")
 
+            canonical_image = current["image_url"] or ((current["image_gallery"] or [None])[0])
+            if not canonical_image:
+                raise HTTPException(status_code=422, detail="No se puede actualizar una publicación sin imagen real")
+
             if str(current["platform"]).lower() != "personal":
                 # Una publicación externa no puede convertirse en una ficha editada.
                 payload = payload.model_copy(update={
                     "title": current["title"],
-                    "image_url": current["image_url"] or ((current["image_gallery"] or [None])[0]),
+                    "image_url": canonical_image,
                     "product_url": current["affiliate_url"] or current["product_url"],
                     "sale_price": current["current_price"],
                     "cost_price": current["current_price"],
