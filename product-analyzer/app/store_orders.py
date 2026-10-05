@@ -1,11 +1,20 @@
 """Pedidos públicos y métricas de la tienda."""
+import hmac
+import os
 from typing import Optional
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 from db import get_connection
 import secrets,datetime
 
 router=APIRouter(prefix="/store",tags=["store"])
+
+def require_admin_key(x_admin_key: str | None = Header(default=None, alias="X-Admin-Key")):
+ expected=os.getenv("MONETIZATION_ADMIN_KEY","").strip()
+ if not expected:
+  raise HTTPException(503,"Operación administrativa no configurada")
+ if not x_admin_key or not hmac.compare_digest(x_admin_key,expected):
+  raise HTTPException(403,"No autorizado")
 class StoreOrderPayload(BaseModel):
  product_id:int=Field(gt=0); publication_id:Optional[int]=Field(default=None,gt=0)
  customer_name:str=Field(min_length=2,max_length=200); customer_email:str=Field(min_length=5,max_length=255)
@@ -38,7 +47,7 @@ def create_store_order(payload:StoreOrderPayload):
  finally: conn.close()
 
 @router.get("/orders")
-def list_store_orders(limit:int=Query(50,ge=1,le=200)):
+def list_store_orders(limit:int=Query(50,ge=1,le=200),_:None=Depends(require_admin_key)):
  conn=get_connection()
  try:
   with conn.cursor() as cur:
@@ -47,7 +56,7 @@ def list_store_orders(limit:int=Query(50,ge=1,le=200)):
  finally: conn.close()
 
 @router.get("/metrics")
-def store_metrics():
+def store_metrics(_:None=Depends(require_admin_key)):
  conn=get_connection()
  try:
   with conn.cursor() as cur:
@@ -62,7 +71,7 @@ def store_metrics():
 
 
 @router.get("/invoices")
-def list_invoices(limit:int=Query(50,ge=1,le=200)):
+def list_invoices(limit:int=Query(50,ge=1,le=200),_:None=Depends(require_admin_key)):
  conn=get_connection()
  try:
   with conn.cursor() as cur:
@@ -74,7 +83,7 @@ def list_invoices(limit:int=Query(50,ge=1,le=200)):
  finally: conn.close()
 
 @router.get("/invoices/{invoice_number}")
-def get_invoice(invoice_number:str):
+def get_invoice(invoice_number:str,_:None=Depends(require_admin_key)):
  conn=get_connection()
  try:
   with conn.cursor() as cur:
