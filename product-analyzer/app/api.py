@@ -121,8 +121,7 @@ def _publish_external_product(conn, product_id, product, platform_label):
         ))
 
 
-@core_router.post("/store/sync")
-def sync_store_catalog(_: dict = Depends(require_admin)):
+def _sync_store_catalog():
     """Importa productos reales al catálogo; las tarjetas se publican únicamente desde Studio."""
     conn = get_connection()
     amazon_imported = []
@@ -217,10 +216,16 @@ def sync_store_catalog(_: dict = Depends(require_admin)):
         conn.close()
 
 
+@core_router.post("/store/sync")
+def sync_store_catalog(_: dict = Depends(require_admin)):
+    """Importa productos reales al catálogo; las tarjetas se publican únicamente desde Studio."""
+    return _sync_store_catalog()
+
+
 @core_router.post("/amazon/sync")
 def sync_amazon_store(limit: int = Query(20, ge=1, le=20), _: dict = Depends(require_admin)):
     """Importa productos reales de Amazon y los publica."""
-    result = sync_store_catalog()
+    result = _sync_store_catalog()
     return result["amazon"]
 
 
