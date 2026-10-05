@@ -116,7 +116,7 @@ def create_product_checkout(req: ProductCheckout):
             payment=cur.fetchone()
         conn.commit()
     finally: conn.close()
-    redirect=req.redirect_url or os.getenv("WOMPI_REDIRECT_URL","").strip() or None
+    redirect=os.getenv("WOMPI_REDIRECT_URL","").strip() or None
     params=[("public-key",public_key),("currency",currency),("amount-in-cents",str(cents)),("reference",reference),("signature:integrity",signature),("customer-data:email",req.customer_email.strip().lower()),("customer-data:full-name",req.customer_name.strip())]
     if req.customer_phone: params += [("customer-data:phone-number",req.customer_phone),("customer-data:phone-number-prefix","+57")]
     if redirect: params.append(("redirect-url",redirect))
@@ -260,7 +260,7 @@ async def create_cart_checkout(request: Request):
     finally:
         conn.close()
 
-    redirect = body.get("redirect_url") or os.getenv("WOMPI_REDIRECT_URL", "").strip() or None
+    redirect = os.getenv("WOMPI_REDIRECT_URL", "").strip() or None
     params = [
         ("public-key", public_key),
         ("currency", currency),
@@ -318,8 +318,7 @@ def create_subscription_checkout(req: SubscriptionCheckout):
             reference = f"SUB-{secrets.token_hex(12).upper()}"
             signature = _integrity_signature(
                 reference, amount_in_cents, currency)
-            redirect_url = req.redirect_url or os.getenv(
-                "WOMPI_REDIRECT_URL", "").strip() or None
+            redirect_url = os.getenv("WOMPI_REDIRECT_URL", "").strip() or None
 
             cur.execute(
                 """INSERT INTO payment_transactions
@@ -359,7 +358,7 @@ def get_payment(reference: str):
     try:
         with conn.cursor() as cur:
             cur.execute(
-                """SELECT id, reference, transaction_id, provider, customer_email,
+                """SELECT id, reference, transaction_id, provider,
                         amount_in_cents, currency, status, payment_method_type,
                         status_message, environment, created_at, updated_at, paid_at
                     FROM payment_transactions WHERE reference = %s""",

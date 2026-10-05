@@ -44,6 +44,13 @@ jobs:
         shell: bash
         run: |
           python -m compileall -q product-analyzer/app
+          python -m pip install --disable-pip-version-check --no-cache-dir pip-audit
+          pip-audit -r product-analyzer/app/requirements.txt
+      - name: Audit frontend dependencies
+        shell: bash
+        run: |
+          npm --prefix product-analyzer/headphones install --no-audit --no-fund
+          npm --prefix product-analyzer/headphones audit --audit-level=high
 
 
 

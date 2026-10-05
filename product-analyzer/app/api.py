@@ -56,9 +56,7 @@ default_origins = ",".join(
     [
         "http://localhost:3000",
         "http://localhost:8000",
-        "https://central-five-pied.vercel.app",
-        "https://central-jorgedevop27-9650.vercel.app",
-        "https://central-git-main-jorgedevop27-9650.vercel.app",
+        "https://central-7ykr.vercel.app",
     ]
 )
 app.add_middleware(
@@ -70,7 +68,6 @@ app.add_middleware(
     ],
     allow_methods=["*"],
     allow_headers=["*"],
-    allow_origin_regex=r"https://.*\\.vercel\\.app",
 )
 
 core_router = APIRouter(tags=["core"])
