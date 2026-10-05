@@ -93,6 +93,7 @@ def create_product_checkout(req: ProductCheckout):
                            WHERE p.id=%s AND p.is_active=TRUE""",(req.product_id,))
             product=cur.fetchone()
             if not product: raise HTTPException(status_code=404,detail="Producto no encontrado")
+            if str(product.get("platform") or "").lower() != "personal": raise HTTPException(status_code=409,detail="Este producto se compra en su plataforma de origen")
             if req.publication_id and product["publication_id"]!=req.publication_id: raise HTTPException(status_code=409,detail="La publicación no corresponde al producto solicitado")
             if product["stock"] is not None and req.quantity>product["stock"]: raise HTTPException(status_code=409,detail="Stock insuficiente")
             sale=float(product["sale_price"] or product["current_price"] or 0)
@@ -139,6 +140,11 @@ async def create_cart_checkout(request: Request):
     email = str(body.get("customer_email") or customer.get("email") or body.get("email") or "").strip().lower()
     phone = body.get("customer_phone") or customer.get("phone") or body.get("phone")
     phone = str(phone).strip() if phone else None
+    address_line = str(body.get("address_line") or customer.get("address_line") or "").strip()
+    city = str(body.get("city") or customer.get("city") or "").strip()
+    department = str(body.get("department") or customer.get("department") or "").strip()
+    if not address_line or not city or not department:
+        raise HTTPException(status_code=400, detail="Dirección, ciudad y departamento son obligatorios")
     if not name or "@" not in email:
         raise HTTPException(status_code=400, detail="Nombre y correo válidos son obligatorios")
 
@@ -195,6 +201,8 @@ async def create_cart_checkout(request: Request):
                 p = rows.get(pid)
                 if not p:
                     raise HTTPException(status_code=404, detail=f"Producto {pid} no encontrado")
+                if str(p.get("platform_name") or "").lower() != "personal":
+                    raise HTTPException(status_code=409, detail="Producto " + str(p["title"]) + " se compra en su plataforma de origen")
                 if entry["publication_id"] and p["publication_id"] != entry["publication_id"]:
                     raise HTTPException(status_code=409, detail="La publicación no corresponde al producto solicitado")
                 qty = entry["qty"]
@@ -227,12 +235,13 @@ async def create_cart_checkout(request: Request):
                    (reference, product_id, publication_id, customer_name, customer_email, customer_phone,
                     quantity, unit_price, cost_unit_price, total_amount, estimated_profit, currency,
                     status, payment_status, source,
-                    product_title_snapshot, product_image_snapshot, product_url_snapshot, platform_snapshot)
-                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'PENDING','PENDING','TIENDA',%s,%s,%s,%s)
+                    product_title_snapshot, product_image_snapshot, product_url_snapshot, platform_snapshot,
+                   address_line, city, department)
+                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'PENDING','PENDING','TIENDA',%s,%s,%s,%s,%s,%s,%s)
                    RETURNING id, reference""",
                 (reference, first["product_id"], first["publication_id"], name, email, phone,
                  total_qty, total / total_qty, cost_total / total_qty, total, profit, currency,
-                 title_snapshot, first_row["image_url"], first_row["product_url"], first_row["platform_name"]),
+                 title_snapshot, first_row["image_url"], first_row["product_url"], first_row["platform_name"], address_line, city, department),
             )
             order = cur.fetchone()
 
@@ -269,6 +278,10 @@ async def create_cart_checkout(request: Request):
         ("signature:integrity", signature),
         ("customer-data:email", email),
         ("customer-data:full-name", name),
+        ("shipping-address:address-line-1", address_line),
+        ("shipping-address:country", "CO"),
+        ("shipping-address:city", city),
+        ("shipping-address:region", department),
     ]
     if phone:
         params += [("customer-data:phone-number", phone), ("customer-data:phone-number-prefix", "+57")]
@@ -455,5 +468,12 @@ async def wompi_events(
         conn.commit()
     finally:
         conn.close()
+
+    if payment and payment.get("order_id") and status == "APPROVED":
+        try:
+            from commerce import dispatch_lead
+            dispatch_lead(payment["order_id"])
+        except Exception as exc:
+            print(f"[commerce] lead delivery deferred: {type(exc).__name__}")
 
     return {"received": True, "processed": payment is not None, "status": status}
