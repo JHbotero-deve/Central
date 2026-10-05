@@ -69,7 +69,7 @@ def list_publications(
                        pc.profit_amount, pc.profit_margin_pct, pc.opportunity_score, pc.footer,
                        pc.accent, pc.is_published, pc.sort_order, pc.published_at,
                        p.current_price, p.currency, p.image_gallery, p.affiliate_url, p.external_id, p.sku,
-                       p.description, p.stock, pl.name AS platform, c.name AS category
+                       p.description, p.stock, p.rating, p.reviews_count, p.sales_estimate, pl.name AS platform, c.name AS category
                 FROM published_cards pc
                 JOIN products p ON p.id = pc.product_id
                 JOIN platforms pl ON pl.id = p.platform_id
