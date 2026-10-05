@@ -3,11 +3,12 @@ from typing import Optional
 import os
 import secrets
 
-from fastapi import APIRouter, HTTPException, Query, Header
+from fastapi import APIRouter, Depends, HTTPException, Query, Header
 from pydantic import BaseModel, Field
 
 from db import get_connection
 from notifications import send_telegram_publication
+from auth import require_admin
 
 router = APIRouter(tags=["publications"])
 
@@ -101,8 +102,7 @@ def list_publications(
 
 
 @router.post("/publications")
-def publish_card(payload: PublicationPayload, x_admin_key: Optional[str] = Header(default=None)):
-    verificar_admin(x_admin_key)
+def publish_card(payload: PublicationPayload, _: dict = Depends(require_admin)):
     conn = get_connection()
     try:
         with conn.cursor() as cur:
@@ -192,7 +192,7 @@ def publish_card(payload: PublicationPayload, x_admin_key: Optional[str] = Heade
 
 
 @router.patch("/publications/{publication_id}")
-def update_publication(publication_id: int, payload: PublicationPayload, x_admin_key: Optional[str] = Header(default=None)):
+def update_publication(publication_id: int, payload: PublicationPayload, _: dict = Depends(require_admin)):
     verificar_admin(x_admin_key)
     conn = get_connection()
     try:
@@ -265,7 +265,7 @@ def update_publication(publication_id: int, payload: PublicationPayload, x_admin
 
 
 @router.post("/publications/{publication_id}/telegram")
-def publish_publication_telegram(publication_id: int, x_admin_key: Optional[str] = Header(default=None)):
+def publish_publication_telegram(publication_id: int, _: dict = Depends(require_admin)):
     verificar_admin(x_admin_key)
     conn = get_connection()
     try:

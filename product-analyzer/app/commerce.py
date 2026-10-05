@@ -9,16 +9,13 @@ from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
 
 from db import get_connection
+from auth import require_admin
 
 router = APIRouter(prefix="/store", tags=["commerce"])
 
 
-def _admin_key(x_admin_key: str | None = Header(default=None, alias="X-Admin-Key")):
-    expected = os.getenv("MONETIZATION_ADMIN_KEY", "").strip()
-    if not expected:
-        raise HTTPException(503, "Operación administrativa no configurada")
-    if not x_admin_key or not hmac.compare_digest(x_admin_key, expected):
-        raise HTTPException(403, "No autorizado")
+def _admin_key(user: dict = Depends(require_admin)):
+    return user
 
 
 class OrderLookup(BaseModel):

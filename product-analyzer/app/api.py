@@ -7,7 +7,7 @@ import time
 from typing import Optional
 from urllib.parse import quote
 
-from fastapi import APIRouter, FastAPI, HTTPException, Query
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query
 from fastapi.responses import Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -25,6 +25,7 @@ from tiktok_api import router as tiktok_creator_router
 from url_import import import_url
 from wompi import router as wompi_router
 from meli_oauth import router as meli_oauth_router, notification_router as meli_notification_router
+from auth import router as auth_router, require_admin
 
 API_VERSION = "1.3.0"
 
@@ -38,6 +39,7 @@ app.include_router(monetization_router, prefix="/api/v1")
 app.include_router(wompi_router, prefix="/api/v1")
 app.include_router(meli_oauth_router, prefix="/api/v1")
 app.include_router(meli_notification_router, prefix="/api/v1")
+app.include_router(auth_router, prefix="/api/v1")
 app.include_router(tiktok_creator_router, prefix="/api/v1")
 app.include_router(publication_router, prefix="/api/v1")
 app.include_router(store_orders_router, prefix="/api/v1")
@@ -120,7 +122,7 @@ def _publish_external_product(conn, product_id, product, platform_label):
 
 
 @core_router.post("/store/sync")
-def sync_store_catalog():
+def sync_store_catalog(_: dict = Depends(require_admin)):
     """Importa productos reales al catálogo; las tarjetas se publican únicamente desde Studio."""
     conn = get_connection()
     amazon_imported = []
@@ -216,14 +218,14 @@ def sync_store_catalog():
 
 
 @core_router.post("/amazon/sync")
-def sync_amazon_store(limit: int = Query(20, ge=1, le=20)):
+def sync_amazon_store(limit: int = Query(20, ge=1, le=20), _: dict = Depends(require_admin)):
     """Importa productos reales de Amazon y los publica."""
     result = sync_store_catalog()
     return result["amazon"]
 
 
 @core_router.get("/pipeline/summary")
-def pipeline_summary():
+def pipeline_summary(_: dict = Depends(require_admin)):
     conn = get_connection()
     try:
         with conn.cursor() as cur:
@@ -280,7 +282,7 @@ def list_products(
 
 
 @core_router.get("/intelligence/overview")
-def intelligence_overview():
+def intelligence_overview(_: dict = Depends(require_admin)):
     conn=get_connection()
     try:
         with conn.cursor() as cur:
@@ -399,7 +401,7 @@ class ProductImport(BaseModel):
 
 
 @core_router.post("/products/import-url")
-def import_product_from_url(payload: ProductImport):
+def import_product_from_url(payload: ProductImport, _: dict = Depends(require_admin)):
     try:
         product = import_url(
             payload.url,
@@ -470,7 +472,7 @@ class PersonalProduct(BaseModel):
 
 
 @core_router.post("/products/personal")
-def create_personal_product(payload: PersonalProduct):
+def create_personal_product(payload: PersonalProduct, _: dict = Depends(require_admin)):
     conn = get_connection()
     try:
         with conn.cursor() as cur:
@@ -523,7 +525,7 @@ class ProductImages(BaseModel):
 
 
 @core_router.patch("/products/{product_id}/images")
-def update_product_images(product_id: int, payload: ProductImages):
+def update_product_images(product_id: int, payload: ProductImages, _: dict = Depends(require_admin)):
     clean=[str(x).strip() for x in payload.images if str(x).strip()]
     if len(clean)>5: raise HTTPException(status_code=400, detail="Máximo 5 imágenes por producto")
     if any(len(x)>2_000_000 for x in clean): raise HTTPException(status_code=400, detail="Cada imagen es demasiado grande")
@@ -546,7 +548,7 @@ class ModelUpdate(BaseModel):
 
 
 @core_router.patch("/products/{product_id}/model")
-def set_product_model(product_id: int, update: ModelUpdate):
+def set_product_model(product_id: int, update: ModelUpdate, _: dict = Depends(require_admin)):
     conn = get_connection()
     try:
         with conn.cursor() as cur:
@@ -608,7 +610,7 @@ def get_product(product_id: int):
 
 
 @core_router.get("/comparison")
-def price_comparison(limit: int = Query(100, ge=1, le=500)):
+def price_comparison(limit: int = Query(100, ge=1, le=500), _: dict = Depends(require_admin)):
     conn = get_connection()
     try:
         with conn.cursor() as cur:
@@ -619,7 +621,7 @@ def price_comparison(limit: int = Query(100, ge=1, le=500)):
 
 
 @core_router.get("/opportunities/top")
-def top_opportunities(limit: int = Query(20, ge=1, le=100)):
+def top_opportunities(limit: int = Query(20, ge=1, le=100), _: dict = Depends(require_admin)):
     conn = get_connection()
     try:
         with conn.cursor() as cur:

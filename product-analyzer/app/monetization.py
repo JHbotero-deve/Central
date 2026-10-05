@@ -6,16 +6,13 @@ from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 
 from db import get_connection
+from auth import require_admin
 
 router = APIRouter(prefix="/monetize", tags=["monetización"])
 
 
-def require_admin_key(x_admin_key: str | None = Header(default=None, alias="X-Admin-Key")):
-    expected = os.getenv("MONETIZATION_ADMIN_KEY", "").strip()
-    if not expected:
-        raise HTTPException(status_code=503, detail="Operación administrativa no configurada")
-    if not x_admin_key or not hmac.compare_digest(x_admin_key, expected):
-        raise HTTPException(status_code=403, detail="No autorizado")
+def require_admin_key(user: dict = Depends(require_admin)):
+    return user
 
 
 # ---------- Afiliados ----------
