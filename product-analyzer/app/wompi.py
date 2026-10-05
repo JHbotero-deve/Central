@@ -202,7 +202,7 @@ async def create_cart_checkout(request: Request):
                 if not p:
                     raise HTTPException(status_code=404, detail=f"Producto {pid} no encontrado")
                 if str(p.get("platform_name") or "").lower() != "personal":
-                    raise HTTPException(status_code=409, detail=f"{p["title"]} se compra en su plataforma de origen")
+                    raise HTTPException(status_code=409, detail=f"Producto {p[\'title\']} se compra en su plataforma de origen")
                 if entry["publication_id"] and p["publication_id"] != entry["publication_id"]:
                     raise HTTPException(status_code=409, detail="La publicación no corresponde al producto solicitado")
                 qty = entry["qty"]
