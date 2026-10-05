@@ -193,7 +193,6 @@ def publish_card(payload: PublicationPayload, _: dict = Depends(require_admin)):
 
 @router.patch("/publications/{publication_id}")
 def update_publication(publication_id: int, payload: PublicationPayload, _: dict = Depends(require_admin)):
-    verificar_admin(x_admin_key)
     conn = get_connection()
     try:
         with conn.cursor() as cur:
@@ -266,7 +265,6 @@ def update_publication(publication_id: int, payload: PublicationPayload, _: dict
 
 @router.post("/publications/{publication_id}/telegram")
 def publish_publication_telegram(publication_id: int, _: dict = Depends(require_admin)):
-    verificar_admin(x_admin_key)
     conn = get_connection()
     try:
         with conn.cursor() as cur:

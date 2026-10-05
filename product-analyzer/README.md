@@ -1,28 +1,30 @@
 # Central
 
 ## Arquitectura
+
 - Frontend estático en Vercel desde `product-analyzer/frontend`.
-- API y worker en Railway desde `product-analyzer/app`.
-- PostgreSQL como persistencia.
-- Amazon y Mercado Libre como fuentes de catálogo según las credenciales y permisos disponibles.
-- Telegram para consulta y alertas.
-- Wompi preparado para pagos.
+- API, worker y bot en Railway desde `product-analyzer/app`.
+- PostgreSQL de Railway como persistencia única.
+- Amazon, Mercado Libre y TikTok Shop como fuentes según configuración.
+- Telegram para consultas y alertas.
+- Wompi para pagos de productos propios.
 
 ## Flujo
-Fuentes -> ingesta cada 2 horas -> PostgreSQL -> scoring -> API -> Vercel.
 
-## Tarjetas
-Cada producto se representa en una tarjeta única. La zona multimedia admite imágenes reales y, cuando `model_url` apunta a un modelo GLB/GLTF accesible, activa el visor 3D dentro de la misma tarjeta. Sin modelo válido, no se simula 3D.
-Los productos activos caducan a las 48 horas; cuando vuelven a detectarse, su vigencia se renueva 48 horas.
+Fuentes → ingesta cada 2 horas → PostgreSQL → puntuación → API → Vercel.
+
+## Publicación
+
+Central ingresa y analiza productos. El usuario decide qué tarjetas se publican. La tienda solo muestra publicaciones activas almacenadas en PostgreSQL.
+
+## Rutas
+
+`/` abre Central. `/tienda` abre la tienda. `/producto/{slug}` abre una ficha publicada. `/api/*` se enruta a Railway.
 
 ## Regla de datos
-No existen productos demo, mocks ni valores de respaldo. Si la fuente real falla, el frontend informa la indisponibilidad y no inventa catálogo.
+
+No existen productos demo, datos simulados ni valores de respaldo. Si una fuente real falla, Central muestra la indisponibilidad y conserva únicamente datos persistidos válidos.
 
 ## Producción
-Las credenciales reales viven en las variables de entorno de Railway/Vercel y no se almacenan en Git.
 
-## Amazon por URL
-La ruta comercial de Amazon permanece activa aunque la API de catálogo no esté habilitada. Se puede registrar un producto mediante su URL original; Central intenta obtener título e imagen pública y conserva el enlace para abrirlo y venderlo. El precio es opcional para el alta por URL. La integración de Amazon API es independiente y no bloquea el worker de Mercado Libre.
-
-## Telegram
-El bot mantiene /top, /buscar, /modelar y /estado. También acepta /agregar para registrar una URL de Amazon o Mercado Libre. El servicio de Telegram en Railway requiere TELEGRAM_BOT_TOKEN y TELEGRAM_CHAT_ID; sin esas variables queda deshabilitado de forma segura.
+Las credenciales reales viven en las variables de entorno de Railway y Vercel y no se almacenan en Git.

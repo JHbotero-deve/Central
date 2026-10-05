@@ -1,17 +1,20 @@
 {
-  "outputDirectory": "product-analyzer/frontend",
   "rewrites": [
     {
       "source": "/api/:path*",
       "destination": "https://gracious-renewal-production-9f45.up.railway.app/api/v1/:path*"
     },
     {
+      "source": "/",
+      "destination": "/index.html"
+    },
+    {
       "source": "/admin",
       "destination": "/index.html"
     },
     {
-      "source": "/",
-      "destination": "/tienda.html"
+      "source": "/central",
+      "destination": "/index.html"
     },
     {
       "source": "/tienda",
@@ -28,10 +31,6 @@
     {
       "source": "/sitemap.xml",
       "destination": "https://gracious-renewal-production-9f45.up.railway.app/api/v1/public/sitemap.xml"
-    },
-    {
-      "source": "/((?!api/|admin(?:/|$)|tienda(?:/|$)).*)",
-      "destination": "/tienda.html"
     }
   ],
   "headers": [
