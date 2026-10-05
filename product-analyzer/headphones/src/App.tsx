@@ -22,7 +22,7 @@ type Publication = {
   checkout_mode?: string;
 };
 
-const API = "/api";
+const API = "/api/v1";
 
 const money = (value?: number | null, currency = "COP") => {
   if (value == null || !Number.isFinite(Number(value))) return "Consultar";
