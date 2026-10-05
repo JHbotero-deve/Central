@@ -35,7 +35,7 @@
 
 <script>
 (()=>{"use strict";
-const API="/api", $=id=>document.getElementById(id), TOKEN_KEY="central_admin_token";
+const API="/api/v1", $=id=>document.getElementById(id), TOKEN_KEY="central_admin_token";
 const token=()=>localStorage.getItem(TOKEN_KEY)||"";
 const authHeaders=(extra={})=>{const t=token();return t?{...extra,Authorization:"Bearer "+t}:extra};
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
