@@ -279,6 +279,26 @@ def list_products(
         conn.close()
 
 
+@core_router.get("/intelligence/overview")
+def intelligence_overview():
+    conn=get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""SELECT COUNT(*) AS active_products,COUNT(*) FILTER(WHERE COALESCE(s.opportunity_score,0)>=70) AS high_opportunity,ROUND(AVG(COALESCE(s.opportunity_score,0))::numeric,1) AS avg_opportunity,COUNT(*) FILTER(WHERE p.catalog_expires_at IS NOT NULL AND p.catalog_expires_at<=NOW()+INTERVAL '24 hours') AS expiring_24h,COUNT(*) FILTER(WHERE COALESCE(p.sales_estimate,0)>0) AS products_with_demand FROM products p LEFT JOIN product_scores s ON s.product_id=p.id WHERE p.is_active=TRUE""")
+            c=cur.fetchone()
+            cur.execute("""SELECT COUNT(*) AS orders,COUNT(*) FILTER(WHERE payment_status IN ('PAID','APPROVED') OR paid_at IS NOT NULL) AS paid_orders,COALESCE(SUM(total_amount) FILTER(WHERE payment_status IN ('PAID','APPROVED') OR paid_at IS NOT NULL),0) AS revenue,COALESCE(SUM(estimated_profit) FILTER(WHERE payment_status IN ('PAID','APPROVED') OR paid_at IS NOT NULL),0) AS estimated_profit,COUNT(*) FILTER(WHERE status IN ('DELIVERED','COMPLETED')) AS delivered FROM store_orders""")
+            o=cur.fetchone()
+            cur.execute("""SELECT (SELECT COUNT(*) FROM affiliate_clicks) AS clicks,(SELECT COUNT(*) FROM store_leads) AS leads,(SELECT COUNT(*) FROM store_returns) AS returns,(SELECT COUNT(*) FROM store_invoices) AS invoices""")
+            f=cur.fetchone()
+            cur.execute("""SELECT p.id,p.title,pl.name AS platform,p.current_price,p.currency,COALESCE(s.opportunity_score,0) AS opportunity_score,COALESCE(p.sales_estimate,0) AS sales_estimate,p.rating,p.reviews_count,COALESCE((SELECT COUNT(*) FROM affiliate_clicks ac WHERE ac.product_id=p.id),0) AS clicks,COALESCE((SELECT COUNT(*) FROM store_orders so WHERE so.product_id=p.id AND (so.payment_status IN ('PAID','APPROVED') OR so.paid_at IS NOT NULL)),0) AS paid_orders FROM products p JOIN platforms pl ON pl.id=p.platform_id LEFT JOIN product_scores s ON s.product_id=p.id WHERE p.is_active=TRUE ORDER BY COALESCE(s.opportunity_score,0) DESC,COALESCE(p.sales_estimate,0) DESC,p.updated_at DESC LIMIT 8""")
+            top=cur.fetchall()
+            cur.execute("""SELECT pl.name AS platform,COUNT(p.id) AS products,ROUND(AVG(COALESCE(s.opportunity_score,0))::numeric,1) AS avg_score,COALESCE(SUM(p.sales_estimate),0) AS demand FROM platforms pl LEFT JOIN products p ON p.platform_id=pl.id AND p.is_active=TRUE LEFT JOIN product_scores s ON s.product_id=p.id GROUP BY pl.name HAVING COUNT(p.id)>0 ORDER BY products DESC""")
+            src=cur.fetchall()
+        n=lambda v:int(v or 0); d=lambda v:float(v or 0)
+        return {"catalog":{"active_products":n(c["active_products"]),"high_opportunity":n(c["high_opportunity"]),"avg_opportunity":d(c["avg_opportunity"]),"expiring_24h":n(c["expiring_24h"]),"products_with_demand":n(c["products_with_demand"])},"commerce":{"orders":n(o["orders"]),"paid_orders":n(o["paid_orders"]),"revenue":d(o["revenue"]),"estimated_profit":d(o["estimated_profit"]),"delivered":n(o["delivered"])},"funnel":{"clicks":n(f["clicks"]),"leads":n(f["leads"]),"returns":n(f["returns"]),"invoices":n(f["invoices"])},"top_products":[{"id":x["id"],"title":x["title"],"platform":x["platform"],"current_price":d(x["current_price"]),"currency":x["currency"],"opportunity_score":d(x["opportunity_score"]),"sales_estimate":n(x["sales_estimate"]),"clicks":n(x["clicks"]),"paid_orders":n(x["paid_orders"])} for x in top],"sources":[{"platform":x["platform"],"products":n(x["products"]),"avg_score":d(x["avg_score"]),"demand":n(x["demand"])} for x in src]}
+    finally:
+        conn.close()
+
 def _seo_slug(value: str) -> str:
     import re, unicodedata
     text = unicodedata.normalize("NFKD", value or "").encode("ascii", "ignore").decode().lower()
