@@ -20,6 +20,7 @@ from db import get_connection, upsert_product
 from monetization import router as monetization_router
 from publications import router as publication_router
 from store_orders import router as store_orders_router
+from commerce import router as commerce_router
 from tiktok_api import router as tiktok_creator_router
 from url_import import import_url
 from wompi import router as wompi_router
@@ -40,6 +41,7 @@ app.include_router(meli_notification_router, prefix="/api/v1")
 app.include_router(tiktok_creator_router, prefix="/api/v1")
 app.include_router(publication_router, prefix="/api/v1")
 app.include_router(store_orders_router, prefix="/api/v1")
+app.include_router(commerce_router, prefix="/api/v1")
 
 
 @app.middleware("http")

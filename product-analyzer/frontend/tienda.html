@@ -62,7 +62,7 @@
 <header class="topbar">
   <a class="brand" href="/tienda"><span class="mark">C</span><span><b>CENTRAL</b><small>Commerce OS</small></span></a>
   <div class="top-actions">
-    <button class="top-btn primary" id="cartTop">Carrito · <span id="cartCountTop">0</span></button>
+    <button class="top-btn" id="trackingBtn">Seguimiento</button><button class="top-btn primary" id="cartTop">Carrito · <span id="cartCountTop">0</span></button>
   </div>
 </header>
 
@@ -110,13 +110,18 @@
     <form class="checkout" id="checkout">
       <input id="name" placeholder="Nombre completo" required>
       <input id="email" type="email" placeholder="Correo electrónico" required>
-      <input id="phone" placeholder="Teléfono">
+      <input id="phone" placeholder="Teléfono" required>
+      <input id="address" placeholder="Dirección de entrega" required>
+      <input id="city" placeholder="Ciudad" required>
+      <input id="department" placeholder="Departamento" required>
       <button class="btn primary" type="submit">Continuar a Wompi</button>
       <div class="muted-note">El checkout de Central solo usa productos propios. Los productos externos conservan su enlace de origen.</div>
       <div class="err" id="err"></div>
     </form>
   </div>
 </div>
+
+<div class="drawer" id="trackingDrawer"><div class="drawer-box"><div class="drawer-head"><div><div class="kicker">CENTRAL</div><h2>Seguimiento</h2></div><button class="close" id="trackingClose">×</button></div><form class="checkout" id="trackingForm"><input id="trackingReference" placeholder="Referencia del pedido" required><input id="trackingEmail" type="email" placeholder="Correo de compra" required><button class="btn primary" type="submit">Consultar pedido</button></form><div class="err" id="trackingErr"></div><div id="trackingResult"></div><form class="checkout" id="returnForm" style="display:none;margin-top:20px"><textarea id="returnReason" maxlength="1000" required placeholder="Motivo de devolución" style="width:100%;min-height:90px;border:1px solid var(--line);border-radius:11px;padding:12px;resize:vertical"></textarea><button class="btn primary" type="submit">Solicitar devolución</button><div class="err" id="returnErr"></div></form></div></div>
 
 <script>
 (()=>{"use strict";
@@ -237,8 +242,15 @@ $("drawer").onclick=e=>{if(e.target===$("drawer"))closeCart()};
 $("checkout").onsubmit=async e=>{
   e.preventDefault();if(!cart.length){$("err").textContent="El carrito está vacío";return}
   $("err").textContent="Preparando Wompi…";
-  try{const r=await fetch(API+"/wompi/checkout/cart",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({items:cart.map(x=>({product_id:x.product_id,publication_id:x.publication_id,quantity:x.quantity})),customer_name:$("name").value.trim(),customer_email:$("email").value.trim(),customer_phone:$("phone").value.trim()||null})});const d=await r.json();if(!r.ok)throw Error(d.detail||"No fue posible iniciar el pago");localStorage.removeItem("central_cart");location.href=d.checkout_url}catch(err){$("err").textContent=err.message}
+  try{const r=await fetch(API+"/wompi/checkout/cart",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({items:cart.map(x=>({product_id:x.product_id,publication_id:x.publication_id,quantity:x.quantity})),customer_name:$("name").value.trim(),customer_email:$("email").value.trim(),customer_phone:$("phone").value.trim(),address_line:$("address").value.trim(),city:$("city").value.trim(),department:$("department").value.trim()})});const d=await r.json();if(!r.ok)throw Error(d.detail||"No fue posible iniciar el pago");localStorage.setItem("central_last_order_reference",d.reference);localStorage.setItem("central_last_order_email",$("email").value.trim());localStorage.removeItem("central_cart");location.href=d.checkout_url.checkout_url}catch(err){$("err").textContent=err.message}
 };
+const trackingDrawer=$("trackingDrawer");
+function openTracking(){trackingDrawer.classList.add("open");$("trackingReference").value=localStorage.getItem("central_last_order_reference")||"";$("trackingEmail").value=localStorage.getItem("central_last_order_email")||""}
+function closeTracking(){trackingDrawer.classList.remove("open")}
+$("trackingBtn").onclick=openTracking;$("trackingClose").onclick=closeTracking;trackingDrawer.onclick=e=>{if(e.target===trackingDrawer)closeTracking()};
+let trackedOrder=null;
+$("trackingForm").onsubmit=async e=>{e.preventDefault();$("trackingErr").textContent="";$("trackingResult").innerHTML="Consultando…";$("returnForm").style.display="none";try{const r=await fetch(API+"/store/orders/lookup",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({reference:$("trackingReference").value.trim(),email:$("trackingEmail").value.trim()})});const d=await r.json();if(!r.ok)throw Error(d.detail||"Pedido no encontrado");trackedOrder=d;$("trackingResult").innerHTML='<div class="sales-item" style="margin-top:16px"><b>'+esc(d.reference)+'</b><span>Estado pago: '+esc(d.payment_status)+' · Entrega: '+esc(d.delivery_status||"PENDING")+'</span><span>'+esc(d.city||"")+' · '+esc(d.department||"")+'</span>'+(d.invoice_number?'<span>Factura: '+esc(d.invoice_number)+'</span>':"")+(d.tracking_number?'<span>Guía: '+esc(d.tracking_number)+' · '+esc(d.carrier||"")+'</span>':"")+'</div>';if(d.payment_status==="PAID"&&!d.returns?.length){$("returnForm").style.display="grid"}}catch(err){$("trackingErr").textContent=err.message}};
+$("returnForm").onsubmit=async e=>{e.preventDefault();$("returnErr").textContent="";try{const r=await fetch(API+"/store/orders/return",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({reference:trackedOrder.reference,email:$("trackingEmail").value.trim(),reason:$("returnReason").value.trim()})});const d=await r.json();if(!r.ok)throw Error(d.detail||"No fue posible registrar la devolución");$("returnErr").textContent="Solicitud registrada: "+d.status;$("returnForm").style.display="none"}catch(err){$("returnErr").textContent=err.message}};
 renderCart();load();
 })();
 </script>
