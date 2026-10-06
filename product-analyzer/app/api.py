@@ -114,6 +114,28 @@ def proxy_product_image(url: str = Query(..., min_length=8, max_length=2_000_000
     )
 
 
+@core_router.get("/telegram/status")
+def telegram_status():
+    """Estado público mínimo del bot: no expone token ni chat ID."""
+    token = os.getenv("TELEGRAM_BOT_TOKEN") or os.getenv("BOT_TOKEN") or os.getenv("TELEGRAM_TOKEN")
+    if not token:
+        return {"configured": False, "connected": False, "username": None, "name": None}
+    try:
+        response = requests.get(f"https://api.telegram.org/bot{token}/getMe", timeout=8)
+        payload = response.json()
+        if not response.ok or not payload.get("ok"):
+            return {"configured": True, "connected": False, "username": None, "name": None}
+        user = payload.get("result") or {}
+        return {
+            "configured": True,
+            "connected": True,
+            "username": user.get("username"),
+            "name": user.get("first_name") or user.get("username"),
+        }
+    except (requests.RequestException, ValueError):
+        return {"configured": True, "connected": False, "username": None, "name": None}
+
+
 @core_router.get("/health")
 def health():
     try:
