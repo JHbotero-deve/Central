@@ -130,7 +130,7 @@ const API="/api/v1", $=id=>document.getElementById(id);
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const money=(v,c="COP")=>{if(v==null||v==="")return"Consultar";try{return new Intl.NumberFormat("es-CO",{style:"currency",currency:String(c).toUpperCase()==="USD"?"USD":"COP",maximumFractionDigits:0}).format(Number(v))}catch{return String(v)}};
 const slug=p=>p.slug||String(p.title||"producto").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
-const productUrl=p=>"/producto/"+esc(slug(p))+"-"+esc(p.product_id||p.id||"");
+const productUrl=p=>{const id=p.product_id||p.id||"";let s=String(p.title||p.slug||"producto").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");s=s.replace(new RegExp("-"+String(id)+"$"),"");return "/producto/"+esc(s)+"-"+esc(id)};
 let products=JSON.parse(localStorage.getItem("central_products_cache")||"[]");
 let cart=JSON.parse(localStorage.getItem("central_cart")||"[]");
 let filtered=[], active=null, quickMode="all";
