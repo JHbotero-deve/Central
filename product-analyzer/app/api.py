@@ -579,6 +579,86 @@ def set_product_model(product_id: int, update: ModelUpdate, _: dict = Depends(re
         conn.close()
 
 
+@core_router.get("/catalog/active")
+def active_catalog(_: dict = Depends(require_admin)):
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT p.id, p.title, pl.name AS platform, c.name AS category,
+                       p.current_price, p.currency, p.image_url, p.image_gallery,
+                       p.product_url, p.affiliate_url, p.updated_at, p.catalog_expires_at,
+                       p.stock, p.sku, p.rating, p.reviews_count,
+                       COALESCE(pc.is_published, FALSE) AS is_published,
+                       pc.id AS publication_id
+                FROM products p
+                JOIN platforms pl ON pl.id = p.platform_id
+                LEFT JOIN categories c ON c.id = p.category_id
+                LEFT JOIN published_cards pc ON pc.product_id = p.id
+                WHERE p.is_active = TRUE AND p.is_blocked = FALSE
+                ORDER BY p.updated_at DESC
+                LIMIT 200
+            """)
+            return cur.fetchall()
+    finally:
+        conn.close()
+
+
+class ProductStatus(BaseModel):
+    active: bool
+
+
+@core_router.patch("/products/{product_id}/status")
+def update_product_status(product_id: int, payload: ProductStatus, _: dict = Depends(require_admin)):
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE products
+                SET is_active=%s,
+                    is_blocked=CASE WHEN %s THEN FALSE ELSE TRUE END,
+                    updated_at=NOW()
+                WHERE id=%s
+                RETURNING id, is_active, is_blocked, updated_at
+            """, (payload.active, payload.active, product_id))
+            result = cur.fetchone()
+            if not result:
+                raise HTTPException(status_code=404, detail="Producto no encontrado")
+            if not payload.active:
+                cur.execute("UPDATE published_cards SET is_published=FALSE, updated_at=NOW() WHERE product_id=%s", (product_id,))
+        conn.commit()
+        return result
+    except HTTPException:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+@core_router.delete("/products/{product_id}")
+def remove_product(product_id: int, _: dict = Depends(require_admin)):
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE products
+                SET is_active=FALSE, is_blocked=TRUE, updated_at=NOW()
+                WHERE id=%s
+                RETURNING id, title
+            """, (product_id,))
+            result = cur.fetchone()
+            if not result:
+                raise HTTPException(status_code=404, detail="Producto no encontrado")
+            cur.execute("UPDATE published_cards SET is_published=FALSE, updated_at=NOW() WHERE product_id=%s", (product_id,))
+        conn.commit()
+        return {"status":"removed","product":result}
+    except HTTPException:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
 @core_router.get("/products/{product_id}")
 def get_product(product_id: int):
     conn = get_connection()
