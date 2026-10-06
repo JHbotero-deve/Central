@@ -37,7 +37,7 @@
 /* Cuerpo: altura uniforme, precio siempre abajo */
 .card-body{display:flex;flex-direction:column;flex:1;padding:14px 16px 16px}
 .card-body .category{color:var(--accent-ink);font-size:9px;font-weight:800;letter-spacing:.12em;text-transform:uppercase}
-.card h3{font:600 16px/1.25 "Space Grotesk";letter-spacing:-.01em;margin:6px 0 4px;min-height:2.5em;display:-webkit-box;-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.card h3{font:600 16px/1.25 "Space Grotesk";letter-spacing:-.01em;margin:6px 0 4px;min-height:2.5em;display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .card small{display:block;color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .card-price{font:800 22px "Space Grotesk";color:var(--text);margin:auto 0 12px;padding-top:10px}
 .card-price.ask{font-size:14px;color:var(--accent-ink)}
@@ -213,7 +213,7 @@ async function load(){
     const d=await r.json();const list=Array.isArray(d)?d:(d.items||d.publications||d.data||[]);
     if(!Array.isArray(list)||!list.length)throw Error("sin publicaciones");
     products=list;localStorage.setItem("central_products_cache",JSON.stringify(products));setCategories();applyFilter();return;
-  }catch(e){}
+  }catch(e){console.error("Error cargando catalogo:",endpoint,e)}
   if(products.length){setCategories();applyFilter();return}
   $("grid").innerHTML='<div class="empty"><b>Catálogo vacío</b>Vuelve pronto: estamos preparando nuestros productos.</div>';renderFeature();
 }
