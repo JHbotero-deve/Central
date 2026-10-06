@@ -88,7 +88,71 @@ function renderIntelligence(i){
   $("sources").innerHTML=sources||'<div class="empty">Sin fuentes activas.</div>';
 }
 async function load(){try{const [top,items]=await Promise.all([get("/opportunities/top?limit=12"),get("/products?limit=50")]);$("featured").innerHTML=top.length?top.map(card).join(""):'<div class="empty">No hay oportunidades reales disponibles.</div>';await Promise.all(top.map(p=>open3dInCard(p)));const scores=items.map(p=>Number(p.opportunity_score)).filter(Number.isFinite);$("iProducts").textContent=items.length;$("iHigh").textContent=items.filter(p=>Number(p.opportunity_score)>=70).length;$("iScore").textContent=(scores.length?scores.reduce((a,b)=>a+b,0)/scores.length:0).toFixed(0)+"/100";$("count").textContent=items.length;const last=items.map(x=>x.updated_at).filter(Boolean).sort().pop();$("last").textContent=date(last);$("mlCount").textContent=items.filter(x=>x.platform==="mercadolibre").length;$("amzCount").textContent=items.filter(x=>x.platform==="amazon").length;$("updated").textContent=new Date().toLocaleTimeString("es-CO");status("ok","Central conectado")}catch(e){console.error(e);$("featured").innerHTML='<div class="empty">API no disponible.</div>';status("error","API no disponible")}}
-$("manualForm").addEventListener("submit",async e=>{e.preventDefault();const btn=$("manualBtn"),out=$("manualResult");btn.disabled=true;btn.textContent="Creando…";out.textContent="Guardando la tarjeta en el catálogo…";try{const body={title:$("manualTitle").value.trim(),price:Number($("manualPrice").value),category:$("manualCategory").value,currency:"COP",image_url:$("manualImage").value.trim()||null,product_url:$("manualUrl").value.trim()||null,description:$("manualDescription").value.trim()||null,stock:$("manualStock").value===""?null:Number($("manualStock").value),sku:$("manualSku").value.trim()||null};const r=await fetch(API+"/products/personal",{method:"POST",headers:{...authHeaders({"Content-Type":"application/json",Accept:"application/json"})},body:JSON.stringify(body)});const data=await r.json().catch(()=>({}));if(!r.ok)throw new Error(data.detail||"No fue posible crear la tarjeta");out.textContent="Tarjeta creada: "+(data.product?.title||body.title);$("manualForm").reset();await load()}catch(err){out.textContent="Error: "+err.message}finally{btn.disabled=false;btn.textContent="Crear tarjeta"}});\n$("importForm").addEventListener("submit",async e=>{e.preventDefault();const btn=$("importBtn"),out=$("importResult");btn.disabled=true;btn.textContent="Importando…";out.textContent="Leyendo la URL y guardando el producto…";try{const r=await fetch(API+"/products/import-url",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url:$("url").value,category:$("category").value})});const data=await r.json();if(!r.ok)throw new Error(data.detail||"No fue posible importar");out.textContent="Producto importado: "+(data.product?.title||"OK")+(data.opportunity_score!=null?" · score "+Math.round(data.opportunity_score):" · score pendiente por falta de precio");$("url").value="";await load()}catch(err){out.textContent="Error: "+err.message}finally{btn.disabled=false;btn.textContent="Importar"}});
+async function submitManual(e){
+  e.preventDefault();
+  const btn=$("manualBtn"),out=$("manualResult");
+  btn.disabled=true;
+  btn.textContent="Creando…";
+  out.textContent="Guardando la tarjeta en el catálogo…";
+  try{
+    const body={
+      title:$("manualTitle").value.trim(),
+      price:Number($("manualPrice").value),
+      category:$("manualCategory").value,
+      currency:"COP",
+      image_url:$("manualImage").value.trim()||null,
+      product_url:$("manualUrl").value.trim()||null,
+      description:$("manualDescription").value.trim()||null,
+      stock:$("manualStock").value===""?null:Number($("manualStock").value),
+      sku:$("manualSku").value.trim()||null
+    };
+    const r=await fetch(API+"/products/personal",{
+      method:"POST",
+      headers:authHeaders({"Content-Type":"application/json",Accept:"application/json"}),
+      body:JSON.stringify(body)
+    });
+    const data=await r.json().catch(()=>({}));
+    if(!r.ok)throw new Error(data.detail||"No fue posible crear la tarjeta");
+    out.textContent="Tarjeta creada: "+(data.product?.title||body.title);
+    $("manualForm").reset();
+    await load();
+  }catch(err){
+    out.textContent="Error: "+err.message;
+  }finally{
+    btn.disabled=false;
+    btn.textContent="Crear tarjeta";
+  }
+}
+$("manualForm").addEventListener("submit",submitManual);
+
+async function submitImport(e){
+  e.preventDefault();
+  const btn=$("importBtn"),out=$("importResult");
+  btn.disabled=true;
+  btn.textContent="Importando…";
+  out.textContent="Leyendo la URL y guardando el producto…";
+  try{
+    const r=await fetch(API+"/products/import-url",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({url:$("url").value,category:$("category").value})
+    });
+    const data=await r.json();
+    if(!r.ok)throw new Error(data.detail||"No fue posible importar");
+    out.textContent="Producto importado: "+(data.product?.title||"OK")+
+      (data.opportunity_score!=null
+        ?" · score "+Math.round(data.opportunity_score)
+        :" · score pendiente por falta de precio");
+    $("url").value="";
+    await load();
+  }catch(err){
+    out.textContent="Error: "+err.message;
+  }finally{
+    btn.disabled=false;
+    btn.textContent="Importar";
+  }
+}
+$("importForm").addEventListener("submit",submitImport);
 
 const viewers=new Map();
 function open3dInCard(p){
