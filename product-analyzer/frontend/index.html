@@ -47,9 +47,10 @@ async function get(path){const r=await fetch(API+path,{cache:"no-store",headers:
 function status(kind,label){$("status").innerHTML='<span class="dot '+(kind==="ok"?"ok":kind==="warn"?"warn":"")+'"></span>'+esc(label)}
 function card(p){
   const score=p.opportunity_score==null?"—":Math.round(Number(p.opportunity_score));
-  
-  const image=p.image_url
-    ? `<img src="${esc(p.image_url)}" alt="${esc(p.title)}" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none';this.nextElementSibling.style.display='block'"><span class="noimg" style="display:none">Sin imagen</span>`
+  const gallery=Array.isArray(p.image_gallery)?p.image_gallery.filter(Boolean):[];
+  const images=[p.image_url,...gallery].filter((url,i,a)=>url&&a.indexOf(url)===i);
+  const image=images.length
+    ? `<img src="${esc(images[0])}" alt="${esc(p.title)}" loading="lazy" data-images="${esc(JSON.stringify(images))}" onerror="this.dataset.index=String(Number(this.dataset.index||0)+1);const a=JSON.parse(this.dataset.images||"[]");const i=Number(this.dataset.index);if(a[i]){this.src=a[i]}else{this.style.display="none";this.nextElementSibling.style.display="block"}}><span class="noimg" style="display:none">Sin imagen</span>`
     : `<span class="noimg">Sin imagen</span>`;
   const original=p.product_url
     ? `<a class="btn small" href="${esc(p.product_url)}" target="_blank" rel="noopener noreferrer">Abrir original</a>`
