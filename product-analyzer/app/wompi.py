@@ -24,11 +24,16 @@ def _required(name: str) -> str:
     return value
 
 
+MIN_CHECKOUT_COP = 1000
+
+
 def _amount_to_cents(amount: Any) -> int:
     cents = int(round(float(amount) * 100))
-    if cents <= 0:
+    if cents < MIN_CHECKOUT_COP * 100:
         raise HTTPException(
-            status_code=400, detail="El monto debe ser mayor que cero")
+            status_code=400,
+            detail=f"El valor mínimo de compra es ${MIN_CHECKOUT_COP:,.0f} COP",
+        )
     return cents
 
 
