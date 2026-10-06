@@ -163,6 +163,8 @@ async def create_cart_checkout(request: Request):
     department = str(body.get("department") or customer.get("department") or "").strip()
     if not address_line or not city or not department:
         raise HTTPException(status_code=400, detail="Dirección, ciudad y departamento son obligatorios")
+    if not phone:
+        raise HTTPException(status_code=400, detail="El teléfono es obligatorio para la dirección de envío")
     if not name or "@" not in email:
         raise HTTPException(status_code=400, detail="Nombre y correo válidos son obligatorios")
 
@@ -311,6 +313,7 @@ async def create_cart_checkout(request: Request):
         ("shipping-address:country", "CO"),
         ("shipping-address:city", city),
         ("shipping-address:region", department),
+        ("shipping-address:phone-number", phone),
     ]
     if phone:
         params += [("customer-data:phone-number", phone), ("customer-data:phone-number-prefix", "+57")]
