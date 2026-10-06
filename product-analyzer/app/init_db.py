@@ -17,6 +17,7 @@ SQL_FILES = [
     "sql/012_seo_affiliate_cart_invoice.sql",
     "sql/013_meli_oauth.sql",
     "sql/014_commerce_lifecycle.sql",
+    "sql/015_product_blocks.sql",
 ]
 
 
