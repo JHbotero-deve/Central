@@ -135,7 +135,7 @@ let products=JSON.parse(localStorage.getItem("central_products_cache")||"[]");
 let cart=JSON.parse(localStorage.getItem("central_cart")||"[]");
 let filtered=[], active=null, quickMode="all";
 
-function imageSrc(p){return p.image_url||((p.image_gallery||[]).find(Boolean)||"")}function imageFallback(p){const src=imageSrc(p);if(!src)return "";if(src.includes("images-na.ssl-images-amazon.com/images/P/"))return src.replace("images-na.ssl-images-amazon.com/images/P/","m.media-amazon.com/images/P/");return src}
+function mediaSrc(url){return url?API+"/media/image?url="+encodeURIComponent(url):""}function imageSrc(p){return p.image_url||((p.image_gallery||[]).find(Boolean)||"")}function imageFallback(p){const src=imageSrc(p);if(!src)return "";if(src.includes("images-na.ssl-images-amazon.com/images/P/"))return src.replace("images-na.ssl-images-amazon.com/images/P/","m.media-amazon.com/images/P/");return src}
 function saveCart(){localStorage.setItem("central_cart",JSON.stringify(cart));renderCart()}
 function isOwn(p){return String(p.checkout_mode||"").toUpperCase()==="CENTRAL"||String(p.platform||"").toLowerCase()==="personal"}
 function externalUrl(p){return p.product_url||p.affiliate_url||""}
@@ -164,7 +164,7 @@ function renderFeature(selected){
   const media=$("featureMedia");
   if(!p){media.innerHTML='<span class="feature-empty">No hay productos publicados</span>';$("featureTitle").textContent="Catálogo Central";$("featureDescription").textContent="No hay productos publicados.";return}
   const src=imageSrc(p);
-  media.innerHTML=src?'<img class="feature-image" src="'+esc(src)+'" alt="'+esc(p.title)+'" data-fb="'+esc(imageFallback(p))+'">':'<span class="feature-empty">Imagen no disponible</span>';
+  media.innerHTML=src?'<img class="feature-image" src="'+esc(mediaSrc(src))+'" alt="'+esc(p.title)+'" data-fb="'+esc(imageFallback(p))+'">':'<span class="feature-empty">Imagen no disponible</span>';
   $("featureSource").textContent="CENTRAL · "+String(p.platform||"producto").toUpperCase();
   $("featureTitle").textContent=p.title||"Producto";
   $("featureDescription").textContent=p.description||p.subtitle||"Producto publicado en Central.";
@@ -179,7 +179,7 @@ function renderFeature(selected){
   else{action.textContent="Ver ficha";action.href=productUrl(p);action.target="_self";action.onclick=null}
   $("featureFicha").href=productUrl(p);
   $("featureFicha").target="_self";
-  document.querySelectorAll(".variant").forEach(b=>b.onclick=()=>{media.innerHTML='<img class="feature-image" src="'+b.dataset.image+'" alt="'+esc(p.title)+'" referrerpolicy="no-referrer">';document.querySelectorAll(".variant").forEach(x=>x.classList.remove("active"));b.classList.add("active")});
+  document.querySelectorAll(".variant").forEach(b=>b.onclick=()=>{media.innerHTML='<img class="feature-image" src="'+mediaSrc(b.dataset.image)+'" alt="'+esc(p.title)+'" referrerpolicy="no-referrer">';document.querySelectorAll(".variant").forEach(x=>x.classList.remove("active"));b.classList.add("active")});
 }
 function card(p){
   const own=isOwn(p), ext=externalUrl(p), src=imageSrc(p);
@@ -190,7 +190,7 @@ function card(p){
     : ext
       ? '<a class="btn primary wide" href="'+esc(ext)+'" target="_blank" rel="nofollow sponsored noopener">Ir a la oferta</a>'
       : '<a class="btn primary wide" href="'+productUrl(p)+'">Ver ficha</a>';
-  return '<article class="card"><div class="card-media">'+(src?'<img src="'+esc(src)+'" alt="'+esc(p.title)+'" loading="lazy" referrerpolicy="no-referrer" data-fb="'+esc(imageFallback(p))+'"><div class="no-image" hidden>Imagen no disponible</div>':'<div class="no-image">Imagen no disponible</div>')+'<span class="badge">'+esc(p.platform||"Central")+'</span></div><div class="card-body"><div class="category">'+esc(p.category||"Producto")+'</div><h3>'+esc(p.title)+'</h3><small>'+esc(p.subtitle||"Producto publicado por Central")+'</small>'+(p.external_id?'<div class="ref">Ref. '+esc(p.external_id)+'</div>':'')+'<div class="card-price'+(ask?' ask':'')+'">'+esc(price)+'</div><div class="card-actions"><button type="button" class="btn primary wide view-product" data-id="'+esc(p.product_id||p.id)+'">Ver producto</button>'+buy+'</div></div></article>'
+  return '<article class="card"><div class="card-media">'+(src?'<img src="'+esc(mediaSrc(src))+'" alt="'+esc(p.title)+'" loading="lazy" referrerpolicy="no-referrer" data-fb="'+esc(imageFallback(p))+'"><div class="no-image" hidden>Imagen no disponible</div>':'<div class="no-image">Imagen no disponible</div>')+'<span class="badge">'+esc(p.platform||"Central")+'</span></div><div class="card-body"><div class="category">'+esc(p.category||"Producto")+'</div><h3>'+esc(p.title)+'</h3><small>'+esc(p.subtitle||"Producto publicado por Central")+'</small>'+(p.external_id?'<div class="ref">Ref. '+esc(p.external_id)+'</div>':'')+'<div class="card-price'+(ask?' ask':'')+'">'+esc(price)+'</div><div class="card-actions"><button type="button" class="btn primary wide view-product" data-id="'+esc(p.product_id||p.id)+'">Ver producto</button>'+buy+'</div></div></article>'
 }
 function renderGrid(){
   $("grid").innerHTML=filtered.length?filtered.map(card).join(""):'<div class="empty"><b>No hay productos</b>No hay productos disponibles.</div>';
@@ -203,7 +203,7 @@ function addToCart(p){
 }
 function renderCart(){
   const qty=cart.reduce((n,x)=>n+Number(x.quantity||0),0);$("cartCount").textContent=qty;$("cartCountTop").textContent=qty;
-  $("cartItems").innerHTML=cart.length?cart.map(x=>'<div class="cart-item"><img src="'+esc(x.image_url||"")+'" alt="'+esc(x.title)+'"><div><b>'+esc(x.title)+'</b><small>'+money(x.price,"COP")+'</small><div class="qty"><button data-minus="'+esc(x.product_id)+'">−</button><span>'+x.quantity+'</span><button data-plus="'+esc(x.product_id)+'">+</button></div></div><button class="close" data-remove="'+esc(x.product_id)+'">×</button></div>').join(""):'<p style="color:#5f6670">Tu carrito está vacío.</p>';
+  $("cartItems").innerHTML=cart.length?cart.map(x=>'<div class="cart-item"><img src="'+esc(mediaSrc(x.image_url||""))+'" alt="'+esc(x.title)+'"><div><b>'+esc(x.title)+'</b><small>'+money(x.price,"COP")+'</small><div class="qty"><button data-minus="'+esc(x.product_id)+'">−</button><span>'+x.quantity+'</span><button data-plus="'+esc(x.product_id)+'">+</button></div></div><button class="close" data-remove="'+esc(x.product_id)+'">×</button></div>').join(""):'<p style="color:#5f6670">Tu carrito está vacío.</p>';
   $("cartTotal").textContent=money(cart.reduce((n,x)=>n+Number(x.price)*Number(x.quantity),0),"COP");
 }
 async function load(){
