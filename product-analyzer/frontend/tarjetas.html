@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
+<title>Panel de tarjetas | Central</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/shopr.css"><script src="/shopr-core.js"></script></head>
+<body><div class="sh-wrap">
+<header class="sh-top"><a class="sh-logo" href="/vitrina">CENTRAL</a><div style="display:flex;gap:8px"><a class="sh-pill" href="/vitrina">Ver vitrina</a><a class="sh-pill" href="#" id="logout" hidden>Salir</a></div></header>
+
+<section id="auth" class="ed-side" style="max-width:420px;margin:30px 0" hidden><div class="ed-body">
+  <strong>Acceso de administrador</strong>
+  <label class="ed-l">Usuario o correo<input class="ed-in" id="u" autocomplete="username"></label>
+  <label class="ed-l">Contraseña<input class="ed-in" id="p" type="password" autocomplete="current-password"></label>
+  <button class="ed-btn" id="loginBtn" type="button">Entrar</button>
+  <details><summary style="cursor:pointer;color:var(--muted);font-size:12px">Ya tengo un token</summary><div style="display:flex;flex-direction:column;gap:8px;margin-top:8px"><input class="ed-in" id="t" placeholder="Pega el token"><button class="ed-btn ghost" id="tokBtn" type="button">Usar token</button></div></details>
+  <div id="authMsg" class="ed-msg err" hidden></div></div></section>
+
+<section id="panel" hidden><div class="ed-grid">
+ <aside class="ed-side">
+  <div class="ed-tabs"><button type="button" data-tab="mine">Productos</button><button type="button" data-tab="add" class="on">Agregar</button><button type="button" data-tab="theme">Tema</button></div>
+
+  <div class="ed-body" id="tab-mine" hidden><div class="ed-l">Tus tarjetas (fuente personal)</div><div class="sh-grid" id="mine" style="grid-template-columns:1fr 1fr"></div></div>
+
+  <div class="ed-body" id="tab-add">
+   <div class="ed-l">NUEVO PRODUCTO</div>
+   <label class="ed-l">Nombre del producto *<input class="ed-in" id="title" maxlength="200" placeholder="Ej: Air Street Pro X"></label>
+   <div class="ed-2">
+    <label class="ed-l">Marca<input class="ed-in" id="brand" maxlength="60" placeholder="Ej: Nike"></label>
+    <label class="ed-l">Categoría<select class="ed-in" id="category"><option value="zapatos">Zapatos</option><option value="camisetas">Camisetas</option><option value="electronicos">Electrónicos</option><option value="otros" selected>Otros</option></select></label>
+   </div>
+   <label class="ed-l">Descripción<textarea class="ed-in" id="description" rows="3" placeholder="Describe el producto…"></textarea></label>
+   <label class="ed-l">Etiqueta (opcional)<input class="ed-in" id="tag" maxlength="30" placeholder="Ej: Más vendido, Nuevo, Premium"></label>
+   <div class="ed-2">
+    <label class="ed-l">Precio *<input class="ed-in" id="price" inputmode="decimal" placeholder="149.99"></label>
+    <label class="ed-l">Precio original<input class="ed-in" id="prev" inputmode="decimal" placeholder="189.99"></label>
+   </div>
+   <div class="ed-2">
+    <label class="ed-l">Moneda<select class="ed-in" id="currency"><option>USD</option><option>COP</option></select></label>
+    <label class="ed-l">Rating (0–5)<input class="ed-in" id="rating" inputmode="decimal" placeholder="4,5"></label>
+   </div>
+   <label class="ed-l">N° reseñas<input class="ed-in" id="reviews" inputmode="numeric" placeholder="0"></label>
+   <div class="ed-l">Características (hasta 4)</div>
+   <div class="ed-2"><input class="ed-in" id="feat1" placeholder="Característica 1"><input class="ed-in" id="feat2" placeholder="Característica 2"><input class="ed-in" id="feat3" placeholder="Característica 3"><input class="ed-in" id="feat4" placeholder="Característica 4"></div>
+   <div style="display:flex;justify-content:space-between"><span class="ed-l">Variantes de color *</span><button type="button" class="ed-x" id="addVar" style="color:var(--muted)">＋ Agregar</button></div>
+   <div id="vars" style="display:flex;flex-direction:column;gap:10px"></div>
+   <label class="ed-l" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" id="plate"> Marco claro para la imagen (útil si tiene fondo blanco)</label>
+   <div class="ed-l">Links de compra</div>
+   <input class="ed-in" id="l_amz" placeholder="🟠 Amazon: https://…"><input class="ed-in" id="l_meli" placeholder="🟡 Mercado Libre: https://…"><input class="ed-in" id="l_wmp" placeholder="🔵 Wompi (link de pago): https://…">
+   <button class="ed-btn" id="save" type="button">Crear tarjeta</button><div id="msg" class="ed-msg" hidden></div>
+  </div>
+
+  <div class="ed-body" id="tab-theme" hidden><div class="ed-l">Fondo de la vitrina (se guarda en este navegador)</div><div class="ed-themes" id="themes"></div></div>
+ </aside>
+ <main><div class="ed-l" style="margin-bottom:10px">VISTA PREVIA EN VIVO</div><div id="preview"></div></main>
+</div></section>
+</div>
+
+<script>
+(()=>{"use strict";const S=Shopr,$=id=>document.getElementById(id);S.applyTheme();
+const f=id=>$(id).value.trim();
+const num=v=>{v=String(v).trim().replace(",",".");return v===""||isNaN(Number(v))?null:Number(v)};
+let V=[{name:"",glow:0,img:""}];
+
+function show(el,k,t){el.hidden=false;el.className="ed-msg "+k;el.textContent=t}
+function gate(){const ok=!!S.tok();$("auth").hidden=ok;$("panel").hidden=!ok;$("logout").hidden=!ok;if(ok){renderVars();preview();loadMine();renderThemes()}}
+function tab(n){["mine","add","theme"].forEach(x=>{$("tab-"+x).hidden=x!==n});document.querySelectorAll("[data-tab]").forEach(b=>b.classList.toggle("on",b.dataset.tab===n))}
+
+function renderVars(){
+  $("vars").innerHTML=V.map((v,i)=>{const up=v.img.startsWith("data:");return `<div class="ed-var" data-i="${i}">
+   <div class="ed-varh"><b>Variante ${i+1}</b>${V.length>1?`<button type="button" class="ed-x" data-del="${i}">Quitar</button>`:""}</div>
+   <input class="ed-in" data-f="name" placeholder="Nombre del color (Ej: Rojo Fuego)" value="${S.esc(v.name)}">
+   <div class="ed-row"><input class="ed-in" data-f="img" placeholder="URL de imagen (Amazon / Mercado Libre)" value="${up?"":S.esc(v.img)}"><label class="ed-up" title="Subir imagen">⬆<input type="file" accept="image/*" data-file hidden></label></div>
+   ${up?'<div class="ed-note">Imagen subida ✓</div>':""}
+   <div class="ed-glows">${S.GLOWS.map((g,gi)=>`<button type="button" class="ed-g ${gi===v.glow?"on":""}" data-g="${gi}" title="${g[0]}" style="background:${g[1]}"></button>`).join("")}</div></div>`}).join("");
+  $("addVar").hidden=V.length>=4;
+}
+function model(){return{id:"preview",title:f("title")||"Nombre del producto",brand:f("brand"),tag:f("tag"),cat:f("category"),desc:f("description"),
+  price:num(f("price")),prev:num(f("prev")),currency:f("currency"),rating:num(f("rating"))||0,reviews:parseInt(f("reviews"),10)||0,
+  features:[1,2,3,4].map(i=>f("feat"+i)).filter(Boolean),variants:V.map(v=>({...v})),
+  links:{amazon:f("l_amz"),meli:f("l_meli"),wompi:f("l_wmp")},fallback:"",platform:"personal",plate:$("plate").checked}}
+function preview(){S.mountDetail($("preview"),model(),0)}
+
+function resize(file,max=700){return new Promise((res,rej)=>{const im=new Image(),u=URL.createObjectURL(file);
+  im.onload=()=>{const s=Math.min(1,max/Math.max(im.width,im.height)),c=document.createElement("canvas");c.width=Math.round(im.width*s);c.height=Math.round(im.height*s);
+   const x=c.getContext("2d");x.drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(u);
+   res(c.toDataURL(file.type==="image/png"?"image/png":"image/jpeg",.85))};
+  im.onerror=()=>rej(new Error("Imagen no valida"));im.src=u})}
+
+$("vars").addEventListener("input",e=>{const b=e.target.closest(".ed-var");if(!b||!e.target.dataset.f)return;V[+b.dataset.i][e.target.dataset.f]=e.target.value.trim()});
+$("vars").addEventListener("click",e=>{const t=e.target.closest("[data-del],[data-g]");if(!t)return;const i=+t.closest(".ed-var").dataset.i;
+  if(t.dataset.del!==undefined)V.splice(i,1);else V[i].glow=+t.dataset.g;renderVars();preview()});
+$("vars").addEventListener("change",async e=>{if(!e.target.matches("[data-file]"))return;const i=+e.target.closest(".ed-var").dataset.i,file=e.target.files[0];if(!file)return;
+  try{V[i].img=await resize(file);renderVars();preview()}catch(err){show($("msg"),"err",err.message)}});
+$("addVar").addEventListener("click",()=>{if(V.length<4){V.push({name:"",glow:Math.min(V.length,7),img:""});renderVars();preview()}});
+$("tab-add").addEventListener("input",preview);$("plate").addEventListener("change",preview);
+document.querySelectorAll("[data-tab]").forEach(b=>b.addEventListener("click",()=>tab(b.dataset.tab)));
+
+async function loadMine(){
+  try{const d=await S.api("/products?limit=50");const l=(Array.isArray(d)?d:(d.items||d.products||[])).filter(p=>String(p.platform||"").toLowerCase()==="personal");
+    $("mine").innerHTML=l.length?l.map(p=>S.cardHtml(S.fromApi(p))).join(""):'<div class="ed-note" style="color:var(--muted)">Aún no tienes tarjetas propias.</div>'}
+  catch(e){$("mine").innerHTML='<div class="ed-msg err">'+S.esc(e.message)+'</div>'}}
+function renderThemes(){const cur=S.theme()[0];
+  $("themes").innerHTML=S.THEMES.map((t,i)=>`<button type="button" class="ed-t ${t[0]===cur?"on":""}" data-t="${i}" style="background:${t[1]}">${t[0]}</button>`).join("");
+  $("themes").querySelectorAll("[data-t]").forEach(b=>b.addEventListener("click",()=>{S.setTheme(S.THEMES[+b.dataset.t]);renderThemes()}))}
+
+$("loginBtn").addEventListener("click",async()=>{const b=$("loginBtn");b.disabled=true;$("authMsg").hidden=true;
+  try{S.setTok(await S.login($("u").value.trim(),$("p").value));gate()}catch(e){show($("authMsg"),"err",e.message)}finally{b.disabled=false}});
+$("tokBtn").addEventListener("click",()=>{const v=$("t").value.trim();if(v){S.setTok(v);gate()}});
+$("logout").addEventListener("click",e=>{e.preventDefault();S.setTok("");gate()});
+
+$("save").addEventListener("click",async()=>{
+  const m=model(),msg=$("msg");msg.hidden=true;
+  if(f("title").length<2)return show(msg,"err","El nombre necesita al menos 2 caracteres");
+  if(!(m.price>0))return show(msg,"err","El precio debe ser mayor a 0");
+  if(m.prev!=null&&m.prev<=0)return show(msg,"err","El precio original debe ser mayor a 0");
+  if(m.rating<0||m.rating>5)return show(msg,"err","El rating va de 0 a 5");
+  for(const [k,v] of Object.entries(m.links))if(v&&!S.url(v))return show(msg,"err","El link de "+k+" debe iniciar con http(s)://");
+  for(const v of V)if(v.img&&!S.imgOk(v.img))return show(msg,"err","Una URL de imagen no es valida (usa http(s):// o sube un archivo)");
+  if(!V.some(v=>v.img))return show(msg,"err","Agrega al menos una imagen en una variante");
+  const gallery=[];
+  const vs=V.filter(v=>v.img||v.name).map(v=>{let ref=v.img;if(v.img.startsWith("data:")){gallery.push(v.img);ref="g:"+(gallery.length-1)}return{n:v.name,g:v.glow,i:ref}});
+  const links={};if(m.links.amazon)links.amazon=m.links.amazon;if(m.links.meli)links.meli=m.links.meli;if(m.links.wompi)links.wompi=m.links.wompi;
+  const meta={v:1,brand:m.brand,tag:m.tag,rating:m.rating||null,reviews:m.reviews||null,features:m.features,variants:vs,links,plate:m.plate};
+  const description=S.pack(f("description"),meta);
+  if(description.length>5000)return show(msg,"err","Descripción + datos extra superan 5000 caracteres ("+description.length+"). Acórtala.");
+  const first=V.find(v=>v.img);
+  const body={title:f("title"),description,price:m.price,previous_price:m.prev>0?m.prev:null,currency:m.currency,category:m.cat||"otros",
+    image_url:first.img,image_gallery:gallery,product_url:links.amazon||links.meli||links.wompi||null};
+  const b=$("save");b.disabled=true;
+  try{await S.api("/products/personal",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+    show(msg,"ok","Tarjeta creada");
+    ["title","brand","description","tag","price","prev","rating","reviews","feat1","feat2","feat3","feat4","l_amz","l_meli","l_wmp"].forEach(id=>$(id).value="");
+    V=[{name:"",glow:0,img:""}];renderVars();preview();loadMine()}
+  catch(e){if(e.status===401){S.setTok("");gate();show($("authMsg"),"err","Sesión vencida, entra de nuevo")}else show(msg,"err",e.message)}
+  finally{b.disabled=false}});
+gate();})();
+</script></body></html>

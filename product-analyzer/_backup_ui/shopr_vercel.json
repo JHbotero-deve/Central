@@ -1,6 +1,5 @@
 {
   "rewrites": [
-    { "source": "/vitrina", "destination": "/vitrina.html" },
     { "source": "/tarjetas", "destination": "/tarjetas.html" },
     {
       "source": "/api/v1/:path*",

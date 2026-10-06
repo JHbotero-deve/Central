@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Central | Vitrina</title><meta name="description" content="Productos seleccionados por Central.">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/shopr.css"><script src="/shopr-core.js"></script></head>
+<body><div class="sh-wrap">
+<header class="sh-top"><a class="sh-logo" href="/vitrina">CENTRAL</a><nav class="sh-pills" id="pills"></nav><a class="sh-icon" href="/tarjetas" title="Panel de tarjetas">＋</a></header>
+<div id="detail"><div class="sh-skel"></div></div>
+<h2 class="sh-h2" id="moreH" hidden></h2><div class="sh-grid" id="more"></div>
+<div id="state" class="sh-state" hidden></div>
+</div>
+<script>
+(()=>{"use strict";const S=Shopr,$=id=>document.getElementById(id);S.applyTheme();
+let all=[],cat="todos",cur=null,cache={};
+const ICON={zapatos:"👟",camisetas:"👕",electronicos:"⚡","electrónicos":"⚡"};
+const cname=c=>c==="todos"?"Todos":c.charAt(0).toUpperCase()+c.slice(1);
+function pills(){
+  const n={};all.forEach(m=>n[m.cat]=(n[m.cat]||0)+1);
+  const cats=["todos",...Object.keys(n).sort((a,b)=>n[b]-n[a]).slice(0,5)];
+  $("pills").innerHTML=cats.map(c=>`<button type="button" class="sh-pill ${c===cat?"on":""}" data-c="${S.esc(c)}">${ICON[c]||(c==="todos"?"✦":"🛍️")} ${S.esc(cname(c))}</button>`).join("");
+  $("pills").querySelectorAll("[data-c]").forEach(b=>b.addEventListener("click",()=>{cat=b.dataset.c;pills();const l=pool();if(l[0])pick(l[0])}));
+}
+const pool=()=>all.filter(m=>cat==="todos"||m.cat===cat).sort((a,b)=>(b.score||0)-(a.score||0));
+function more(){
+  const l=pool().filter(m=>!cur||m.id!==cur.id).slice(0,8);
+  $("moreH").hidden=!l.length;$("moreH").innerHTML="Más en <em>"+S.esc(cat==="todos"?"Central":cname(cat))+"</em>";
+  $("more").innerHTML=l.map(S.cardHtml).join("");
+  $("more").querySelectorAll("[data-id]").forEach(b=>b.addEventListener("click",()=>{const m=all.find(x=>String(x.id)===b.dataset.id);if(m){pick(m);window.scrollTo({top:0,behavior:"smooth"})}}));
+}
+async function pick(m){
+  cur=m;$("detail").innerHTML='<div class="sh-skel"></div>';more();
+  let d=cache[m.id];
+  if(d===undefined){try{d=await S.api("/products/"+encodeURIComponent(m.id))}catch{d=null}cache[m.id]=d}
+  if(cur!==m)return;
+  S.mountDetail($("detail"),S.fromApi(m.raw,d||undefined),0);
+}
+async function init(){
+  $("state").hidden=true;
+  try{const d=await S.api("/products?limit=50");const list=Array.isArray(d)?d:(d.items||d.products||[]);all=list.map(p=>S.fromApi(p))}
+  catch(e){$("detail").innerHTML="";$("state").hidden=false;$("state").innerHTML='No se pudo cargar el catalogo ('+S.esc(e.message)+'). <button class="sh-pill on" id="retry" type="button">Reintentar</button>';$("retry").addEventListener("click",init);return}
+  if(!all.length){$("detail").innerHTML="";$("state").hidden=false;$("state").textContent="Aun no hay productos publicados.";return}
+  pills();pick(pool()[0]);
+}
+init();})();
+</script></body></html>

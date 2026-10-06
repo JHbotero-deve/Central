@@ -1,7 +1,5 @@
 {
   "rewrites": [
-    { "source": "/vitrina", "destination": "/vitrina.html" },
-    { "source": "/tarjetas", "destination": "/tarjetas.html" },
     {
       "source": "/api/v1/:path*",
       "destination": "https://gracious-renewal-production-aadd.up.railway.app/api/v1/:path*"
