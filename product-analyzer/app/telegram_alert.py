@@ -11,8 +11,8 @@ from url_import import import_url
 
 POLL_INTERVAL = int(os.getenv("TELEGRAM_POLL_INTERVAL", "3"))
 API_BASE = "https://api.telegram.org"
-ALLOWED_PLATFORMS = {"mercadolibre", "amazon"}
-ALLOWED_CATEGORIES = {"ropa", "calzado", "accesorios"}
+ALLOWED_PLATFORMS = {"mercadolibre", "amazon", "personal"}
+ALLOWED_CATEGORIES = {"ropa", "calzado", "accesorios", "electronica", "hogar", "fitness", "otros"}
 
 
 def _token():
@@ -127,6 +127,7 @@ def _top_products(limit=5):
                 LEFT JOIN categories c ON c.id = p.category_id
                 LEFT JOIN product_scores s ON s.product_id = p.id
                 WHERE p.is_active = TRUE
+                  AND p.is_blocked = FALSE
                 ORDER BY COALESCE(s.opportunity_score, 0) DESC, p.updated_at DESC
                 LIMIT %s
                 """,
@@ -155,6 +156,7 @@ def _search_products(term, limit=8):
                 LEFT JOIN categories c ON c.id = p.category_id
                 LEFT JOIN product_scores s ON s.product_id = p.id
                 WHERE p.is_active = TRUE
+                  AND p.is_blocked = FALSE
                   AND p.title ILIKE %s
                 ORDER BY COALESCE(s.opportunity_score, 0) DESC
                 LIMIT %s
@@ -262,6 +264,7 @@ def _handle(token, chat_id, text):
     if command in ("/start", "/help"):
         return _send(token, chat_id, (
             "<b>Radar de Producto</b>\n\n"
+            "/productos — mostrar los 20 productos del catálogo\n"
             "/top — oportunidades con mayor score\n"
             "/buscar producto — buscar en los datos modelados\n"
             "/modelar — registrar y puntuar un producto\n"
@@ -269,6 +272,16 @@ def _handle(token, chat_id, text):
             "/estado — estado del catálogo\n"
             "/help — ayuda"
         ))
+
+    if command in ("/productos", "/catalogo"):
+        products = _top_products(20)
+        if not products:
+            return _send(token, chat_id, "No hay productos activos en el catálogo.")
+        _send(token, chat_id, "<b>Catálogo Central · 20 productos</b>")
+        for i, product in enumerate(products, 1):
+            product["title"] = f"{i}. {product['title']}"
+            _send_product(token, chat_id, product)
+        return True
 
     if command == "/top":
         products = _top_products()
