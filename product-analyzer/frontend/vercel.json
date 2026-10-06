@@ -23,8 +23,8 @@
       "destination": "/tienda.html"
     },
     {
-      "source": "/producto/:slug",
-      "destination": "/producto.html?slug=:slug"
+      "source": "/producto/:path*",
+      "destination": "/producto.html?slug=:path*"
     },
     {
       "source": "/robots.txt",
