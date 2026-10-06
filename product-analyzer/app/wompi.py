@@ -81,7 +81,7 @@ class ProductCheckout(BaseModel):
 def create_product_checkout(req: ProductCheckout):
     if req.quantity<1 or req.quantity>100: raise HTTPException(status_code=400,detail="Cantidad inválida")
     public_key=_required("WOMPI_PUBLIC_KEY")
-    currency=os.getenv("WOMPI_CURRENCY","COP").strip().upper()
+    currency="COP"
     environment=os.getenv("WOMPI_ENVIRONMENT","prod").strip().lower()
     if currency!="COP": raise HTTPException(status_code=500,detail="Wompi Colombia requiere moneda COP")
     conn=get_connection()
