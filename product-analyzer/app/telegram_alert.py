@@ -138,6 +138,36 @@ def _top_products(limit=5):
         conn.close()
 
 
+def _catalog_products(limit=20):
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT p.title, p.current_price, p.currency, p.product_url, p.image_url,
+                       p.rating, p.reviews_count, p.sales_estimate,
+                       pl.name AS platform, c.name AS category,
+                       COALESCE(s.price_score, 0) AS price_score,
+                       COALESCE(s.demand_score, 0) AS demand_score,
+                       COALESCE(s.trend_score, 0) AS trend_score,
+                       COALESCE(s.opportunity_score, 0) AS opportunity_score
+                FROM products p
+                JOIN platforms pl ON pl.id = p.platform_id
+                LEFT JOIN categories c ON c.id = p.category_id
+                LEFT JOIN product_scores s ON s.product_id = p.id
+                WHERE p.is_active = TRUE
+                  AND p.is_blocked = FALSE
+                  AND pl.name = 'personal'
+                ORDER BY p.id ASC
+                LIMIT %s
+                """,
+                (limit,),
+            )
+            return cur.fetchall()
+    finally:
+        conn.close()
+
+
 def _search_products(term, limit=8):
     conn = get_connection()
     try:
@@ -274,7 +304,7 @@ def _handle(token, chat_id, text):
         ))
 
     if command in ("/productos", "/catalogo"):
-        products = _top_products(20)
+        products = _catalog_products(20)
         if not products:
             return _send(token, chat_id, "No hay productos activos en el catálogo.")
         _send(token, chat_id, "<b>Catálogo Central · 20 productos</b>")

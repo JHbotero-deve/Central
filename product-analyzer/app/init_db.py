@@ -19,6 +19,7 @@ SQL_FILES = [
     "sql/014_commerce_lifecycle.sql",
     "sql/015_product_blocks.sql",
     "sql/016_replace_catalog_20.sql",
+    "sql/017_stock_reservations.sql",
 ]
 
 

@@ -88,14 +88,23 @@ def create_product_checkout(req: ProductCheckout):
     try:
         with conn.cursor() as cur:
             cur.execute("""SELECT p.id,p.title,p.image_url,p.product_url,p.current_price,p.currency,p.stock,
-                                  pc.id AS publication_id,pc.sale_price,pc.cost_price
-                           FROM products p LEFT JOIN published_cards pc ON pc.product_id=p.id AND pc.is_published=TRUE
-                           WHERE p.id=%s AND p.is_active=TRUE""",(req.product_id,))
+                                  pc.id AS publication_id,pc.sale_price,pc.cost_price,
+                                  pl.name AS platform_name
+                           FROM products p
+                           LEFT JOIN published_cards pc ON pc.product_id=p.id AND pc.is_published=TRUE
+                           JOIN platforms pl ON pl.id=p.platform_id
+                           WHERE p.id=%s AND p.is_active=TRUE
+                           FOR UPDATE OF p""",(req.product_id,))
             product=cur.fetchone()
             if not product: raise HTTPException(status_code=404,detail="Producto no encontrado")
-            if str(product.get("platform") or "").lower() != "personal": raise HTTPException(status_code=409,detail="Este producto se compra en su plataforma de origen")
+            if str(product.get("platform_name") or "").lower() != "personal": raise HTTPException(status_code=409,detail="Este producto se compra en su plataforma de origen")
             if req.publication_id and product["publication_id"]!=req.publication_id: raise HTTPException(status_code=409,detail="La publicación no corresponde al producto solicitado")
-            if product["stock"] is not None and req.quantity>product["stock"]: raise HTTPException(status_code=409,detail="Stock insuficiente")
+            cur.execute("""SELECT COALESCE(SUM(quantity), 0) AS reserved
+                           FROM store_stock_reservations
+                           WHERE product_id=%s AND status='ACTIVE' AND expires_at > NOW()""",(req.product_id,))
+            reserved = int((cur.fetchone() or {}).get("reserved") or 0)
+            if product["stock"] is not None and req.quantity + reserved > product["stock"]:
+                raise HTTPException(status_code=409,detail="Stock insuficiente")
             sale=float(product["sale_price"] or product["current_price"] or 0)
             cost=float(product["cost_price"] if product["cost_price"] is not None else product["current_price"] or 0)
             if sale<=0: raise HTTPException(status_code=400,detail="Producto sin precio de venta")
@@ -115,6 +124,10 @@ def create_product_checkout(req: ProductCheckout):
                 VALUES (%s,'wompi',%s,%s,%s,%s,%s,'PENDING',%s) RETURNING id,reference""",
                 (reference,req.product_id,order["id"],req.customer_email.strip().lower(),cents,currency,environment))
             payment=cur.fetchone()
+            cur.execute("""INSERT INTO store_stock_reservations
+                           (order_id,product_id,quantity,status,expires_at)
+                           VALUES (%s,%s,%s,'ACTIVE',NOW()+INTERVAL '30 minutes')""",
+                        (order["id"],req.product_id,req.quantity))
         conn.commit()
     finally: conn.close()
     redirect=os.getenv("WOMPI_REDIRECT_URL","").strip() or None
@@ -190,7 +203,8 @@ async def create_cart_checkout(request: Request):
                    FROM products p
                    LEFT JOIN published_cards pc ON pc.product_id=p.id AND pc.is_published=TRUE
                    LEFT JOIN platforms pl ON pl.id=p.platform_id
-                   WHERE p.id = ANY(%s) AND p.is_active=TRUE""",
+                   WHERE p.id = ANY(%s) AND p.is_active=TRUE
+                   FOR UPDATE OF p""",
                 (list(wanted.keys()),),
             )
             rows = {r["id"]: r for r in cur.fetchall()}
@@ -206,7 +220,12 @@ async def create_cart_checkout(request: Request):
                 if entry["publication_id"] and p["publication_id"] != entry["publication_id"]:
                     raise HTTPException(status_code=409, detail="La publicación no corresponde al producto solicitado")
                 qty = entry["qty"]
-                if p["stock"] is not None and qty > p["stock"]:
+                cur.execute("""SELECT COALESCE(SUM(quantity), 0) AS reserved
+                               FROM store_stock_reservations
+                               WHERE product_id=%s AND status='ACTIVE' AND expires_at > NOW()""",
+                            (pid,))
+                reserved = int((cur.fetchone() or {}).get("reserved") or 0)
+                if p["stock"] is not None and qty + reserved > p["stock"]:
                     raise HTTPException(status_code=409, detail=f"Stock insuficiente: {p['title']}")
                 sale = float(p["sale_price"] or p["current_price"] or 0)
                 cost = float(p["cost_price"] if p["cost_price"] is not None else p["current_price"] or 0)
@@ -265,6 +284,11 @@ async def create_cart_checkout(request: Request):
                 (reference, first["product_id"], order["id"], email, cents, currency, environment),
             )
             payment = cur.fetchone()
+            for line in lines:
+                cur.execute("""INSERT INTO store_stock_reservations
+                               (order_id,product_id,quantity,status,expires_at)
+                               VALUES (%s,%s,%s,'ACTIVE',NOW()+INTERVAL '30 minutes')""",
+                            (order["id"],line["product_id"],line["qty"]))
         conn.commit()
     finally:
         conn.close()
@@ -439,18 +463,43 @@ async def wompi_events(
 
             if payment and payment.get("order_id") and status == "APPROVED":
                 cur.execute("""UPDATE store_orders SET status='PAID',payment_status='PAID',paid_at=NOW(),updated_at=NOW()
-                               WHERE id=%s AND payment_status<>'PAID' RETURNING id,product_id,quantity""",(payment["order_id"],))
+                               WHERE id=%s AND payment_status<>'PAID' RETURNING id""",(payment["order_id"],))
                 order=cur.fetchone()
                 if order:
-                    cur.execute("""UPDATE products p SET stock=CASE WHEN p.stock IS NULL THEN NULL ELSE GREATEST(p.stock-oi.quantity,0) END
-                                   FROM store_order_items oi
-                                   WHERE oi.order_id=%s AND oi.product_id=p.id""",(order["id"],))
+                    cur.execute("""SELECT id,product_id,quantity
+                                   FROM store_stock_reservations
+                                   WHERE order_id=%s AND status IN ('ACTIVE','EXPIRED')
+                                   ORDER BY id FOR UPDATE""",(order["id"],))
+                    reservations=cur.fetchall()
+                    for reservation in reservations:
+                        cur.execute("""UPDATE products
+                                       SET stock=CASE WHEN stock IS NULL THEN NULL ELSE stock-%s END,
+                                           updated_at=NOW()
+                                       WHERE id=%s AND (stock IS NULL OR stock >= %s)
+                                       RETURNING id""",
+                                    (reservation["quantity"],reservation["product_id"],reservation["quantity"]))
+                        if cur.fetchone():
+                            cur.execute("""UPDATE store_stock_reservations
+                                           SET status='CONSUMED',released_at=NOW()
+                                           WHERE id=%s""",(reservation["id"],))
+                        else:
+                            cur.execute("""UPDATE store_stock_reservations
+                                           SET status='STOCK_ERROR',released_at=NOW()
+                                           WHERE id=%s""",(reservation["id"],))
+                            cur.execute("""UPDATE store_orders
+                                           SET status='PAID_STOCK_REVIEW',
+                                               notes=LEFT(COALESCE(notes,'') || ' | Pago aprobado sin stock disponible para completar la reserva.',1000),
+                                               updated_at=NOW()
+                                           WHERE id=%s""",(order["id"],))
                     cur.execute("""INSERT INTO store_invoices(order_id,invoice_number,total_amount,currency,status)
                                    SELECT id,'FAC-'||to_char(NOW(),'YYYYMMDDHH24MISS')||'-'||id,total_amount,currency,'ISSUED'
                                    FROM store_orders WHERE id=%s
                                    ON CONFLICT(order_id) DO NOTHING""",(order["id"],))
             elif payment and payment.get("order_id") and status in {"DECLINED","VOIDED","ERROR"}:
-                cur.execute("""UPDATE store_orders SET status=%s,payment_status=%s,updated_at=NOW() WHERE id=%s AND payment_status='PENDING'""",(status,status,payment["order_id"]))
+                cur.execute("""UPDATE store_orders SET status=%s,payment_status=%s,updated_at=NOW() WHERE id=%s AND payment_status='PENDING'""",(status,status,payment["order_id"],))
+                cur.execute("""UPDATE store_stock_reservations
+                               SET status='RELEASED',released_at=NOW()
+                               WHERE order_id=%s AND status='ACTIVE'""",(payment["order_id"],))
 
             if payment and status == "APPROVED" and payment["plan_id"]:
                 cur.execute(
