@@ -35,6 +35,11 @@ async function login(u,p){
     if(r.status!==422&&r.status!==400)break}
   throw new Error(last)}
 
+function mkLinks(mt,plat,p,g){
+  const L=Object.assign({},mt.links||{}),aff=g("affiliate_url")||g("product_url")||"";
+  if(plat==="amazon"&&!L.amazon)L.amazon=aff;
+  if((plat==="mercadolibre"||plat==="meli")&&!L.meli)L.meli=aff;
+  return L}
 function fromApi(p,detail){
   const d=detail?(detail.product||detail):p, g=k=>(d[k]!=null?d[k]:p[k]);
   const u=unpack(g("description")), mt=u.meta||{}, gal=Array.isArray(g("image_gallery"))?g("image_gallery"):[];
@@ -45,7 +50,7 @@ function fromApi(p,detail){
   return{id:p.id,raw:p,title:g("title")||"Producto",brand:mt.brand||(plat&&plat!=="personal"?plat.toUpperCase():""),tag:mt.tag||"",
     cat:String(g("category")||"otros").toLowerCase(),desc:u.text,price:nn(g("current_price")??g("price")),prev:nn(g("previous_price")),
     currency:g("currency")||"COP",rating:nn(mt.rating)||0,reviews:nn(mt.reviews)||0,features:mt.features||[],variants,
-    links:Object.assign({},mt.links),fallback:g("product_url")||"",platform:plat,score:nn(g("opportunity_score"))||0,
+    links:mkLinks(mt,plat,p,g),fallback:g("product_url")||"",platform:plat,score:nn(g("opportunity_score"))||0,
     plate:mt.plate!==undefined?!!mt.plate:plat!=="personal"}}
 
 const stars=r=>{const n=Math.max(0,Math.min(5,Math.round(r)));return"★".repeat(n)+"☆".repeat(5-n)};
@@ -57,6 +62,7 @@ function detailHtml(m,vi){
   if(url(L.meli))b.push(a("sh-meli",L.meli,"Ver en <b>Mercado Libre</b>"));
   if(url(L.wompi))b.push(a("sh-wmp",L.wompi,"Pagar con <b>Wompi</b>"));
   if(!b.length&&url(m.fallback))b.push(a("sh-amz",m.fallback,"Ver <b>producto</b>"));
+  if(!b.length&&m.platform==="personal")b.push('<a class="sh-btn sh-wmp" href="/tienda">Comprar en <b>Central</b></a>');
   const im=imgOk(v.img)?`<img src="${esc(imgOk(v.img))}" alt="${esc(m.title)}" referrerpolicy="no-referrer">`:'<span class="sh-noimg">Sin imagen</span>';
   const sw=m.variants.length>1?`<div class="sh-color">COLOR: <b>${esc(v.name||gl[0])}</b></div><div class="sh-sw">${m.variants.map((x,i)=>`<button type="button" data-vi="${i}" class="${i===vi?"on":""}" title="${esc(x.name||"")}" style="background:${(GLOWS[x.glow]||GLOWS[0])[1]}"></button>`).join("")}</div>`:"";
   return `<section class="sh-detail"><div class="sh-stage ${m.plate?"plate":""}">${im}</div><div class="sh-info">
