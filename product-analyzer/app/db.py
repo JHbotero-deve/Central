@@ -59,7 +59,7 @@ def upsert_product(conn, platform_name: str, category_name: str, product: dict):
                 platform_id, category_id, seller_id, external_id, title,
                 image_url, image_gallery, product_url, affiliate_url, current_price, currency, rating,
                 reviews_count, sales_estimate, source_metadata,
-                catalog_batch_id, catalog_expires_at, updated_at
+                catalog_batch_id, catalog_expires_at, is_blocked, updated_at
             )
             VALUES (
                 %s, %s, %s, %s, %s, %s, %s, %s,
@@ -81,7 +81,7 @@ def upsert_product(conn, platform_name: str, category_name: str, product: dict):
                 source_metadata = EXCLUDED.source_metadata,
                 catalog_batch_id = NOW(),
                 catalog_expires_at = NOW() + INTERVAL '48 hours',
-                is_active = TRUE,
+                is_active = CASE WHEN products.is_blocked THEN FALSE ELSE TRUE END,
                 updated_at = NOW()
             RETURNING id
             """,
