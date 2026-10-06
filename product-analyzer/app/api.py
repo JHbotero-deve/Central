@@ -4,6 +4,8 @@ Central Product Analyzer REST API.
 
 import os
 import time
+
+import requests
 from typing import Optional
 from urllib.parse import quote
 
@@ -22,7 +24,7 @@ from publications import router as publication_router
 from store_orders import router as store_orders_router
 from commerce import router as commerce_router
 from tiktok_api import router as tiktok_creator_router
-from url_import import import_url
+from url_import import import_url, _public_url
 from wompi import router as wompi_router
 from meli_oauth import router as meli_oauth_router, notification_router as meli_notification_router
 from auth import router as auth_router, require_admin
@@ -75,6 +77,41 @@ app.add_middleware(
 )
 
 core_router = APIRouter(tags=["core"])
+
+
+@core_router.get("/media/image")
+def proxy_product_image(url: str = Query(..., min_length=8, max_length=2_000_000)):
+    """Entrega imágenes públicas de productos con validación SSRF y caché corta."""
+    try:
+        _public_url(url)
+        response = requests.get(
+            url,
+            headers={
+                "User-Agent": "Mozilla/5.0 (compatible; CentralImageProxy/1.0)",
+                "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+            },
+            timeout=12,
+            allow_redirects=True,
+        )
+        response.raise_for_status()
+        _public_url(response.url)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"No fue posible obtener la imagen: {exc}")
+
+    content_type = (response.headers.get("Content-Type") or "").split(";", 1)[0].lower()
+    allowed_types = {"image/jpeg", "image/png", "image/webp", "image/gif", "image/avif", "image/svg+xml"}
+    if content_type not in allowed_types:
+        raise HTTPException(status_code=415, detail="El recurso no es una imagen compatible")
+
+    data = response.content
+    if len(data) > 8 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="La imagen supera el límite permitido")
+
+    return Response(
+        content=data,
+        media_type=content_type,
+        headers={"Cache-Control": "public, max-age=3600, stale-while-revalidate=86400"},
+    )
 
 
 @core_router.get("/health")
