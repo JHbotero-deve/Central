@@ -63,7 +63,7 @@
 <header class="topbar">
   <a class="brand" href="/tienda"><span class="mark">C</span><span><b>CENTRAL</b><small>TIENDA</small></span></a>
   <div class="top-actions">
-    <button class="top-btn" id="trackingBtn">Seguimiento</button><button class="top-btn primary" id="cartTop">Carrito · <span id="cartCountTop">0</span></button>
+    <a class="top-btn" id="telegramTop" href="#" target="_blank" rel="noopener noreferrer" hidden>Telegram</a><button class="top-btn" id="trackingBtn">Seguimiento</button><button class="top-btn primary" id="cartTop">Carrito · <span id="cartCountTop">0</span></button>
   </div>
 </header>
 
@@ -72,7 +72,7 @@
     <div class="kicker">CENTRAL · TIENDA</div>
     <h1>Tu catálogo.<br><span>Tu producto.</span><br>Tu Central.</h1>
     <p>Catálogo público de Central con productos seleccionados y publicados desde Central.</p>
-    <div class="hero-actions"><a class="btn primary" href="#catalogo">Explorar productos</a></div>
+    <div class="hero-actions"><a class="btn primary" href="#catalogo">Explorar productos</a><a class="btn" id="telegramHero" href="#" target="_blank" rel="noopener noreferrer" hidden>Canal / bot de Telegram</a></div>
   </div>
   <div class="stage">
     <div class="stage-orbit"><div class="ring"></div><div class="ring r2"></div><div class="central-mark">C</div><div class="stage-label"><b>CENTRAL</b><span>COMMERCE OS</span></div></div>
@@ -206,6 +206,18 @@ function renderCart(){
   $("cartItems").innerHTML=cart.length?cart.map(x=>'<div class="cart-item"><img src="'+esc(mediaSrc(x.image_url||""))+'" alt="'+esc(x.title)+'"><div><b>'+esc(x.title)+'</b><small>'+money(x.price,"COP")+'</small><div class="qty"><button data-minus="'+esc(x.product_id)+'">−</button><span>'+x.quantity+'</span><button data-plus="'+esc(x.product_id)+'">+</button></div></div><button class="close" data-remove="'+esc(x.product_id)+'">×</button></div>').join(""):'<p style="color:#5f6670">Tu carrito está vacío.</p>';
   $("cartTotal").textContent=money(cart.reduce((n,x)=>n+Number(x.price)*Number(x.quantity),0),"COP");
 }
+async function loadTelegram(){
+  const buttons=[$("telegramTop"),$("telegramHero")];
+  try{
+    const r=await fetch(API+"/telegram/status",{cache:"no-store"});
+    const d=await r.json();
+    if(!d.connected||!d.username)return;
+    const href="https://t.me/"+encodeURIComponent(d.username);
+    buttons.forEach(b=>{b.href=href;b.hidden=false});
+  }catch(e){
+    console.warn("Telegram no disponible:",e);
+  }
+}
 async function load(){
   const endpoints=[API+"/publications?limit=100"];
   for(const endpoint of endpoints)try{
@@ -259,7 +271,7 @@ $("trackingBtn").onclick=openTracking;$("trackingClose").onclick=closeTracking;t
 let trackedOrder=null;
 $("trackingForm").onsubmit=async e=>{e.preventDefault();$("trackingErr").textContent="";$("trackingResult").innerHTML="Consultando…";$("returnForm").style.display="none";try{const r=await fetch(API+"/store/orders/lookup",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({reference:$("trackingReference").value.trim(),email:$("trackingEmail").value.trim()})});const d=await r.json();if(!r.ok)throw Error(d.detail||"Pedido no encontrado");trackedOrder=d;$("trackingResult").innerHTML='<div class="sales-item" style="margin-top:16px"><b>'+esc(d.reference)+'</b><span>Estado pago: '+esc(d.payment_status)+' · Entrega: '+esc(d.delivery_status||"PENDING")+'</span><span>'+esc(d.city||"")+' · '+esc(d.department||"")+'</span>'+(d.invoice_number?'<span>Factura: '+esc(d.invoice_number)+'</span>':"")+(d.tracking_number?'<span>Guía: '+esc(d.tracking_number)+' · '+esc(d.carrier||"")+'</span>':"")+'</div>';if(d.payment_status==="PAID"&&!d.returns?.length){$("returnForm").style.display="grid"}}catch(err){$("trackingErr").textContent=err.message}};
 $("returnForm").onsubmit=async e=>{e.preventDefault();$("returnErr").textContent="";try{const r=await fetch(API+"/store/orders/return",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({reference:trackedOrder.reference,email:$("trackingEmail").value.trim(),reason:$("returnReason").value.trim()})});const d=await r.json();if(!r.ok)throw Error(d.detail||"No fue posible registrar la devolución");$("returnErr").textContent="Solicitud registrada: "+d.status;$("returnForm").style.display="none"}catch(err){$("returnErr").textContent=err.message}};
-renderCart();load();
+renderCart();load();loadTelegram();
 })();
 </script>
 </body>
