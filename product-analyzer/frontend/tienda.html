@@ -158,8 +158,8 @@ function applyFilter(){
   renderFeature();
   renderGrid();
 }
-function renderFeature(){
-  const p=filtered[0]||products[0];
+function renderFeature(selected){
+  const p=selected||active||filtered[0]||products[0];
   active=p||null;
   const media=$("featureMedia");
   if(!p){media.innerHTML='<span class="feature-empty">No hay productos publicados</span>';$("featureTitle").textContent="Catálogo Central";$("featureDescription").textContent="No hay productos publicados.";return}
@@ -185,11 +185,12 @@ function card(p){
   const own=isOwn(p), ext=externalUrl(p), src=imageSrc(p);
   let price=p.price_display||money(p.sale_price??p.current_price,p.currency), ask=false;
   if(price==="Consultar"&&ext){price="Ver precio en la tienda";ask=true}
-  let main;
-  if(own) main='<button class="btn primary wide add" data-id="'+esc(p.product_id||p.id)+'">Añadir al carrito</button>';
-  else if(ext) main='<a class="btn primary wide" href="'+esc(ext)+'" target="_blank" rel="nofollow sponsored noopener">Ver producto</a>';
-  else main='<a class="btn primary wide" href="'+productUrl(p)+'">Ver ficha</a>';
-  return '<article class="card"><div class="card-media">'+(src?'<img src="'+esc(src)+'" alt="'+esc(p.title)+'" loading="lazy" referrerpolicy="no-referrer" data-fb="'+esc(imageFallback(p))+'"><div class="no-image" hidden>Imagen no disponible</div>':'<div class="no-image">Imagen no disponible</div>')+'<span class="badge">'+esc(p.platform||"Central")+'</span></div><div class="card-body"><div class="category">'+esc(p.category||"Producto")+'</div><h3>'+esc(p.title)+'</h3><small>'+esc(p.subtitle||"Producto publicado por Central")+'</small>'+(p.external_id?'<div class="ref">Ref. '+esc(p.external_id)+'</div>':'')+'<div class="card-price'+(ask?' ask':'')+'">'+esc(price)+'</div><div class="card-actions">'+main+'<a class="btn" href="'+productUrl(p)+'">Ficha</a></div></div></article>'
+  const buy=own
+    ? '<button class="btn primary wide add" data-id="'+esc(p.product_id||p.id)+'">Añadir al carrito</button>'
+    : ext
+      ? '<a class="btn primary wide" href="'+esc(ext)+'" target="_blank" rel="nofollow sponsored noopener">Ir a la oferta</a>'
+      : '<a class="btn primary wide" href="'+productUrl(p)+'">Ver ficha</a>';
+  return '<article class="card"><div class="card-media">'+(src?'<img src="'+esc(src)+'" alt="'+esc(p.title)+'" loading="lazy" referrerpolicy="no-referrer" data-fb="'+esc(imageFallback(p))+'"><div class="no-image" hidden>Imagen no disponible</div>':'<div class="no-image">Imagen no disponible</div>')+'<span class="badge">'+esc(p.platform||"Central")+'</span></div><div class="card-body"><div class="category">'+esc(p.category||"Producto")+'</div><h3>'+esc(p.title)+'</h3><small>'+esc(p.subtitle||"Producto publicado por Central")+'</small>'+(p.external_id?'<div class="ref">Ref. '+esc(p.external_id)+'</div>':'')+'<div class="card-price'+(ask?' ask':'')+'">'+esc(price)+'</div><div class="card-actions"><button type="button" class="btn primary wide view-product" data-id="'+esc(p.product_id||p.id)+'">Ver producto</button>'+buy+'</div></div></article>'
 }
 function renderGrid(){
   $("grid").innerHTML=filtered.length?filtered.map(card).join(""):'<div class="empty"><b>No hay productos</b>No hay productos disponibles.</div>';
@@ -230,8 +231,14 @@ document.addEventListener("error",e=>{const im=e.target;if(im.matches&&im.matche
 document.addEventListener("load",e=>{const im=e.target;if(im.matches&&im.matches("img[data-fb]")&&im.naturalWidth<=1)imgFail(im)},true);
 $("search").oninput=applyFilter;$("category").onchange=applyFilter;$("sort").onchange=applyFilter;$("quick").onclick=e=>{const b=e.target.closest("[data-mode]");if(!b)return;quickMode=b.dataset.mode;document.querySelectorAll("#quick button").forEach(x=>x.classList.toggle("active",x===b));applyFilter()};
 $("categories").onclick=e=>{const b=e.target.closest("[data-cat]");if(!b)return;$("category").value=b.dataset.cat;document.querySelectorAll(".cat").forEach(x=>x.classList.toggle("active",x===b));applyFilter()};
+function showProduct(p){
+  if(!p)return;
+  renderFeature(p);
+  $("feature").scrollIntoView({behavior:"smooth",block:"start"});
+}
 document.addEventListener("click",e=>{
-  const add=e.target.closest(".add"),minus=e.target.closest("[data-minus]"),plus=e.target.closest("[data-plus]"),rem=e.target.closest("[data-remove]");
+  const add=e.target.closest(".add"),view=e.target.closest(".view-product"),minus=e.target.closest("[data-minus]"),plus=e.target.closest("[data-plus]"),rem=e.target.closest("[data-remove]");
+  if(view){const p=products.find(x=>String(x.product_id||x.id)===String(view.dataset.id));if(p)showProduct(p)}
   if(add){const p=products.find(x=>String(x.product_id||x.id)===String(add.dataset.id));if(p)addToCart(p)}
   if(minus){const x=cart.find(i=>String(i.product_id)===String(minus.dataset.minus));if(x){x.quantity--;if(x.quantity<=0)cart=cart.filter(i=>i!==x);saveCart()}}
   if(plus){const x=cart.find(i=>String(i.product_id)===String(plus.dataset.plus));if(x){x.quantity++;saveCart()}}
