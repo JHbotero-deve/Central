@@ -260,7 +260,10 @@ function openCart(){$("drawer").classList.add("open")}function closeCart(){$("dr
 $("cartBtn").onclick=openCart;$("cartTop").onclick=openCart;$("close").onclick=closeCart;
 $("drawer").onclick=e=>{if(e.target===$("drawer"))closeCart()};
 $("checkout").onsubmit=async e=>{
-  e.preventDefault();if(!cart.length){$("err").textContent="El carrito está vacío";return}
+  e.preventDefault();
+  if(!cart.length){$("err").textContent="El carrito está vacío";return}
+  const cartTotal=cart.reduce((n,x)=>n+Number(x.price)*Number(x.quantity),0);
+  if(cartTotal<1000){$("err").textContent="El valor mínimo para pagar con Wompi es $1.000 COP";return}
   $("err").textContent="Preparando Wompi…";
   try{const r=await fetch(API+"/wompi/checkout/cart",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({items:cart.map(x=>({product_id:x.product_id,publication_id:x.publication_id,quantity:x.quantity})),customer_name:$("name").value.trim(),customer_email:$("email").value.trim(),customer_phone:$("phone").value.trim(),address_line:$("address").value.trim(),city:$("city").value.trim(),department:$("department").value.trim()})});const d=await r.json();if(!r.ok)throw Error(d.detail||"No fue posible iniciar el pago");localStorage.setItem("central_last_order_reference",d.reference);localStorage.setItem("central_last_order_email",$("email").value.trim());localStorage.removeItem("central_cart");location.href=d.checkout_url}catch(err){$("err").textContent=err.message}
 };
