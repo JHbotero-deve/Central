@@ -16,7 +16,7 @@
 <script src="/central-shim.js"></script>
 </head>
 <body>
-<nav class="nav"><div class="wrap"><div class="brand">CENTRAL <b>·</b> RADAR</div><div class="navlinks"><a href="#oportunidades">Oportunidades</a><a href="#importar">Importar producto</a><a href="#catalogo">Catálogo</a><a href="/tienda" target="_blank" rel="noopener noreferrer">Abrir tienda</a></div><div class="status" id="status"><span class="dot"></span>Acceso requerido</div></div></nav>
+<nav class="nav"><div class="wrap"><div class="brand">CENTRAL <b>·</b> RADAR</div><div class="navlinks"><a href="#oportunidades">Oportunidades</a><a href="#importar">Importar producto</a><a href="/catalogo.html">Catálogo activo</a><a href="/tienda" target="_blank" rel="noopener noreferrer">Abrir tienda</a></div><div class="status" id="status"><span class="dot"></span>Acceso requerido</div></div></nav>
 
 <header><div class="wrap"><div class="eyebrow">Producto real · análisis · monetización</div><h1>Detecta oportunidades antes de que desaparezcan.</h1><p class="hero-copy">Central reúne productos reales, calcula una señal de oportunidad y mantiene un catálogo con renovación automática cada 2 horas y vigencia de 48 horas. No usa productos de demostración.</p><div class="actions"><a class="btn primary" href="#oportunidades">Ver oportunidades</a><a class="btn" href="#importar">Importar producto</a><a class="btn" href="/tienda" target="_blank" rel="noopener noreferrer">Abrir tienda</a></div></div></header>
 
@@ -26,7 +26,7 @@
 
 <section id="importar"><div class="wrap"><div class="section-head"><div><div class="eyebrow">03 · entrada real</div><h2>Importar desde una plataforma</h2><p>Pega una URL de Amazon o Mercado Libre. Central extrae los metadatos disponibles y guarda el producto en el catálogo.</p></div></div><form class="import" id="importForm"><input class="field" id="url" type="url" placeholder="Pega la URL del producto" required><select class="field" id="category"><option value="accesorios">Accesorios</option><option value="ropa">Ropa</option><option value="calzado">Calzado</option></select><button class="btn primary" id="importBtn" type="submit">Importar</button></form><div class="import-result" id="importResult"></div></div></section>
 
-<section id="catalogo"><div class="wrap"><div class="section-head"><div><div class="eyebrow">04 · catálogo</div><h2>Productos activos</h2><p>Datos persistidos en PostgreSQL, con vencimiento y renovación controlados por el worker.</p></div><button class="btn small" id="refreshBtn">Actualizar</button></div><div class="table-wrap"><table><thead><tr><th>Producto</th><th>Fuente</th><th>Precio</th><th>Score</th><th>Vigencia</th></tr></thead><tbody id="catalog"><tr><td colspan="5">Cargando…</td></tr></tbody></table></div></div></section>
+
 
 <section id="estado"><div class="wrap"><div class="section-head"><div><div class="eyebrow">05 · operación</div><h2>Estado de Central</h2></div></div><div class="metrics"><div class="metric"><span>Productos activos</span><strong id="count">—</strong></div><div class="metric"><span>Última actualización</span><strong id="last" style="font-size:14px">—</strong></div><div class="metric"><span>Mercado Libre</span><strong id="mlCount">—</strong></div><div class="metric"><span>Amazon</span><strong id="amzCount">—</strong></div></div></div></section>
 </main>
@@ -50,15 +50,12 @@ function card(p){
   const gallery=Array.isArray(p.image_gallery)?p.image_gallery.filter(Boolean):[];
   const images=[p.image_url,...gallery].filter((url,i,a)=>url&&a.indexOf(url)===i);
   const image=images.length
-    ? `<img src="${esc(images[0])}" alt="${esc(p.title)}" loading="lazy" data-images="${esc(JSON.stringify(images))}" onerror="this.dataset.index=String(Number(this.dataset.index||0)+1);const a=JSON.parse(this.dataset.images||"[]");const i=Number(this.dataset.index);if(a[i]){this.src=a[i]}else{this.style.display="none";this.nextElementSibling.style.display="block"}}><span class="noimg" style="display:none">Sin imagen</span>`
+    ? `<img src="${esc("/api/v1/media/image?url="+encodeURIComponent(images[0]))}" alt="${esc(p.title)}" loading="lazy" data-images="${esc(JSON.stringify(images))}" data-index="0" onerror="const a=JSON.parse(this.dataset.images||"[]");const i=Number(this.dataset.index||0)+1;this.dataset.index=String(i);if(a[i]){this.src="/api/v1/media/image?url="+encodeURIComponent(a[i])}else{this.style.display="none";this.nextElementSibling.style.display="block"}}><span class="noimg" style="display:none">Sin imagen</span>`
     : `<span class="noimg">Sin imagen</span>`;
   const original=p.product_url
     ? `<a class="btn small" href="${esc(p.product_url)}" target="_blank" rel="noopener noreferrer">Abrir original</a>`
     : "";
-  return `<article class="card" data-product="${esc(p.id)}"><div class="card-media">${image}</div><div class="inline-3d open" id="viewer-${esc(p.id)}"><span class="hint">Vista 3D</span></div><div class="card-body"><span class="badge">${esc(p.platform||"—")}</span><div class="title">${esc(p.title)}</div><div class="price">${money(p.current_price,p.currency)}</div><div class="score">Score ${score}/100</div><div class="card-actions">${original}</div></div></article>`;
-}
-function row(p){
-  return `<tr><td>${esc(p.title)}</td><td>${esc(p.platform)}</td><td>${money(p.current_price,p.currency)}</td><td>${esc(p.opportunity_score==null?"—":Math.round(Number(p.opportunity_score)))}</td><td>${date(p.catalog_expires_at)}</td></tr>`;
+  return `<article class="card" data-product="${esc(p.id)}"><div class="card-media">${image}</div><div class="inline-3d open" id="viewer-${esc(p.id)}"><span class="hint">Vista 3D</span></div><div class="card-body"><span class="badge">${esc(p.platform||"—")}</span><div class="title">${esc(p.title)}</div><div class="price">${money(p.current_price,p.currency)}</div><div class="card-actions">${original}</div></div></article>`;
 }
 function renderIntelligence(i){
   $("iProducts").textContent=Number(i.catalog.active_products||0).toLocaleString("es-CO");
