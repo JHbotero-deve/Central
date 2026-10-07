@@ -24,11 +24,16 @@ def _required(name: str) -> str:
     return value
 
 
+MIN_CHECKOUT_COP = 1000
+
+
 def _amount_to_cents(amount: Any) -> int:
     cents = int(round(float(amount) * 100))
-    if cents <= 0:
+    if cents < MIN_CHECKOUT_COP * 100:
         raise HTTPException(
-            status_code=400, detail="El monto debe ser mayor que cero")
+            status_code=400,
+            detail=f"El valor mínimo de compra es ${MIN_CHECKOUT_COP:,.0f} COP",
+        )
     return cents
 
 
@@ -158,6 +163,8 @@ async def create_cart_checkout(request: Request):
     department = str(body.get("department") or customer.get("department") or "").strip()
     if not address_line or not city or not department:
         raise HTTPException(status_code=400, detail="Dirección, ciudad y departamento son obligatorios")
+    if not phone:
+        raise HTTPException(status_code=400, detail="El teléfono es obligatorio para la dirección de envío")
     if not name or "@" not in email:
         raise HTTPException(status_code=400, detail="Nombre y correo válidos son obligatorios")
 
@@ -208,8 +215,6 @@ async def create_cart_checkout(request: Request):
                 (list(wanted.keys()),),
             )
             rows = {r["id"]: r for r in cur.fetchall()}
-
-            # --- Validar y calcular cada línea con precios del servidor ---
             lines = []
             for pid, entry in wanted.items():
                 p = rows.get(pid)
@@ -247,8 +252,6 @@ async def create_cart_checkout(request: Request):
             first = lines[0]
             first_row = rows[first["product_id"]]
             title_snapshot = first["title"] if len(lines) == 1 else f"{first['title']} y {len(lines) - 1} más"
-
-            # --- Pedido (cabecera) ---
             cur.execute(
                 """INSERT INTO store_orders
                    (reference, product_id, publication_id, customer_name, customer_email, customer_phone,
@@ -263,8 +266,6 @@ async def create_cart_checkout(request: Request):
                  title_snapshot, first_row["image_url"], first_row["product_url"], first_row["platform_name"], address_line, city, department),
             )
             order = cur.fetchone()
-
-            # --- Pedido (ítems) ---
             for l in lines:
                 cur.execute(
                     """INSERT INTO store_order_items
@@ -274,8 +275,6 @@ async def create_cart_checkout(request: Request):
                     (order["id"], l["product_id"], l["publication_id"], l["title"], l["qty"],
                      l["sale"], l["cost"], l["sale"] * l["qty"], (l["sale"] - l["cost"]) * l["qty"]),
                 )
-
-            # --- Transacción de pago ---
             cur.execute(
                 """INSERT INTO payment_transactions
                    (reference, provider, product_id, order_id, customer_email,
@@ -306,6 +305,7 @@ async def create_cart_checkout(request: Request):
         ("shipping-address:country", "CO"),
         ("shipping-address:city", city),
         ("shipping-address:region", department),
+        ("shipping-address:phone-number", phone),
     ]
     if phone:
         params += [("customer-data:phone-number", phone), ("customer-data:phone-number-prefix", "+57")]

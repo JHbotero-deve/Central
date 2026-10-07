@@ -21,8 +21,6 @@ notification_router = APIRouter(prefix="/meli", tags=["mercadolibre-notification
 
 def _env(name: str) -> str:
     return os.getenv(name, "").strip()
-
-
 def _redirect_uri() -> str:
     value = _env("MELI_REDIRECT_URI")
     if not value:

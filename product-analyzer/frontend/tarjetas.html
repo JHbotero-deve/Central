@@ -2,7 +2,22 @@
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
 <title>Panel de tarjetas | Central</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/shopr.css"><script src="/shopr-core.js"></script></head>
+<link rel="stylesheet" href="/shopr.css"><script src="/shopr-core.js"></script><style>
+.admin-cards{grid-template-columns:repeat(auto-fill,minmax(220px,1fr))!important;gap:16px!important}
+.admin-card{background:var(--panel);border:1px solid var(--line);border-radius:18px;overflow:hidden;text-align:left;color:inherit;cursor:pointer;padding:0;font:inherit;transition:transform .15s ease,border-color .15s ease}
+.admin-card:hover{transform:translateY(-3px);border-color:var(--brand)}
+.admin-card:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.admin-card-media{aspect-ratio:4/3;display:grid;place-items:center;overflow:hidden;background:linear-gradient(160deg,#25171a,#0f0f12)}
+.admin-card-media img{width:100%;height:100%;object-fit:contain}
+.admin-card-media.plate img{background:#fff}
+.admin-card-noimg{font-size:12px;color:var(--muted)}
+.admin-card-body{padding:12px 14px;display:flex;flex-direction:column;gap:3px}
+.admin-card-brand{font:700 10px var(--font);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.admin-card-title{font-weight:700;font-size:15px;line-height:1.25}
+.admin-card-price{font:800 16px var(--display);color:var(--brand)}
+.admin-card-meta{display:flex;align-items:center;justify-content:space-between;gap:8px;color:var(--muted);font-size:11px}
+.admin-card-status{display:inline-flex;width:max-content;padding:2px 6px;border:1px solid color-mix(in srgb,var(--ok) 45%,var(--line));border-radius:999px;color:var(--ok);font-weight:700}
+</style></head>
 <body><div class="sh-wrap">
 <header class="sh-top"><a class="sh-logo" href="/vitrina">CENTRAL</a><div style="display:flex;gap:8px"><a class="sh-pill" href="/vitrina">Ver vitrina</a><a class="sh-pill" href="#" id="logout" hidden>Salir</a></div></header>
 
@@ -18,7 +33,7 @@
  <aside class="ed-side">
   <div class="ed-tabs"><button type="button" data-tab="mine">Productos</button><button type="button" data-tab="add" class="on">Agregar</button><button type="button" data-tab="theme">Tema</button></div>
 
-  <div class="ed-body" id="tab-mine" hidden><div class="ed-l">Tus tarjetas (fuente personal)</div><div class="sh-grid" id="mine" style="grid-template-columns:1fr 1fr"></div></div>
+  <div class="ed-body" id="tab-mine" hidden><div class="ed-l">Productos</div><div class="sh-grid admin-cards" id="mine"></div></div>
 
   <div class="ed-body" id="tab-add">
    <div class="ed-l">NUEVO PRODUCTO</div>
@@ -94,10 +109,25 @@ $("addVar").addEventListener("click",()=>{if(V.length<4){V.push({name:"",glow:Ma
 $("tab-add").addEventListener("input",preview);$("plate").addEventListener("change",preview);
 document.querySelectorAll("[data-tab]").forEach(b=>b.addEventListener("click",()=>tab(b.dataset.tab)));
 
+function adminCardHtml(m){
+  const v=m.variants[0]||{},src=S.imgOk(v.img);
+  const img=src?'<img src="'+S.esc(src)+'" alt="'+S.esc(m.title)+'" loading="lazy" referrerpolicy="no-referrer">':'<span class="admin-card-noimg">Sin imagen</span>';
+  return '<button type="button" class="admin-card" data-id="'+S.esc(m.id)+'" aria-label="Abrir '+S.esc(m.title)+'"><div class="admin-card-media '+(m.plate?"plate":"")+'">'+img+'</div><div class="admin-card-body"><span class="admin-card-brand">'+S.esc(m.brand||m.cat)+'</span><span class="admin-card-title">'+S.esc(m.title)+'</span><span class="admin-card-price">'+S.money(m.price,m.currency)+'</span><div class="admin-card-meta"><span>'+S.esc(m.cat)+'</span><span class="admin-card-status">Activo</span></div></div></button>'
+}
+function bindAdminCards(){
+  document.querySelectorAll(".admin-card").forEach(card=>card.addEventListener("click",()=>{
+    const m=mineModels.find(x=>String(x.id)===String(card.dataset.id));
+    if(m)S.mountDetail($("preview"),m,0);
+  }));
+}
+let mineModels=[];
 async function loadMine(){
   try{const d=await S.api("/products?limit=50");const l=(Array.isArray(d)?d:(d.items||d.products||[])).filter(p=>String(p.platform||"").toLowerCase()==="personal");
-    $("mine").innerHTML=l.length?l.map(p=>S.cardHtml(S.fromApi(p))).join(""):'<div class="ed-note" style="color:var(--muted)">Aún no tienes tarjetas propias.</div>'}
-  catch(e){$("mine").innerHTML='<div class="ed-msg err">'+S.esc(e.message)+'</div>'}}
+    mineModels=l.map(p=>S.fromApi(p));
+    $("mine").innerHTML=mineModels.length?mineModels.map(adminCardHtml).join(""):'<div class="ed-note" style="color:var(--muted)">Aún no tienes productos.</div>';
+    bindAdminCards();
+  }catch(e){$("mine").innerHTML='<div class="ed-msg err">'+S.esc(e.message)+'</div>'}
+}
 function renderThemes(){const cur=S.theme()[0];
   $("themes").innerHTML=S.THEMES.map((t,i)=>`<button type="button" class="ed-t ${t[0]===cur?"on":""}" data-t="${i}" style="background:${t[1]}">${t[0]}</button>`).join("");
   $("themes").querySelectorAll("[data-t]").forEach(b=>b.addEventListener("click",()=>{S.setTheme(S.THEMES[+b.dataset.t]);renderThemes()}))}

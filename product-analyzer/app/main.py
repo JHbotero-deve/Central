@@ -9,8 +9,6 @@ from db import get_connection, upsert_product
 from ingest import fetch_mercadolibre
 from init_db import init_database
 from notifications import send_telegram_alert
-from telegram_alert import run_bot
-import threading
 from tiktok_creator import creator_configured, sync_showcase
 
 SEARCH_CONFIG = [
@@ -23,8 +21,7 @@ SEARCH_CONFIG = [
     ("hogar", "lampara led"),
     ("ropa", "campera mujer"),
     ("calzado", "zapatillas urbanas"),
-    ("fitness", "accesorios gimnasio"),
-]
+    ("fitness", "accesorios gimnasio"),]
 SCORE_THRESHOLD = float(os.getenv("SCORE_THRESHOLD", "50"))
 AMAZON_BATCH_SIZE = int(os.getenv("AMAZON_BATCH_SIZE", "15"))
 
@@ -163,7 +160,6 @@ def run_worker():
     print("Esperando a que la base de datos esté lista...")
     time.sleep(5)
     init_database()
-    threading.Thread(target=run_bot, daemon=True, name="telegram-bot").start()
     run_pipeline()
     schedule.every(2).hours.do(run_pipeline)
     while True:

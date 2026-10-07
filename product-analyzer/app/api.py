@@ -1,4 +1,4 @@
-"""
+﻿"""
 Central Product Analyzer REST API.
 """
 
@@ -77,8 +77,6 @@ app.add_middleware(
 )
 
 core_router = APIRouter(tags=["core"])
-
-
 @core_router.get("/media/image")
 def proxy_product_image(url: str = Query(..., min_length=8, max_length=2_000_000)):
     """Entrega imágenes públicas de productos con validación SSRF y caché corta."""
@@ -112,6 +110,28 @@ def proxy_product_image(url: str = Query(..., min_length=8, max_length=2_000_000
         media_type=content_type,
         headers={"Cache-Control": "public, max-age=3600, stale-while-revalidate=86400"},
     )
+
+
+@core_router.get("/telegram/status")
+def telegram_status():
+    """Estado público mínimo del bot: no expone token ni chat ID."""
+    token = os.getenv("TELEGRAM_BOT_TOKEN") or os.getenv("BOT_TOKEN") or os.getenv("TELEGRAM_TOKEN")
+    if not token:
+        return {"configured": False, "connected": False, "username": None, "name": None}
+    try:
+        response = requests.get(f"https://api.telegram.org/bot{token}/getMe", timeout=8)
+        payload = response.json()
+        if not response.ok or not payload.get("ok"):
+            return {"configured": True, "connected": False, "username": None, "name": None}
+        user = payload.get("result") or {}
+        return {
+            "configured": True,
+            "connected": True,
+            "username": user.get("username"),
+            "name": user.get("first_name") or user.get("username"),
+        }
+    except (requests.RequestException, ValueError):
+        return {"configured": True, "connected": False, "username": None, "name": None}
 
 
 @core_router.get("/health")
@@ -173,8 +193,6 @@ def _sync_store_catalog():
                 WHERE p.is_active = TRUE AND pl.name IN ('amazon', 'mercadolibre')
             """)
             existing = {(str(row["platform"]).lower(), str(row["external_id"]).upper()) for row in cur.fetchall()}
-
-        # Amazon: hasta 15 productos reales nuevos y válidos.
         try:
             amazon_products = fetch_amazon_products(
                 {external_id for platform, external_id in existing if platform == "amazon"},
@@ -201,8 +219,6 @@ def _sync_store_catalog():
         except Exception as exc:
             conn.rollback()
             errors.append(f"Amazon: {exc}")
-
-        # Mercado Libre: toma los primeros 5 productos reales disponibles.
         meli_queries = ("soporte celular", "audifonos bluetooth", "smartwatch", "mouse gamer", "lampara led")
         try:
             for query in meli_queries:
@@ -373,45 +389,185 @@ def public_product(product_id: int):
 
 @core_router.post("/affiliate/click")
 def affiliate_click(payload: dict):
+    """
+    Resuelve la URL comercial de un producto externo.
+
+    Amazon:
+      1. affiliate_url almacenada.
+      2. product_url + AMAZON_PARTNER_TAG.
+      3. product_url sin atribución.
+
+    Mercado Libre:
+      1. affiliate_url almacenada.
+      2. product_url sin modificar.
+
+    Productos propios:
+      No utilizan afiliación; deben pasar por Wompi.
+    """
     product_id = int(payload.get("product_id") or 0)
+
     if product_id <= 0:
-        raise HTTPException(400, "product_id es obligatorio")
+        raise HTTPException(
+            status_code=400,
+            detail="product_id es obligatorio",
+        )
+
     conn = get_connection()
+
     try:
         with conn.cursor() as cur:
-            cur.execute("""SELECT p.product_url,p.affiliate_url,pl.name AS platform
+            cur.execute(
+                """
+                SELECT
+                    p.id,
+                    p.product_url,
+                    p.affiliate_url,
+                    p.checkout_mode,
+                    pl.name AS platform
                 FROM products p
-                JOIN platforms pl ON pl.id=p.platform_id
-                JOIN published_cards pc ON pc.product_id=p.id AND pc.is_published=TRUE
-                WHERE p.id=%s AND p.is_active=TRUE""", (product_id,))
-            row = cur.fetchone()
-            if not row:
-                raise HTTPException(404, "Producto no encontrado")
-            if str(row["platform"]).lower() != "amazon":
-                raise HTTPException(400, "Este producto no pertenece a Amazon")
+                JOIN platforms pl
+                  ON pl.id = p.platform_id
+                WHERE p.id = %s
+                  AND p.is_active = TRUE
+                """,
+                (product_id,),
+            )
 
-            target_url = (row["affiliate_url"] or "").strip()
-            if not target_url:
-                product_url = (row["product_url"] or "").strip()
-                partner_tag = (os.getenv("AMAZON_PARTNER_TAG") or os.getenv("AMAZON_ASSOCIATE_TAG") or "").strip()
-                if product_url and partner_tag:
-                    target_url = product_url + ("&" if "?" in product_url else "?") + "tag=" + quote(partner_tag, safe="")
+            row = cur.fetchone()
+
+            if not row:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Producto no encontrado",
+                )
+
+            platform = str(
+                row["platform"] or ""
+            ).strip().lower()
+
+            checkout_mode = str(
+                row["checkout_mode"] or ""
+            ).strip().upper()
+
+            is_own = (
+                checkout_mode == "CENTRAL"
+                or platform == "personal"
+            )
+
+            if is_own:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "Los productos propios no "
+                        "utilizan afiliación."
+                    ),
+                )
+
+            product_url = str(
+                row["product_url"] or ""
+            ).strip()
+
+            affiliate_url = str(
+                row["affiliate_url"] or ""
+            ).strip()
+
+            target_url = ""
+            tracking = False
+
+            if platform == "amazon":
+
+                if affiliate_url:
+                    target_url = affiliate_url
+                    tracking = True
+
+                else:
+                    partner_tag = str(
+                        os.getenv(
+                            "AMAZON_PARTNER_TAG"
+                        )
+                        or os.getenv(
+                            "AMAZON_ASSOCIATE_TAG"
+                        )
+                        or ""
+                    ).strip()
+
+                    if product_url and partner_tag:
+                        separator = (
+                            "&"
+                            if "?" in product_url
+                            else "?"
+                        )
+
+                        target_url = (
+                            product_url
+                            + separator
+                            + "tag="
+                            + quote(
+                                partner_tag,
+                                safe="",
+                            )
+                        )
+
+                        tracking = True
+
+                    else:
+                        target_url = product_url
+
+            elif platform in {
+                "mercadolibre",
+                "mercado libre",
+                "meli",
+            }:
+                if affiliate_url:
+                    target_url = affiliate_url
+                    tracking = True
                 else:
                     target_url = product_url
 
+            else:
+                target_url = (
+                    affiliate_url
+                    or product_url
+                )
+
+                tracking = bool(
+                    affiliate_url
+                )
+
             if not target_url:
-                raise HTTPException(400, "El producto no tiene una URL de Amazon válida")
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "El producto no tiene "
+                        "una URL comercial válida."
+                    ),
+                )
 
             cur.execute(
-                "INSERT INTO affiliate_clicks(product_id,platform,target_url) VALUES(%s,%s,%s)",
-                (product_id, row["platform"], target_url),
+                """
+                INSERT INTO affiliate_clicks(
+                    product_id,
+                    platform,
+                    target_url
+                )
+                VALUES(%s,%s,%s)
+                """,
+                (
+                    product_id,
+                    row["platform"],
+                    target_url,
+                ),
             )
+
         conn.commit()
+
         return {
             "product_id": product_id,
+            "platform": row["platform"],
             "url": target_url,
-            "tracking": target_url != row["product_url"],
+            "tracking": tracking,
         }
+
     finally:
         conn.close()
 
@@ -771,3 +927,4 @@ def top_opportunities(limit: int = Query(20, ge=1, le=100)):
 
 
 app.include_router(core_router, prefix="/api/v1")
+

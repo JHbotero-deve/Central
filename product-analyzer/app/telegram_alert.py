@@ -90,22 +90,47 @@ def _send_product(token, chat_id, product):
     text = _format_product(product)
     if image_url.startswith(("http://", "https://")):
         try:
-            r = requests.post(
-                f"{API_BASE}/bot{token}/sendPhoto",
-                json={
-                    "chat_id": chat_id,
-                    "photo": image_url,
-                    "caption": text[:1024],
-                    "parse_mode": "HTML",
+            # Telegram no siempre puede descargar imágenes de Amazon/Mercado Libre.
+            # Descargamos la imagen desde Railway y la subimos directamente a Telegram.
+            image_response = requests.get(
+                image_url,
+                headers={
+                    "User-Agent": "Mozilla/5.0 (compatible; CentralTelegram/1.0)",
+                    "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
                 },
                 timeout=15,
+                allow_redirects=True,
             )
-            payload = r.json()
-            if r.ok and payload.get("ok"):
-                return True
-            print(f"[telegram-bot] sendPhoto rejected: {payload.get('description', 'respuesta inválida')}")
+            image_response.raise_for_status()
+            content_type = (image_response.headers.get("Content-Type") or "").split(";", 1)[0].lower()
+            allowed_types = {"image/jpeg", "image/png", "image/webp", "image/gif", "image/avif"}
+            data = image_response.content
+            if content_type in allowed_types and data and len(data) <= 10 * 1024 * 1024:
+                extension = {
+                    "image/jpeg": "jpg",
+                    "image/png": "png",
+                    "image/webp": "webp",
+                    "image/gif": "gif",
+                    "image/avif": "avif",
+                }.get(content_type, "jpg")
+                r = requests.post(
+                    f"{API_BASE}/bot{token}/sendPhoto",
+                    data={
+                        "chat_id": str(chat_id),
+                        "caption": text[:1024],
+                        "parse_mode": "HTML",
+                    },
+                    files={"photo": (f"product.{extension}", data, content_type)},
+                    timeout=25,
+                )
+                payload = r.json()
+                if r.ok and payload.get("ok"):
+                    return True
+                print(f"[telegram-bot] sendPhoto upload rejected: {payload.get('description', 'respuesta inválida')}")
+            else:
+                print("[telegram-bot] imagen omitida: formato no compatible o supera 10 MB")
         except (requests.RequestException, ValueError) as exc:
-            print(f"[telegram-bot] sendPhoto error: {exc}")
+            print(f"[telegram-bot] image upload error: {exc}")
     return _send(token, chat_id, text)
 
 
