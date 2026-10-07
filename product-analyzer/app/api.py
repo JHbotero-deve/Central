@@ -74,6 +74,7 @@ app.add_middleware(
     ],
     allow_methods=["*"],
     allow_headers=["*"],
+    allow_credentials=True,
 )
 
 core_router = APIRouter(tags=["core"])
@@ -133,6 +134,11 @@ def telegram_status():
     except (requests.RequestException, ValueError):
         return {"configured": True, "connected": False, "username": None, "name": None}
 
+
+@core_router.get("/mongo/health")
+def mongo_health(_: dict = Depends(require_admin)):
+    from mongo_store import health
+    return health()
 
 @core_router.get("/health")
 def health():
