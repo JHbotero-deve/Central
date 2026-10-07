@@ -8,13 +8,12 @@
 <style>
 body{margin:0;background:#f3eee5;color:#20241f;font:14px/1.5 Inter,system-ui,sans-serif}.wrap{width:min(1180px,calc(100% - 32px));margin:auto}.head{padding:32px 0 20px;border-bottom:1px solid #d8d0c4}.head-row,.actions{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.eyebrow{font:11px "JetBrains Mono",monospace;text-transform:uppercase;color:#69715f;letter-spacing:.08em}h1{margin:6px 0;font-size:32px}p{color:#6c706b}.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;padding:24px 0}.card{background:#fffdf8;border:1px solid #d8d0c4;border-radius:10px;overflow:hidden}.media{height:190px;background:#eee7dc;display:grid;place-items:center}.media img{width:100%;height:100%;object-fit:contain;padding:12px;box-sizing:border-box}.body{padding:13px}.title{font-weight:650;min-height:42px}.meta{margin-top:7px;color:#777;font-size:12px}.price{margin-top:9px;font:700 15px "JetBrains Mono";color:#55652f}.actions{justify-content:flex-start;margin-top:13px}.btn{border:1px solid #c9c0b2;background:#fffdf8;color:#20241f;border-radius:7px;padding:8px 11px;text-decoration:none;font-weight:600;cursor:pointer}.btn.danger{border-color:#bba4a0}.empty{padding:36px;text-align:center;border:1px dashed #c9c0b2}.login{max-width:420px;margin:70px auto;background:#fffdf8;border:1px solid #d8d0c4;border-radius:10px;padding:24px}.field{width:100%;padding:11px;margin:6px 0 10px;border:1px solid #c9c0b2;border-radius:7px;box-sizing:border-box}.error{color:#8b3f38;min-height:20px}@media(max-width:1000px){.grid{grid-template-columns:repeat(3,1fr)}}@media(max-width:760px){.grid{grid-template-columns:1fr 1fr}}@media(max-width:520px){.grid{grid-template-columns:1fr}}
 </style>
-<script src="/central-shim.js"></script>
 </head>
 <body>
 <main class="wrap">
 <section class="head">
 <div class="eyebrow">Central · operación</div>
-<div class="head-row"><div><h1>Catálogo activo</h1><p>Productos activos de Central. Revisa cada producto, abre su ficha en la tienda o dale de baja.</p></div><div class="actions"><a class="btn" href="/">Volver a Central</a><button class="btn" id="refresh">Actualizar</button></div></div>
+<div class="head-row"><div><h1>Catálogo activo</h1><p>Productos activos de Central. Revisa cada producto, abre su ficha en la tienda o dale de baja.</p></div><div class="actions"><a class="btn" href="/central">Volver a Central</a><button class="btn" id="refresh">Actualizar</button></div></div>
 </section>
 <section id="login" class="login" hidden>
 <h2>Acceso de administración</h2>

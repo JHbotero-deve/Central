@@ -2,6 +2,7 @@
   "rewrites": [
     { "source": "/vitrina", "destination": "/vitrina.html" },
     { "source": "/tarjetas", "destination": "/tarjetas.html" },
+    { "source": "/catalogo", "destination": "/catalogo.html" },
     {
       "source": "/api/v1/:path*",
       "destination": "https://gracious-renewal-production-aadd.up.railway.app/api/v1/:path*"
@@ -80,7 +81,7 @@
         },
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; img-src 'self' data: blob: https:; font-src 'self' data: https:; style-src 'self' 'unsafe-inline' https:; script-src 'self' 'unsafe-inline'; connect-src 'self' https://gracious-renewal-production-aadd.up.railway.app; form-action 'self' https://checkout.wompi.co"
+          "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; img-src 'self' data: blob: https:; font-src 'self' data: https:; style-src 'self' 'unsafe-inline' https:; script-src 'self' 'unsafe-inline' https://unpkg.com; connect-src 'self' https://gracious-renewal-production-aadd.up.railway.app; form-action 'self' https://checkout.wompi.co"
         },
         {
           "key": "Permissions-Policy",

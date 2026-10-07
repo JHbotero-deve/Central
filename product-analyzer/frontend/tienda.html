@@ -84,7 +84,7 @@
 </section>
 
 <div id="catalogo"></div>
-<div class="sales-rail"><div class="sales-item"><b>Compra real</b><span>Catálogo conectado a fuentes reales.</span></div><div class="sales-item"><b>Selección inteligente</b><span>Descubrimiento por señales disponibles.</span></div><div class="sales-item"><b>Precio en COP</b><span>Comparación rápida antes de comprar.</span></div><div class="sales-item"><b>Checkout seguro</b><span>Wompi para productos propios.</span></div></div><div class="quick" id="quick"><button class="active" data-mode="all">Todos</button><button data-mode="popular">Más relevantes</button><button data-mode="rated">Mejor valorados</button></div><div class="categories" id="categories"></div><div class="toolbar">
+<div class="sales-rail"><div class="sales-item"><b>Compra real</b><span>Catálogo conectado a fuentes reales.</span></div><div class="sales-item"><b>Selección inteligente</b><span>Descubrimiento por señales disponibles.</span></div><div class="sales-item"><b>Precio en COP</b><span>Comparación rápida antes de comprar.</span></div><div class="sales-item"><b>Checkout seguro</b><span>Wompi para productos propios.</span></div></div><div class="quick" id="quick"><button class="active" data-mode="all">Todos</button><button data-mode="popular">Más relevantes</button><button data-mode="rated">Mejor valorados</button><button data-mode="discount">🔥 +50% descuento</button></div><div class="categories" id="categories"></div><div class="toolbar">
   <input class="search" id="search" placeholder="Buscar producto..." autocomplete="off">
   <select class="select" id="category"><option value="">Todas las categorías</option></select><select class="sort" id="sort"><option value="relevance">Orden: relevancia</option><option value="price-asc">Precio menor</option><option value="price-desc">Precio mayor</option><option value="rating">Valoración</option></select><span class="count" id="count">Cargando catálogo…</span>
 </div>
@@ -150,10 +150,10 @@ function setCategories(){
   $("categories").innerHTML='<button class="cat active" data-cat="">Todos</button>'+cats.map(c=>'<button class="cat" data-cat="'+esc(c)+'">'+esc(c)+'</button>').join("");
 }
 function relevance(p){return Number(p.opportunity_score||0)*2+Number(p.rating||0)*10+Math.log10(Number(p.reviews_count||0)+1)*6+Math.log10(Number(p.sales_estimate||0)+1)*4}
-function applyFilter(){
+function discountPercent(p){const previous=Number(p.previous_price||0);const current=Number(p.current_price||0);if(previous<=0||current<=0||current>=previous)return 0;return ((previous-current)/previous)*100;} function applyFilter(){
   const q=$("search").value.trim().toLowerCase(), c=$("category").value, sort=$("sort").value;
   filtered=products.filter(p=>(!q||[p.title,p.subtitle,p.category,p.platform,p.external_id].some(v=>String(v||"").toLowerCase().includes(q)))&&(!c||p.category===c));
-  if(quickMode==="rated")filtered=filtered.filter(p=>Number(p.rating||0)>0);
+  if(quickMode==="rated")filtered=filtered.filter(p=>Number(p.rating||0)>0);if(quickMode==="discount")filtered=filtered.filter(p=>discountPercent(p)>50);
   if(quickMode==="popular")filtered.sort((a,b)=>relevance(b)-relevance(a));
   if(sort==="price-asc")filtered.sort((a,b)=>Number(a.sale_price??a.current_price??Infinity)-Number(b.sale_price??b.current_price??Infinity));
   if(sort==="price-desc")filtered.sort((a,b)=>Number(b.sale_price??b.current_price??-1)-Number(a.sale_price??a.current_price??-1));
@@ -280,7 +280,7 @@ function showProduct(p){
   renderFeature(p);
   $("feature").scrollIntoView({behavior:"smooth",block:"start"});
 }
-document.addEventListener("click",e=>{
+document.addEventListener("click",async e=>{
   const add=e.target.closest(".add"),view=e.target.closest(".view-product"),offer=e.target.closest(".external-offer"),minus=e.target.closest("[data-minus]"),plus=e.target.closest("[data-plus]"),rem=e.target.closest("[data-remove]");
   if(view){const p=products.find(x=>String(x.product_id||x.id)===String(view.dataset.id));if(p)showProduct(p)}
 if(offer){
