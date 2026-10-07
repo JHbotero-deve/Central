@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="es">
 <head>
 <meta charset="utf-8">
@@ -281,10 +281,50 @@ function showProduct(p){
   $("feature").scrollIntoView({behavior:"smooth",block:"start"});
 }
 document.addEventListener("click",e=>{
-  const add=e.target.closest(".card-buy"),view=e.target.closest(".view-product"),share=e.target.closest("[data-share]"),minus=e.target.closest("[data-minus]"),plus=e.target.closest("[data-plus]"),rem=e.target.closest("[data-remove]");
+  const add=e.target.closest(".add"),view=e.target.closest(".view-product"),offer=e.target.closest(".external-offer"),minus=e.target.closest("[data-minus]"),plus=e.target.closest("[data-plus]"),rem=e.target.closest("[data-remove]");
   if(view){const p=products.find(x=>String(x.product_id||x.id)===String(view.dataset.id));if(p)showProduct(p)}
-  if(share){const p=products.find(x=>String(x.product_id||x.id)===String(share.dataset.id));if(p){const url=shareUrl(p),title=p.title||"Producto Central";if(share.dataset.share==="whatsapp")window.open("https://wa.me/?text="+encodeURIComponent(title+" · "+url),"_blank","noopener");else if(share.dataset.share==="telegram")window.open("https://t.me/share/url?url="+encodeURIComponent(url)+"&text="+encodeURIComponent(title),"_blank","noopener");else navigator.clipboard?.writeText(url).then(()=>{share.textContent="¡Copiado!";setTimeout(()=>share.textContent="Copiar link",1400)})}}
-  if(add){const p=products.find(x=>String(x.product_id||x.id)===String(add.dataset.id));if(p&&isOwn(p))addToCart(p)}
+if(offer){
+  const id=offer.dataset.id;
+  const p=products.find(x=>String(x.product_id||x.id)===String(id));
+
+  if(p){
+    offer.disabled=true;
+    offer.textContent="Abriendo oferta…";
+
+    try{
+      const r=await fetch(API+"/affiliate/click",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({product_id:Number(id)})
+      });
+
+      const d=await r.json();
+
+      if(r.ok&&d.url){
+        window.location.href=d.url;
+      }else if(p.product_url){
+        window.location.href=p.product_url;
+      }else{
+        alert(d.detail||"El producto no tiene una URL comercial.");
+        offer.disabled=false;
+        offer.textContent="Ver oferta original";
+      }
+    }catch(error){
+      console.error(error);
+
+      if(p.product_url){
+        window.location.href=p.product_url;
+      }else{
+        alert("No fue posible abrir la oferta.");
+        offer.disabled=false;
+        offer.textContent="Ver oferta original";
+      }
+    }
+  }
+
+  return;
+}
+  if(add){const p=products.find(x=>String(x.product_id||x.id)===String(add.dataset.id));if(p)addToCart(p)}
   if(minus){const x=cart.find(i=>String(i.product_id)===String(minus.dataset.minus));if(x){x.quantity--;if(x.quantity<=0)cart=cart.filter(i=>i!==x);saveCart()}}
   if(plus){const x=cart.find(i=>String(i.product_id)===String(plus.dataset.plus));if(x){x.quantity++;saveCart()}}
   if(rem){cart=cart.filter(i=>String(i.product_id)!==String(rem.dataset.remove));saveCart()}
@@ -312,4 +352,5 @@ renderCart();load();loadTelegram();
 </script>
 </body>
 </html>
+
 

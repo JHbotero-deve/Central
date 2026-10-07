@@ -11,12 +11,8 @@
 :root[data-theme="dark"]{
   --bg:#07090d;--panel:#0e121a;--panel2:#0b0f15;--line:#202936;--text:#f5f7fa;--muted:#8c97a8;
   --accent:#b6f23a;--accent-ink:#0b1008;--shadow:none;
-}
-/* Ajustes puntuales para que la ficha de producto siga el mismo sistema */
-body .media,body .gallery img{background:var(--panel2)}
+}body .media,body .gallery img{background:var(--panel2)}
 body .cta{background:var(--accent);color:var(--accent-ink)}
-
-/* Componentes nuevos */
 [hidden]{display:none!important}
 .cn-wrap{width:min(1120px,calc(100% - 28px));margin:0 auto;padding:0 0 60px;font-family:var(--font-body);color:var(--text)}
 .cn-top{height:70px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);margin-bottom:34px}
