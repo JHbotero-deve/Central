@@ -30,7 +30,7 @@ BEGIN
             pl.id, c.id, v.external_id, v.title, v.image_url,
             jsonb_build_array(v.image_url), NULL, v.price, 'COP', v.rating,
             v.reviews_count, v.sales_estimate, TRUE, v.stock, v.sku, v.description,
-            v.previous_price, NOW(), NOW() + INTERVAL '365 days', FALSE,
+            v.previous_price, NOW(), NOW() + INTERVAL '48 hours', FALSE,
             jsonb_build_object('source','catalogo_inicial','seed','catalogo_20_productos_2026_10')
         FROM (VALUES
             ('CENT-001','Audífonos Bluetooth Pro ANC','https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=900&q=85','electronica',189900,4.8,324,780,35,'CENT-AUD-001','Cancelación de ruido, Bluetooth 5.3 y hasta 30 horas de batería.',249900),
