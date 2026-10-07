@@ -14,9 +14,6 @@ router = APIRouter(prefix="/monetize", tags=["monetización"])
 def require_admin_key(user: dict = Depends(require_admin)):
     return user
 
-
-# ---------- Afiliados ----------
-
 @router.get("/click/{product_id}")
 def register_click(product_id: int, user_id: int | None = None):
     
@@ -54,10 +51,6 @@ def confirm_conversion(click_id: int, commission_earned: float, _: None = Depend
     conn.commit()
     conn.close()
     return {"status": "confirmado"}
-
-
-# ---------- Dropshipping ----------
-
 class OrderCreate(BaseModel):
     user_id: int
     product_id: int

@@ -12,7 +12,6 @@ from auth import require_admin
 
 router = APIRouter(tags=["publications"])
 
-# Campos internos de negocio: NO deben salir en la tienda pública
 CAMPOS_PRIVADOS = ("cost_price", "profit_amount", "profit_margin_pct", "opportunity_score")
 
 
@@ -126,8 +125,6 @@ def publish_card(payload: PublicationPayload, _: dict = Depends(require_admin)):
             if not canonical_image:
                 raise HTTPException(status_code=422, detail="No se puede publicar un producto sin imagen real")
 
-            # Fuentes externas: se publica la ficha original sin editar.
-            # Producto personal: Studio sí puede editarlo antes de publicar.
             is_personal = str(product["platform"]).lower() == "personal"
             if not is_personal:
                 canonical_title = product["title"]

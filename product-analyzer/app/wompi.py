@@ -215,8 +215,6 @@ async def create_cart_checkout(request: Request):
                 (list(wanted.keys()),),
             )
             rows = {r["id"]: r for r in cur.fetchall()}
-
-            # --- Validar y calcular cada línea con precios del servidor ---
             lines = []
             for pid, entry in wanted.items():
                 p = rows.get(pid)
@@ -254,8 +252,6 @@ async def create_cart_checkout(request: Request):
             first = lines[0]
             first_row = rows[first["product_id"]]
             title_snapshot = first["title"] if len(lines) == 1 else f"{first['title']} y {len(lines) - 1} más"
-
-            # --- Pedido (cabecera) ---
             cur.execute(
                 """INSERT INTO store_orders
                    (reference, product_id, publication_id, customer_name, customer_email, customer_phone,
@@ -270,8 +266,6 @@ async def create_cart_checkout(request: Request):
                  title_snapshot, first_row["image_url"], first_row["product_url"], first_row["platform_name"], address_line, city, department),
             )
             order = cur.fetchone()
-
-            # --- Pedido (ítems) ---
             for l in lines:
                 cur.execute(
                     """INSERT INTO store_order_items
@@ -281,8 +275,6 @@ async def create_cart_checkout(request: Request):
                     (order["id"], l["product_id"], l["publication_id"], l["title"], l["qty"],
                      l["sale"], l["cost"], l["sale"] * l["qty"], (l["sale"] - l["cost"]) * l["qty"]),
                 )
-
-            # --- Transacción de pago ---
             cur.execute(
                 """INSERT INTO payment_transactions
                    (reference, provider, product_id, order_id, customer_email,
