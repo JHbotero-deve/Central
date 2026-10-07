@@ -8,12 +8,15 @@ import secrets
 import time
 from typing import Any
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Cookie, Depends, Header, HTTPException, Response
 from pydantic import BaseModel, Field
 from db import get_connection
+from mongo_store import audit_event
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 TOKEN_TTL_SECONDS = 8 * 60 * 60
+AUTH_COOKIE = "central_session"
+MAX_FAILED_LOGINS = 8
 PBKDF2_ROUNDS = 310_000
 
 class LoginPayload(BaseModel):
@@ -70,10 +73,6 @@ def _decode(token: str) -> dict[str, Any]:
     except Exception as exc:
         raise HTTPException(status_code=401, detail="Token invalido") from exc
 
-def _legacy_admin(x_admin_key: str | None) -> bool:
-    values = [os.getenv("ADMIN_API_KEY", "").strip(), os.getenv("MONETIZATION_ADMIN_KEY", "").strip()]
-    return bool(x_admin_key) and any(v and hmac.compare_digest(x_admin_key, v) for v in values)
-
 def _ensure_auth_table() -> None:
     conn = get_connection()
     try:
@@ -112,7 +111,7 @@ def _bootstrap_admin(email: str, password: str) -> None:
         conn.close()
 
 @router.post("/login")
-def login(payload: LoginPayload):
+def login(payload: LoginPayload, response: Response):
     _ensure_auth_table()
     email = payload.email.strip().lower()
     if "@" not in email or len(email) > 320:
@@ -120,8 +119,24 @@ def login(payload: LoginPayload):
     conn = get_connection()
     try:
         with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS central_login_attempts (
+                    id BIGSERIAL PRIMARY KEY,
+                    email TEXT NOT NULL,
+                    success BOOLEAN NOT NULL,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                )
+            """)
+            cur.execute("""
+                SELECT COUNT(*) AS failures FROM central_login_attempts
+                WHERE email=%s AND success=FALSE
+                  AND created_at >= NOW() - INTERVAL '15 minutes'
+            """, (email,))
+            if int(cur.fetchone()["failures"] or 0) >= MAX_FAILED_LOGINS:
+                raise HTTPException(status_code=429, detail="Demasiados intentos. Espere 15 minutos.")
             cur.execute("SELECT id,email,password_hash,role,is_active FROM central_users WHERE email=%s", (email,))
             user = cur.fetchone()
+        conn.commit()
     finally:
         conn.close()
     if not user:
@@ -134,19 +149,31 @@ def login(payload: LoginPayload):
         finally:
             conn.close()
     if not user or not user["is_active"] or not verify_password(payload.password, user["password_hash"]):
+        audit_event("login_failure", email=email)
         raise HTTPException(status_code=401, detail="Credenciales invalidas")
     now = int(time.time())
     token = _sign(
         {"alg": "HS256", "typ": "JWT"},
         {"iss": "central", "sub": str(user["id"]), "email": user["email"], "role": user["role"], "iat": now, "exp": now + TOKEN_TTL_SECONDS},
     )
-    return {"access_token": token, "token_type": "bearer", "expires_in": TOKEN_TTL_SECONDS, "user": {"id": user["id"], "email": user["email"], "role": user["role"]}}
+    response.set_cookie(AUTH_COOKIE, token, max_age=TOKEN_TTL_SECONDS, httponly=True, secure=True, samesite="none", path="/")
+    audit_event("login_success", email=user["email"], role=user["role"])
+    return {"access_token": token, "token_type": "bearer", "expires_in": TOKEN_TTL_SECONDS,
+            "user": {"id": user["id"], "email": user["email"], "role": user["role"]}}
 
-def current_user(authorization: str | None = Header(default=None), x_admin_key: str | None = Header(default=None, alias="X-Admin-Key")) -> dict[str, Any]:
+@router.post("/logout")
+def logout(response: Response):
+    response.delete_cookie(AUTH_COOKIE, path="/")
+    return {"ok": True}
+
+def current_user(
+    authorization: str | None = Header(default=None),
+    central_session: str | None = Cookie(default=None, alias=AUTH_COOKIE),
+) -> dict[str, Any]:
     if authorization and authorization.lower().startswith("bearer "):
         return _decode(authorization[7:].strip())
-    if _legacy_admin(x_admin_key):
-        return {"sub": "legacy-admin", "email": "legacy-admin", "role": "admin"}
+    if central_session:
+        return _decode(central_session)
     raise HTTPException(status_code=401, detail="Autenticacion requerida")
 
 def require_admin(user: dict[str, Any] = Depends(current_user)) -> dict[str, Any]:
