@@ -102,11 +102,12 @@ async function loadTelegram(){
   const el=$("telegram");
   if(!el) return;
   try{
-    const data=await get("/telegram/queue?limit=20");
-    const items=Array.isArray(data)?data:(data.items||[]);
-    el.innerHTML=items.length
-      ? items.map(x=>`<div class="telegram-item"><strong>${esc(x.title||x.product_title||"Oportunidad")}</strong><span>${esc(x.status||"preparado")}</span></div>`).join("")
-      : '<div class="empty">Sin publicaciones de Telegram preparadas.</div>';
+    const data=await get("/telegram/status");
+    el.innerHTML=data.connected
+      ? `<div class="telegram-item"><strong>Telegram conectado</strong><span>@${esc(data.username||"bot")}</span></div>`
+      : data.configured
+        ? '<div class="empty">Telegram configurado, pero no conectado.</div>'
+        : '<div class="empty">Telegram no configurado.</div>';
   }catch(e){
     console.warn("Telegram no disponible:",e);
     el.innerHTML='<div class="empty">Telegram sin datos disponibles.</div>';
