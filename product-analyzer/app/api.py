@@ -339,6 +339,57 @@ def list_products(
         conn.close()
 
 
+@core_router.get("/pipeline/metrics")
+def pipeline_metrics(_: dict = Depends(require_admin)):
+    """Métricas del último ciclo y de las fuentes reales."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT id, started_at, finished_at, status, duration_ms,
+                       expired_products, active_products, high_opportunity,
+                       amazon_products, mercadolibre_products, tiktok_products,
+                       telegram_prepared, error_count, errors
+                FROM pipeline_runs
+                ORDER BY started_at DESC
+                LIMIT 1
+            """)
+            latest = cur.fetchone()
+            cur.execute("""
+                SELECT COUNT(*) AS runs,
+                       COUNT(*) FILTER (WHERE status = 'success') AS successful_runs,
+                       COUNT(*) FILTER (WHERE status <> 'success') AS failed_runs,
+                       MAX(started_at) AS last_run
+                FROM pipeline_runs
+                WHERE started_at >= NOW() - INTERVAL '24 hours'
+            """)
+            day = cur.fetchone()
+        return {
+            "latest": latest,
+            "last_24h": day,
+            "sources": {
+                "amazon": {
+                    "products": int((latest or {}).get("amazon_products") or 0),
+                    "configured": bool(os.getenv("AMAZON_CLIENT_ID") or os.getenv("AMAZON_REFRESH_TOKEN")),
+                },
+                "mercadolibre": {
+                    "products": int((latest or {}).get("mercadolibre_products") or 0),
+                    "configured": bool(os.getenv("MELI_CLIENT_ID") or os.getenv("MERCADOLIBRE_CLIENT_ID")),
+                },
+                "tiktok": {
+                    "products": int((latest or {}).get("tiktok_products") or 0),
+                    "configured": bool(os.getenv("TIKTOK_ACCESS_TOKEN") or os.getenv("TIKTOK_CREATOR_ACCESS_TOKEN")),
+                },
+                "telegram": {
+                    "prepared": int((latest or {}).get("telegram_prepared") or 0),
+                    "configured": bool(os.getenv("TELEGRAM_BOT_TOKEN") or os.getenv("BOT_TOKEN") or os.getenv("TELEGRAM_TOKEN")),
+                },
+            },
+        }
+    finally:
+        conn.close()
+
+
 @core_router.get("/intelligence/overview")
 def intelligence_overview(_: dict = Depends(require_admin)):
     conn=get_connection()
