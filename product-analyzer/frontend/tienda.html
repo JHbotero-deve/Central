@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="stylesheet" href="/central.css">
+<link rel="stylesheet" href="/central.css"><script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
 <meta name="robots" content="index,follow">
 <title>Central — Tienda</title>
 <link rel="canonical" href="https://central-7ykr.vercel.app/tienda">
@@ -22,35 +22,39 @@
 .categories{display:flex;gap:7px;overflow:auto;padding:0 0 18px;scrollbar-width:none}.categories::-webkit-scrollbar{display:none}.cat{border:1px solid var(--line);background:var(--panel);color:var(--muted);border-radius:999px;padding:8px 13px;font-size:10px;font-weight:700;white-space:nowrap}.cat.active{background:var(--accent);border-color:var(--accent);color:#14171a}
 .feature{display:grid;grid-template-columns:1.05fr .95fr;min-height:520px;border:1px solid var(--line);border-radius:25px;overflow:hidden;background:var(--panel);margin-bottom:24px;box-shadow:0 1px 2px rgba(20,23,26,.04)}.feature-media{min-height:520px;position:relative;display:grid;place-items:center;background:radial-gradient(circle at 50% 40%,#fff 0,#f1f3f6 55%,#e8ebef 100%);overflow:hidden}.feature-media:before,.feature-media:after{content:"";position:absolute;width:68%;aspect-ratio:1;border:1px solid rgba(255,138,0,.28);border-radius:50%}.feature-media:after{width:47%;border-color:rgba(20,23,26,.08)}.feature-image{width:min(76%,470px);height:min(430px,78%);object-fit:contain;position:relative;z-index:2;mix-blend-mode:multiply;border-radius:28px}.feature-empty{position:relative;z-index:2;color:var(--dim);font-size:10px;text-transform:uppercase;letter-spacing:.12em}.feature-info{padding:clamp(28px,5vw,70px);display:flex;flex-direction:column;justify-content:center}.source{color:var(--dim);font-size:9px;text-transform:uppercase;letter-spacing:.14em;font-weight:800}.feature-info h2{font:600 clamp(30px,4vw,52px)/.98 "Space Grotesk";letter-spacing:-.055em;margin:12px 0}.feature-info p{color:var(--muted);max-width:540px}.feature-price{font:800 26px "Space Grotesk";color:var(--text);margin:18px 0}.feature-meta{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}.pill{border:1px solid var(--line);background:var(--panel2);color:var(--muted);border-radius:999px;padding:6px 9px;font-size:9px}.variant-row{display:flex;gap:8px;margin:4px 0 18px}.variant{width:27px;height:27px;border-radius:50%;border:2px solid rgba(20,23,26,.15);background:#e6e9ed;cursor:pointer}.variant.active{outline:2px solid var(--accent);outline-offset:2px}
 
-/* ===== GRILLA Y TARJETAS ===== */
+/* ===== GRILLA Y TARJETAS · CENTRAL / Figma-inspired ===== */
 .btn{transition:transform .15s ease,background .15s ease,color .15s ease}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:22px;padding-bottom:70px}
-.card{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:var(--panel);box-shadow:0 1px 2px rgba(60,40,10,.05);transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease}
-.card:hover{transform:translateY(-4px);border-color:rgba(255,138,0,.55);box-shadow:0 14px 32px rgba(20,23,26,.12)}
-
-/* Imagen: fondo claro, cuadrada, el blanco de la foto se integra */
-.card-media{aspect-ratio:1/1;display:grid;place-items:center;position:relative;background:#f6f0e4;overflow:hidden}
-.card-media img{width:100%;height:100%;object-fit:contain;padding:16px;mix-blend-mode:multiply;transition:transform .3s ease}
-.card:hover .card-media img{transform:scale(1.06)}
-.badge{position:absolute;top:10px;left:10px;padding:4px 9px;border-radius:999px;background:rgba(255,253,248,.95);border:1px solid var(--line);color:var(--muted);font-size:9px;text-transform:uppercase;letter-spacing:.08em;z-index:3}
-.no-image{color:var(--dim);text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:.1em}
-
-/* Cuerpo: altura uniforme, precio siempre abajo */
-.card-body{display:flex;flex-direction:column;flex:1;padding:14px 16px 16px}
-.card-body .category{color:var(--accent-ink);font-size:9px;font-weight:800;letter-spacing:.12em;text-transform:uppercase}
-.card h3{font:600 16px/1.25 "Space Grotesk";letter-spacing:-.01em;margin:6px 0 4px;min-height:2.5em;display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.card small{display:block;color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.card-price{font:800 22px "Space Grotesk";color:var(--text);margin:auto 0 12px;padding-top:10px}
-.card-price.ask{font-size:14px;color:var(--accent-ink)}
-.ref{color:var(--dim);font-size:10px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-
-/* Botones: uno principal, "Ficha" como secundario discreto */
-.card-actions{display:grid;grid-template-columns:1fr;gap:6px}
-.card-actions .btn{width:100%;min-height:40px;padding:9px 10px}
-.card-actions .btn.primary:hover{background:var(--accent2);border-color:var(--accent2)}
-.card-actions .btn:not(.primary){background:transparent;border-color:transparent;color:var(--muted)}
-.card-actions .btn:not(.primary):hover{color:var(--accent-ink);transform:none}
-
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:24px;padding-bottom:70px}
+.card{display:flex;flex-direction:column;min-width:0;border:1px solid var(--line);border-radius:22px;overflow:hidden;background:var(--panel);box-shadow:0 8px 24px rgba(20,23,26,.06);transition:transform .25s ease,box-shadow .25s ease,border-color .25s ease}
+.card:hover{transform:translateY(-6px);border-color:rgba(255,138,0,.55);box-shadow:0 20px 45px rgba(20,23,26,.14)}
+.card-media{aspect-ratio:1/1;display:grid;place-items:center;position:relative;background:radial-gradient(circle at 50% 42%,#ffffff 0,#f3f1ed 48%,#e8e4dc 100%);overflow:hidden}
+.card-media:before{content:"";position:absolute;width:72%;aspect-ratio:1;border:1px solid rgba(255,138,0,.18);border-radius:50%;box-shadow:0 0 70px rgba(255,138,0,.08);pointer-events:none}
+.card-media:after{content:"";position:absolute;bottom:8%;width:54%;height:7%;border-radius:50%;background:rgba(20,23,26,.13);filter:blur(15px);pointer-events:none}
+.card-media img{position:relative;z-index:2;width:100%;height:100%;object-fit:contain;padding:14px;mix-blend-mode:multiply;transition:transform .35s cubic-bezier(.2,.7,.2,1)}
+.card:hover .card-media img{transform:scale(1.075) translateY(-3px)}
+.card-3d{position:relative;z-index:2;width:92%;height:92%;--poster-color:transparent}
+.card-3d::part(default-progress-bar){background:var(--accent)}
+.badge{position:absolute;top:13px;left:13px;z-index:5;padding:6px 10px;border-radius:999px;background:rgba(255,253,248,.88);border:1px solid rgba(232,223,207,.9);backdrop-filter:blur(10px);color:var(--text);font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.09em}
+.media-3d{position:absolute;right:12px;bottom:12px;z-index:5;padding:6px 9px;border-radius:999px;background:rgba(20,23,26,.78);color:#fff;font-size:8px;font-weight:700;letter-spacing:.04em}
+.no-image{position:relative;z-index:2;color:var(--dim);text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:.1em}
+.card-body{display:flex;flex-direction:column;flex:1;padding:17px 17px 15px}
+.card-topline{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:17px}
+.card-body .category{color:var(--accent-ink);font-size:8px;font-weight:800;letter-spacing:.12em;text-transform:uppercase}
+.rating{font-size:9px;font-weight:800;color:var(--muted);white-space:nowrap}
+.card h3{font:700 17px/1.18 "Space Grotesk";letter-spacing:-.025em;margin:7px 0 5px;min-height:2.36em;display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.card small{display:block;color:var(--muted);font-size:10px;line-height:1.35;min-height:1.35em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ref{color:var(--dim);font-size:9px;margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card-price{font:800 22px/1 "Space Grotesk";color:var(--text);margin:18px 0 13px}
+.card-price.ask{font-size:13px;color:var(--accent-ink)}
+.card-actions{display:grid;grid-template-columns:1fr;gap:7px}
+.card-buy,.card-info{width:100%;min-height:40px;padding:10px 12px;border-radius:999px;font-size:10px;font-weight:800;text-align:center;display:flex;align-items:center;justify-content:center;transition:transform .15s ease,background .15s ease,border-color .15s ease}
+.card-buy{border:1px solid var(--accent);background:var(--accent);color:#14171a}
+.card-buy:hover{background:var(--accent2);border-color:var(--accent2);transform:translateY(-1px)}
+.card-info{border:1px solid var(--line);background:transparent;color:var(--text)}
+.card-info:hover{border-color:rgba(255,138,0,.55);color:var(--accent-ink);transform:translateY(-1px)}
+.card-share{display:grid;grid-template-columns:1fr 1fr 1.15fr;gap:5px;margin-top:8px;padding-top:9px;border-top:1px solid var(--line)}
+.share-btn{border:0;background:transparent;color:var(--dim);padding:5px 2px;font-size:8px;font-weight:800;white-space:nowrap}
+.share-btn:hover{color:var(--text)}
 .empty{padding:60px 30px;text-align:center;color:var(--muted);border:1px dashed #cfd4da;border-radius:20px;grid-column:1/-1;background:#fff}.empty b{display:block;color:var(--text);font:600 24px "Space Grotesk";margin-bottom:8px}
 .cart-fab{position:fixed;right:22px;bottom:22px;z-index:45;border:1px solid rgba(255,138,0,.5);background:rgba(255,255,255,.96);color:var(--text);border-radius:999px;padding:14px 18px;box-shadow:0 14px 40px rgba(20,23,26,.18);backdrop-filter:blur(14px);font-size:11px;font-weight:800}.cart-fab span{color:var(--accent-ink)}
 .drawer{position:fixed;inset:0;background:rgba(20,23,26,.45);z-index:80;display:none;justify-content:flex-end;padding:12px}.drawer.open{display:flex}.drawer-box{width:min(520px,100%);height:100%;overflow:auto;border:1px solid var(--line);border-radius:22px;background:#fff;padding:24px;box-shadow:-20px 0 60px rgba(20,23,26,.25)}.drawer-head{display:flex;justify-content:space-between;align-items:flex-start}.drawer-head h2{font:600 32px "Space Grotesk";margin:5px 0 20px}.close{border:0;background:transparent;color:var(--text);font-size:26px}.cart-items{display:grid;gap:10px}.cart-item{display:grid;grid-template-columns:60px 1fr auto;gap:11px;align-items:center;padding:10px;border:1px solid var(--line);border-radius:14px;background:var(--panel2)}.cart-item img{width:60px;height:60px;object-fit:contain;background:#fff;border-radius:10px}.cart-item small{display:block;color:var(--muted);margin:4px 0}.qty{display:flex;align-items:center;gap:7px}.qty button{width:25px;height:25px;border:1px solid var(--line);background:#fff;color:var(--text);border-radius:7px}.total{font:800 20px "Space Grotesk";color:var(--text);margin:20px 0}.checkout{display:grid;gap:9px}.checkout input{width:100%;height:43px;border:1px solid var(--line);background:#fff;color:var(--text);border-radius:11px;padding:0 12px;outline:none}.checkout input:focus{border-color:var(--accent)}.err{color:var(--danger);min-height:18px;font-size:10px}.muted-note{color:var(--dim);font-size:9px}
@@ -181,16 +185,44 @@ function renderFeature(selected){
   $("featureFicha").target="_self";
   document.querySelectorAll(".variant").forEach(b=>b.onclick=()=>{media.innerHTML='<img class="feature-image" src="'+mediaSrc(b.dataset.image)+'" alt="'+esc(p.title)+'" referrerpolicy="no-referrer">';document.querySelectorAll(".variant").forEach(x=>x.classList.remove("active"));b.classList.add("active")});
 }
+function shareUrl(p){return new URL(productUrl(p),location.origin).href}
 function card(p){
-  const own=isOwn(p), ext=externalUrl(p), src=imageSrc(p);
+  const own=isOwn(p), ext=externalUrl(p), src=imageSrc(p), model=p.model_url||"";
   let price=p.price_display||money(p.sale_price??p.current_price,p.currency), ask=false;
   if(price==="Consultar"&&ext){price="Ver precio en la tienda";ask=true}
+  const source=String(p.platform||"Central").toLowerCase();
+  const sourceLabel=source==="amazon"?"Amazon":source==="mercadolibre"||source==="mercado libre"?"Mercado Libre":own?"Central":p.platform||"Origen";
   const buy=own
-    ? '<button class="btn primary wide add" data-id="'+esc(p.product_id||p.id)+'">Añadir al carrito</button>'
+    ? '<button class="card-buy" data-id="'+esc(p.product_id||p.id)+'">Añadir al carrito</button>'
     : ext
-      ? '<a class="btn primary wide" href="'+esc(ext)+'" target="_blank" rel="nofollow sponsored noopener">Ir a la oferta</a>'
-      : '<a class="btn primary wide" href="'+productUrl(p)+'">Ver ficha</a>';
-  return '<article class="card"><div class="card-media">'+(src?'<img src="'+esc(mediaSrc(src))+'" alt="'+esc(p.title)+'" loading="lazy" referrerpolicy="no-referrer" data-fb="'+esc(imageFallback(p))+'"><div class="no-image" hidden>Imagen no disponible</div>':'<div class="no-image">Imagen no disponible</div>')+'<span class="badge">'+esc(p.platform||"Central")+'</span></div><div class="card-body"><div class="category">'+esc(p.category||"Producto")+'</div><h3>'+esc(p.title)+'</h3><small>'+esc(p.subtitle||"Producto publicado por Central")+'</small>'+(p.external_id?'<div class="ref">Ref. '+esc(p.external_id)+'</div>':'')+'<div class="card-price'+(ask?' ask':'')+'">'+esc(price)+'</div><div class="card-actions"><button type="button" class="btn primary wide view-product" data-id="'+esc(p.product_id||p.id)+'">Ver producto</button>'+buy+'</div></div></article>'
+      ? '<a class="card-buy" href="'+esc(ext)+'" target="_blank" rel="nofollow sponsored noopener">Comprar en '+esc(sourceLabel)+'</a>'
+      : '<a class="card-buy" href="'+productUrl(p)+'">Ver información</a>';
+  const media=model
+    ? '<model-viewer class="card-3d" src="'+esc(model)+'" alt="'+esc(p.title)+'" camera-controls auto-rotate shadow-intensity="1" exposure="1" loading="lazy"></model-viewer>'
+    : src
+      ? '<img src="'+esc(mediaSrc(src))+'" alt="'+esc(p.title)+'" loading="lazy" referrerpolicy="no-referrer" data-fb="'+esc(imageFallback(p))+'"><div class="no-image" hidden>Imagen no disponible</div>'
+      : '<div class="no-image">Imagen no disponible</div>';
+  return '<article class="card">'+
+    '<div class="card-media">'+media+
+      '<span class="badge">'+esc(sourceLabel)+'</span>'+
+      (model?'<span class="media-3d">3D · arrastra para rotar</span>':'')+
+    '</div>'+
+    '<div class="card-body">'+
+      '<div class="card-topline"><span class="category">'+esc(p.category||"Producto")+'</span>'+(p.rating!=null?'<span class="rating">★ '+esc(Number(p.rating).toFixed(1))+'</span>':'')+'</div>'+
+      '<h3>'+esc(p.title)+'</h3>'+
+      '<small>'+esc(p.subtitle||"Producto publicado en Central")+'</small>'+
+      (p.external_id?'<div class="ref">Ref. '+esc(p.external_id)+'</div>':'')+
+      '<div class="card-price'+(ask?' ask':'')+'">'+esc(price)+'</div>'+
+      '<div class="card-actions">'+
+        '<button type="button" class="card-info view-product" data-id="'+esc(p.product_id||p.id)+'">Ver información</button>'+
+        buy+
+      '</div>'+
+      '<div class="card-share" aria-label="Compartir producto">'+
+        '<button type="button" class="share-btn" data-share="whatsapp" data-id="'+esc(p.product_id||p.id)+'">WhatsApp</button>'+
+        '<button type="button" class="share-btn" data-share="telegram" data-id="'+esc(p.product_id||p.id)+'">Telegram</button>'+
+        '<button type="button" class="share-btn" data-share="copy" data-id="'+esc(p.product_id||p.id)+'">Copiar link</button>'+
+      '</div>'+
+    '</div></article>'
 }
 function renderGrid(){
   $("grid").innerHTML=filtered.length?filtered.map(card).join(""):'<div class="empty"><b>No hay productos</b>No hay productos disponibles.</div>';
