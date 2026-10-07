@@ -293,7 +293,11 @@ def run_worker():
     time.sleep(5)
     init_database()
     run_pipeline()
-    print("== Ejecución programada finalizada; Railway controla el siguiente ciclo. ==")
+    schedule.every(2).hours.do(run_pipeline)
+    print("== Worker activo: próximo ciclo automático en 2 horas. ==")
+    while True:
+        schedule.run_pending()
+        time.sleep(30)
 
 
 if __name__ == "__main__":
