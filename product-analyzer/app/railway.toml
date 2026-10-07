@@ -1,0 +1,4 @@
+[deploy]
+startCommand = "python main.py"
+cronSchedule = "0 */2 * * *"
+restartPolicyType = "NEVER"
