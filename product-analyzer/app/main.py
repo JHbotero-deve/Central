@@ -211,10 +211,9 @@ def run_pipeline():
                         "url": build_url(product["title"], product["product_url"]),
                         "score": round(score, 1),
                     })
+        publish_real_discounts(conn)
     finally:
         conn.close()
-
-    publish_real_discounts(conn)
 
     if creator_configured():
         try:
