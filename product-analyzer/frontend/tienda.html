@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="stylesheet" href="/central.css">
+<link rel="stylesheet" href="/central.css"><script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
 <meta name="robots" content="index,follow">
 <title>Central — Tienda</title>
 <link rel="canonical" href="https://central-7ykr.vercel.app/tienda">
@@ -181,16 +181,44 @@ function renderFeature(selected){
   $("featureFicha").target="_self";
   document.querySelectorAll(".variant").forEach(b=>b.onclick=()=>{media.innerHTML='<img class="feature-image" src="'+mediaSrc(b.dataset.image)+'" alt="'+esc(p.title)+'" referrerpolicy="no-referrer">';document.querySelectorAll(".variant").forEach(x=>x.classList.remove("active"));b.classList.add("active")});
 }
+function shareUrl(p){return new URL(productUrl(p),location.origin).href}
 function card(p){
-  const own=isOwn(p), ext=externalUrl(p), src=imageSrc(p);
+  const own=isOwn(p), ext=externalUrl(p), src=imageSrc(p), model=p.model_url||"";
   let price=p.price_display||money(p.sale_price??p.current_price,p.currency), ask=false;
   if(price==="Consultar"&&ext){price="Ver precio en la tienda";ask=true}
+  const source=String(p.platform||"Central").toLowerCase();
+  const sourceLabel=source==="amazon"?"Amazon":source==="mercadolibre"||source==="mercado libre"?"Mercado Libre":own?"Central":p.platform||"Origen";
   const buy=own
-    ? '<button class="btn primary wide add" data-id="'+esc(p.product_id||p.id)+'">Añadir al carrito</button>'
+    ? '<button class="card-buy" data-id="'+esc(p.product_id||p.id)+'">Añadir al carrito</button>'
     : ext
-      ? '<a class="btn primary wide" href="'+esc(ext)+'" target="_blank" rel="nofollow sponsored noopener">Ir a la oferta</a>'
-      : '<a class="btn primary wide" href="'+productUrl(p)+'">Ver ficha</a>';
-  return '<article class="card"><div class="card-media">'+(src?'<img src="'+esc(mediaSrc(src))+'" alt="'+esc(p.title)+'" loading="lazy" referrerpolicy="no-referrer" data-fb="'+esc(imageFallback(p))+'"><div class="no-image" hidden>Imagen no disponible</div>':'<div class="no-image">Imagen no disponible</div>')+'<span class="badge">'+esc(p.platform||"Central")+'</span></div><div class="card-body"><div class="category">'+esc(p.category||"Producto")+'</div><h3>'+esc(p.title)+'</h3><small>'+esc(p.subtitle||"Producto publicado por Central")+'</small>'+(p.external_id?'<div class="ref">Ref. '+esc(p.external_id)+'</div>':'')+'<div class="card-price'+(ask?' ask':'')+'">'+esc(price)+'</div><div class="card-actions"><button type="button" class="btn primary wide view-product" data-id="'+esc(p.product_id||p.id)+'">Ver producto</button>'+buy+'</div></div></article>'
+      ? '<a class="card-buy" href="'+esc(ext)+'" target="_blank" rel="nofollow sponsored noopener">Comprar en '+esc(sourceLabel)+'</a>'
+      : '<a class="card-buy" href="'+productUrl(p)+'">Ver información</a>';
+  const media=model
+    ? '<model-viewer class="card-3d" src="'+esc(model)+'" alt="'+esc(p.title)+'" camera-controls auto-rotate shadow-intensity="1" exposure="1" loading="lazy"></model-viewer>'
+    : src
+      ? '<img src="'+esc(mediaSrc(src))+'" alt="'+esc(p.title)+'" loading="lazy" referrerpolicy="no-referrer" data-fb="'+esc(imageFallback(p))+'"><div class="no-image" hidden>Imagen no disponible</div>'
+      : '<div class="no-image">Imagen no disponible</div>';
+  return '<article class="card">'+
+    '<div class="card-media">'+media+
+      '<span class="badge">'+esc(sourceLabel)+'</span>'+
+      (model?'<span class="media-3d">3D · arrastra para rotar</span>':'')+
+    '</div>'+
+    '<div class="card-body">'+
+      '<div class="card-topline"><span class="category">'+esc(p.category||"Producto")+'</span>'+(p.rating!=null?'<span class="rating">★ '+esc(Number(p.rating).toFixed(1))+'</span>':'')+'</div>'+
+      '<h3>'+esc(p.title)+'</h3>'+
+      '<small>'+esc(p.subtitle||"Producto publicado en Central")+'</small>'+
+      (p.external_id?'<div class="ref">Ref. '+esc(p.external_id)+'</div>':'')+
+      '<div class="card-price'+(ask?' ask':'')+'">'+esc(price)+'</div>'+
+      '<div class="card-actions">'+
+        '<button type="button" class="card-info view-product" data-id="'+esc(p.product_id||p.id)+'">Ver información</button>'+
+        buy+
+      '</div>'+
+      '<div class="card-share" aria-label="Compartir producto">'+
+        '<button type="button" class="share-btn" data-share="whatsapp" data-id="'+esc(p.product_id||p.id)+'">WhatsApp</button>'+
+        '<button type="button" class="share-btn" data-share="telegram" data-id="'+esc(p.product_id||p.id)+'">Telegram</button>'+
+        '<button type="button" class="share-btn" data-share="copy" data-id="'+esc(p.product_id||p.id)+'">Copiar link</button>'+
+      '</div>'+
+    '</div></article>'
 }
 function renderGrid(){
   $("grid").innerHTML=filtered.length?filtered.map(card).join(""):'<div class="empty"><b>No hay productos</b>No hay productos disponibles.</div>';
@@ -249,9 +277,10 @@ function showProduct(p){
   $("feature").scrollIntoView({behavior:"smooth",block:"start"});
 }
 document.addEventListener("click",e=>{
-  const add=e.target.closest(".add"),view=e.target.closest(".view-product"),minus=e.target.closest("[data-minus]"),plus=e.target.closest("[data-plus]"),rem=e.target.closest("[data-remove]");
+  const add=e.target.closest(".card-buy"),view=e.target.closest(".view-product"),share=e.target.closest("[data-share]"),minus=e.target.closest("[data-minus]"),plus=e.target.closest("[data-plus]"),rem=e.target.closest("[data-remove]");
   if(view){const p=products.find(x=>String(x.product_id||x.id)===String(view.dataset.id));if(p)showProduct(p)}
-  if(add){const p=products.find(x=>String(x.product_id||x.id)===String(add.dataset.id));if(p)addToCart(p)}
+  if(share){const p=products.find(x=>String(x.product_id||x.id)===String(share.dataset.id));if(p){const url=shareUrl(p),title=p.title||"Producto Central";if(share.dataset.share==="whatsapp")window.open("https://wa.me/?text="+encodeURIComponent(title+" · "+url),"_blank","noopener");else if(share.dataset.share==="telegram")window.open("https://t.me/share/url?url="+encodeURIComponent(url)+"&text="+encodeURIComponent(title),"_blank","noopener");else navigator.clipboard?.writeText(url).then(()=>{share.textContent="¡Copiado!";setTimeout(()=>share.textContent="Copiar link",1400)})}}
+  if(add){const p=products.find(x=>String(x.product_id||x.id)===String(add.dataset.id));if(p&&isOwn(p))addToCart(p)}
   if(minus){const x=cart.find(i=>String(i.product_id)===String(minus.dataset.minus));if(x){x.quantity--;if(x.quantity<=0)cart=cart.filter(i=>i!==x);saveCart()}}
   if(plus){const x=cart.find(i=>String(i.product_id)===String(plus.dataset.plus));if(x){x.quantity++;saveCart()}}
   if(rem){cart=cart.filter(i=>String(i.product_id)!==String(rem.dataset.remove));saveCart()}
