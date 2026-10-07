@@ -956,7 +956,7 @@ def price_comparison(limit: int = Query(100, ge=1, le=500), _: dict = Depends(re
 
 
 @core_router.get("/opportunities/top")
-def top_opportunities(limit: int = Query(20, ge=1, le=100)):
+def top_opportunities(limit: int = Query(20, ge=1, le=100), _: dict = Depends(require_admin)):
     conn = get_connection()
     try:
         with conn.cursor() as cur:
