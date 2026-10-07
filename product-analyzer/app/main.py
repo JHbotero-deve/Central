@@ -1,5 +1,6 @@
 import os
 import time
+from psycopg2.extras import Json
 
 import schedule
 
@@ -35,7 +36,6 @@ def expire_catalog():
     conn = get_connection()
     try:
         with conn.cursor() as cur:
-            # El catálogo inicial también sigue la regla real de 48 horas.
             cur.execute("""
                 UPDATE products
                 SET catalog_expires_at = catalog_batch_id + INTERVAL '48 hours'
@@ -63,6 +63,45 @@ def expire_catalog():
                 )
         conn.commit()
         print(f"== Productos vencidos retirados: {len(expired_ids)} ==")
+        return len(expired_ids)
+    finally:
+        conn.close()
+
+
+def save_pipeline_run(started_at, expired_products, amazon_products, mercadolibre_products, tiktok_products, telegram_prepared, errors, status="success"):
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT COUNT(*) AS active_products,
+                       COUNT(*) FILTER (
+                           WHERE COALESCE(s.opportunity_score, 0) >= 70
+                       ) AS high_opportunity
+                FROM products p
+                LEFT JOIN product_scores s ON s.product_id = p.id
+                WHERE p.is_active = TRUE
+            """)
+            totals = cur.fetchone()
+            cur.execute("""
+                INSERT INTO pipeline_runs (
+                    started_at, finished_at, status, duration_ms,
+                    expired_products, active_products, high_opportunity,
+                    amazon_products, mercadolibre_products, tiktok_products,
+                    telegram_prepared, error_count, errors
+                )
+                VALUES (
+                    %s, NOW(), %s,
+                    EXTRACT(EPOCH FROM (NOW() - %s)) * 1000,
+                    %s,%s,%s,%s,%s,%s,%s,%s,%s
+                )
+            """, (
+                started_at, status, started_at,
+                expired_products, int(totals["active_products"] or 0),
+                int(totals["high_opportunity"] or 0),
+                amazon_products, mercadolibre_products, tiktok_products,
+                telegram_prepared, len(errors), Json(errors[:20]),
+            ))
+        conn.commit()
     finally:
         conn.close()
 
@@ -151,20 +190,30 @@ def ingest_amazon(conn) -> list[int]:
 
 
 def run_pipeline():
+    started_at = __import__("datetime").datetime.now()
     print("== Iniciando ciclo de ingesta y análisis ==")
-    expire_catalog()
+    expired_products = expire_catalog()
+    errors = []
+    amazon_count = 0
+    mercadolibre_count = 0
+    tiktok_count = 0
+    telegram_prepared = 0
     conn = get_connection()
     product_ids = []
     try:
         try:
             product_ids.extend(ingest_amazon(conn))
         except Exception as exc:
+            errors.append(f"Amazon: {exc}")
             print(f"[amazon] ciclo abortado: {exc}")
+
+        amazon_count = len(set(product_ids))
 
         for category, term in SEARCH_CONFIG:
             try:
                 products = fetch_mercadolibre(term)
             except Exception as exc:
+                errors.append(f"Mercado Libre '{term}': {exc}")
                 print(f"[mercadolibre] error trayendo '{term}': {exc}")
                 continue
             if not products:
@@ -207,6 +256,7 @@ def run_pipeline():
                     cur.execute("SELECT p.title, p.current_price, p.product_url FROM products p WHERE p.id = %s", (product_id,))
                     product = cur.fetchone()
                 if product:
+                    telegram_prepared += 1
                     send_telegram_alert({
                         "title": product["title"],
                         "price": product["current_price"],
@@ -220,11 +270,21 @@ def run_pipeline():
     if creator_configured():
         try:
             result = sync_showcase(limit=200)
-            print(f"[tiktok] productos sincronizados: {result.get('synced', 0)}")
+            tiktok_count = int(result.get("synced", 0) or 0)
+            print(f"[tiktok] productos sincronizados: {tiktok_count}")
         except Exception as exc:
+            errors.append(f"TikTok: {exc}")
             print(f"[tiktok] error sincronizando Creator: {exc}")
     else:
         print("[tiktok] integración no configurada; se conserva el ciclo principal.")
+    status = "error" if errors else "success"
+    try:
+        save_pipeline_run(
+            started_at, expired_products, amazon_count, mercadolibre_count,
+            tiktok_count, telegram_prepared, errors, status
+        )
+    except Exception as exc:
+        print(f"[metrics] no se pudo guardar la métrica del ciclo: {exc}")
     print("== Ciclo completo ==")
 
 
