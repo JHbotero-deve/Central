@@ -216,6 +216,29 @@ def require_operator(user: dict[str, Any] = Depends(current_user)) -> dict[str, 
         raise HTTPException(status_code=403, detail="Permisos insuficientes")
     return user
 
+class PasswordChange(BaseModel):
+    current_password: str = Field(min_length=8, max_length=256)
+    new_password: str = Field(min_length=12, max_length=256)
+
+@router.post("/password")
+def change_password(payload: PasswordChange, user: dict[str, Any] = Depends(require_admin)):
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT password_hash FROM central_users WHERE id=%s AND is_active=TRUE", (user.get("sub"),))
+            row = cur.fetchone()
+            if not row or not verify_password(payload.current_password, row["password_hash"]):
+                raise HTTPException(status_code=401, detail="Contraseña actual invalida")
+            cur.execute(
+                "UPDATE central_users SET password_hash=%s, updated_at=NOW() WHERE id=%s",
+                (hash_password(payload.new_password), user.get("sub")),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+    audit_event("password_changed", user_id=user.get("sub"), email=user.get("email"))
+    return {"ok": True}
+
 @router.get("/me")
 def me(user: dict[str, Any] = Depends(current_user)):
     return {"id": user.get("sub"), "email": user.get("email"), "role": user.get("role")}
