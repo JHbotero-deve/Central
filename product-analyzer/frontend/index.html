@@ -61,7 +61,7 @@ function card(p){
   const gallery=Array.isArray(p.image_gallery)?p.image_gallery.filter(Boolean):[];
   const images=[p.image_url,...gallery].filter((url,i,a)=>url&&a.indexOf(url)===i);
   const image=images.length
-    ? `<img src="${esc("/api/v1/media/image?url="+encodeURIComponent(images[0]))}" alt="${esc(p.title)}" loading="lazy" data-images="${esc(JSON.stringify(images))}" data-index="0" data-direct="0" onerror="const a=JSON.parse(this.dataset.images||'[]');const i=Number(this.dataset.index||0)+1;if(a[i]){this.dataset.index=String(i);this.src='/api/v1/media/image?url='+encodeURIComponent(a[i])}else if(this.dataset.direct==='0'){this.dataset.direct='1';this.src=a[0]}else{this.style.display='none';this.nextElementSibling.style.display='block'}"><span class="noimg" style="display:none">Sin imagen</span>`
+    ? `<img src="${esc(images[0])}" alt="${esc(p.title)}" loading="lazy" data-images="${esc(JSON.stringify(images))}" data-index="0" data-direct="1" onerror="const a=JSON.parse(this.dataset.images||'[]');const i=Number(this.dataset.index||0);if(this.dataset.direct==='1'){this.dataset.direct='0';this.src='/api/v1/media/image?url='+encodeURIComponent(a[i])}else{const n=i+1;if(a[n]){this.dataset.index=String(n);this.dataset.direct='1';this.src=a[n]}else{this.style.display='none';this.nextElementSibling.style.display='block'}}"><span class="noimg" style="display:none">Sin imagen</span>`
     : `<span class="noimg">Sin imagen</span>`;
   const original=p.product_url
     ? `<a class="btn small" href="${esc(p.product_url)}" target="_blank" rel="noopener noreferrer">Abrir original</a>`
