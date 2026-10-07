@@ -73,6 +73,13 @@ def upsert_product(conn, platform_name: str, category_name: str, product: dict):
                 image_gallery = CASE WHEN EXCLUDED.image_gallery <> '[]'::jsonb THEN EXCLUDED.image_gallery ELSE products.image_gallery END,
                 product_url = COALESCE(EXCLUDED.product_url, products.product_url),
                 affiliate_url = COALESCE(EXCLUDED.affiliate_url, products.affiliate_url),
+                previous_price = CASE
+                    WHEN EXCLUDED.current_price IS NOT NULL
+                     AND products.current_price IS NOT NULL
+                     AND EXCLUDED.current_price <> products.current_price
+                    THEN products.current_price
+                    ELSE products.previous_price
+                END,
                 current_price = COALESCE(EXCLUDED.current_price, products.current_price),
                 currency = COALESCE(EXCLUDED.currency, products.currency),
                 rating = COALESCE(EXCLUDED.rating, products.rating),
