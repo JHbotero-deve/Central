@@ -1,8 +1,6 @@
 import os
 import time
 
-import schedule
-
 from amazon_api import fetch_amazon_products
 from analysis import score_product
 from db import get_connection, upsert_product
@@ -35,19 +33,93 @@ def expire_catalog():
     conn = get_connection()
     try:
         with conn.cursor() as cur:
+            # El catálogo inicial también sigue la regla real de 48 horas.
             cur.execute("""
                 UPDATE products
-                SET is_active = FALSE, updated_at = NOW()
+                SET catalog_expires_at = catalog_batch_id + INTERVAL '48 hours'
+                WHERE is_active = TRUE
+                  AND source_metadata->>'seed' = 'catalogo_20_productos_2026_10'
+                  AND catalog_batch_id IS NOT NULL
+                  AND catalog_expires_at > catalog_batch_id + INTERVAL '48 hours'
+            """)
+            cur.execute("""
+                SELECT id
+                FROM products
                 WHERE is_active = TRUE
                   AND catalog_expires_at IS NOT NULL
                   AND catalog_expires_at <= NOW()
-                RETURNING id
             """)
-            expired = cur.rowcount
+            expired_ids = [row["id"] for row in cur.fetchall()]
+            if expired_ids:
+                cur.execute(
+                    "UPDATE products SET is_active = FALSE, updated_at = NOW() WHERE id = ANY(%s)",
+                    (expired_ids,),
+                )
+                cur.execute(
+                    "UPDATE published_cards SET is_published = FALSE, updated_at = NOW() WHERE product_id = ANY(%s)",
+                    (expired_ids,),
+                )
         conn.commit()
-        print(f"== Productos vencidos retirados: {expired} ==")
+        print(f"== Productos vencidos retirados: {len(expired_ids)} ==")
     finally:
         conn.close()
+
+
+def publish_real_discounts(conn):
+    """Publica únicamente productos activos con una baja real superior al 50%."""
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT
+                p.id, p.title, p.current_price, p.previous_price, p.currency,
+                p.image_url, p.product_url, p.affiliate_url,
+                p.description, p.stock, p.rating, p.reviews_count,
+                pl.name AS platform, s.opportunity_score
+            FROM products p
+            JOIN platforms pl ON pl.id = p.platform_id
+            LEFT JOIN product_scores s ON s.product_id = p.id
+            WHERE p.is_active = TRUE
+              AND p.current_price IS NOT NULL
+              AND p.previous_price IS NOT NULL
+              AND p.previous_price > p.current_price
+              AND ((p.previous_price - p.current_price) / p.previous_price) > 0.50
+              AND COALESCE(NULLIF(p.image_url, ''), '') <> ''
+        """)
+        products = cur.fetchall()
+        for product in products:
+            product_url = product["affiliate_url"] or product["product_url"]
+            price_display = f"{product['current_price']:,.0f} {product['currency'] or 'COP'}"
+            subtitle = (
+                f"{product['platform']} · descuento real verificado"
+            )
+            cur.execute("""
+                INSERT INTO published_cards (
+                    product_id, title, subtitle, price_display, image_url, product_url,
+                    sale_price, cost_price, profit_amount, profit_margin_pct,
+                    opportunity_score, footer, accent, is_published, published_at, updated_at
+                )
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,0,0,%s,%s,%s,TRUE,NOW(),NOW())
+                ON CONFLICT (product_id) DO UPDATE SET
+                    title=EXCLUDED.title,
+                    subtitle=EXCLUDED.subtitle,
+                    price_display=EXCLUDED.price_display,
+                    image_url=EXCLUDED.image_url,
+                    product_url=EXCLUDED.product_url,
+                    sale_price=EXCLUDED.sale_price,
+                    cost_price=EXCLUDED.cost_price,
+                    opportunity_score=EXCLUDED.opportunity_score,
+                    footer=EXCLUDED.footer,
+                    accent=EXCLUDED.accent,
+                    is_published=TRUE,
+                    updated_at=NOW()
+            """, (
+                product["id"], product["title"], subtitle, price_display,
+                product["image_url"], product_url, product["current_price"],
+                product["current_price"], product["opportunity_score"] or 0,
+                "Descuento real > 50% · Disponible en Central", "#b6f23a",
+            ))
+    conn.commit()
+    print(f"[storefront] publicaciones automáticas >50%: {len(products)}")
+
 
 
 def ingest_amazon(conn) -> list[int]:
@@ -142,8 +214,7 @@ def run_pipeline():
     finally:
         conn.close()
 
-    # La publicación de tarjetas es manual desde Central.
-    print("[storefront] publicación automática desactivada; Central controla las tarjetas publicadas.")
+    publish_real_discounts(conn)
 
     if creator_configured():
         try:
@@ -161,10 +232,7 @@ def run_worker():
     time.sleep(5)
     init_database()
     run_pipeline()
-    schedule.every(2).hours.do(run_pipeline)
-    while True:
-        schedule.run_pending()
-        time.sleep(30)
+    print("== Ejecución programada finalizada; saliendo del proceso. ==")
 
 
 if __name__ == "__main__":
