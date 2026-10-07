@@ -1,6 +1,8 @@
 import os
 import time
 
+import schedule
+
 from amazon_api import fetch_amazon_products
 from analysis import score_product
 from db import get_connection, upsert_product
@@ -231,7 +233,11 @@ def run_worker():
     time.sleep(5)
     init_database()
     run_pipeline()
-    print("== Ejecución programada finalizada; saliendo del proceso. ==")
+    schedule.every(2).hours.do(run_pipeline)
+    print("== Worker activo: próximo ciclo automático en 2 horas. ==")
+    while True:
+        schedule.run_pending()
+        time.sleep(30)
 
 
 if __name__ == "__main__":
