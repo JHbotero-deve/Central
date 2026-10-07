@@ -140,7 +140,18 @@ def login(payload: LoginPayload, response: Response):
     finally:
         conn.close()
     if not user:
-        _bootstrap_admin(email, payload.password)
+        try:
+            _bootstrap_admin(email, payload.password)
+        except HTTPException:
+            audit_event("login_failure", email=email)
+            conn = get_connection()
+            try:
+                with conn.cursor() as cur:
+                    cur.execute("INSERT INTO central_login_attempts(email,success) VALUES (%s,FALSE)", (email,))
+                conn.commit()
+            finally:
+                conn.close()
+            raise HTTPException(status_code=401, detail="Credenciales invalidas")
         conn = get_connection()
         try:
             with conn.cursor() as cur:
@@ -150,7 +161,21 @@ def login(payload: LoginPayload, response: Response):
             conn.close()
     if not user or not user["is_active"] or not verify_password(payload.password, user["password_hash"]):
         audit_event("login_failure", email=email)
+        conn = get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("INSERT INTO central_login_attempts(email,success) VALUES (%s,FALSE)", (email,))
+            conn.commit()
+        finally:
+            conn.close()
         raise HTTPException(status_code=401, detail="Credenciales invalidas")
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("INSERT INTO central_login_attempts(email,success) VALUES (%s,TRUE)", (email,))
+        conn.commit()
+    finally:
+        conn.close()
     now = int(time.time())
     token = _sign(
         {"alg": "HS256", "typ": "JWT"},
