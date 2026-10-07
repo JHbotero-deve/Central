@@ -21,8 +21,7 @@ SEARCH_CONFIG = [
     ("hogar", "lampara led"),
     ("ropa", "campera mujer"),
     ("calzado", "zapatillas urbanas"),
-    ("fitness", "accesorios gimnasio"),
-]
+    ("fitness", "accesorios gimnasio"),]
 SCORE_THRESHOLD = float(os.getenv("SCORE_THRESHOLD", "50"))
 AMAZON_BATCH_SIZE = int(os.getenv("AMAZON_BATCH_SIZE", "15"))
 
