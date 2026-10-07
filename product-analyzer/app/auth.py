@@ -134,12 +134,17 @@ def login(payload: LoginPayload, response: Response):
             """, (email,))
             if int(cur.fetchone()["failures"] or 0) >= MAX_FAILED_LOGINS:
                 raise HTTPException(status_code=429, detail="Demasiados intentos. Espere 15 minutos.")
+            cur.execute("SELECT COUNT(*) AS total FROM central_users")
+            user_count = int(cur.fetchone()["total"] or 0)
             cur.execute("SELECT id,email,password_hash,role,is_active FROM central_users WHERE email=%s", (email,))
             user = cur.fetchone()
         conn.commit()
     finally:
         conn.close()
     if not user:
+        if user_count > 0:
+            audit_event("login_failure", email=email)
+            raise HTTPException(status_code=401, detail="Credenciales invalidas")
         try:
             _bootstrap_admin(email, payload.password)
         except HTTPException:
