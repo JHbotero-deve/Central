@@ -914,9 +914,7 @@ def active_catalog(_: dict = Depends(require_admin)):
                 LEFT JOIN published_cards pc ON pc.product_id = p.id
                 WHERE p.is_active = TRUE AND p.is_blocked = FALSE
                 ORDER BY p.updated_at DESC
-                LIMIT 200
-
-            """)
+                LIMIT 200            """)
             return cur.fetchall()
     finally:
         conn.close()
