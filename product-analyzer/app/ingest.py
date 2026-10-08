@@ -235,12 +235,20 @@ def _catalog_search(query, limit=20):
 
 
 def fetch_mercadolibre(query, limit=20):
+    # Primero intentamos la API autenticada. La búsqueda pública puede devolver
+    # 403 desde Railway aunque el endpoint siga funcionando con OAuth.
     try:
-        data = _get(MELI_SEARCH, {"q": query, "limit": min(limit, 50)}, include_auth=False)
+        data = _get(MELI_SEARCH, {"q": query, "limit": min(limit, 50)}, include_auth=True)
+        print(f"[Mercado Libre] API autenticada OK '{query}': {len(data.get('results') or [])} resultados")
     except (RuntimeError, requests.RequestException) as exc:
         if isinstance(exc, RuntimeError) and "403" not in str(exc):
             raise
-        print(f"[Mercado Libre] API bloqueada para '{query}'; usando búsqueda web real: {exc}")
+        print(f"[Mercado Libre] API autenticada bloqueada para '{query}': {exc}")
+        catalog_products = _catalog_search(query, limit)
+        if catalog_products:
+            print(f"[Mercado Libre] usando catálogo autenticado '{query}': {len(catalog_products)} productos")
+            return catalog_products
+        print(f"[Mercado Libre] catálogo sin resultados; usando búsqueda web real '{query}'")
         data = _public_search(query, limit)
     products = []
 
