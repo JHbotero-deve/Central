@@ -22,9 +22,26 @@ SEARCH_CONFIG = [
     ("hogar", "lampara led"),
     ("ropa", "campera mujer"),
     ("calzado", "zapatillas urbanas"),
-    ("fitness", "accesorios gimnasio"),]
+    ("fitness", "accesorios gimnasio"),
+    ("electronica", "monitor 4k"),
+    ("electronica", "webcam"),
+    ("electronica", "parlante bluetooth"),
+    ("electronica", "disco ssd"),
+    ("electronica", "memoria micro sd"),
+    ("accesorios", "cargador usb c"),
+    ("accesorios", "power bank"),
+    ("hogar", "camara seguridad wifi"),
+    ("hogar", "aspiradora robot"),
+    ("hogar", "iluminacion led"),
+    ("fitness", "reloj deportivo"),
+    ("fitness", "bandas resistencia"),
+    ("calzado", "tenis hombre"),
+    ("calzado", "tenis mujer"),
+    ("electronica", "consola videojuegos"),
+]
 SCORE_THRESHOLD = float(os.getenv("SCORE_THRESHOLD", "50"))
-AMAZON_BATCH_SIZE = int(os.getenv("AMAZON_BATCH_SIZE", "15"))
+AMAZON_BATCH_SIZE = int(os.getenv("AMAZON_BATCH_SIZE", "50"))
+MELI_BATCH_SIZE = int(os.getenv("MELI_BATCH_SIZE", "20"))
 
 def build_url(title: str, product_url: str | None) -> str:
     if product_url and product_url != "#":
@@ -211,7 +228,7 @@ def run_pipeline():
 
         for category, term in SEARCH_CONFIG:
             try:
-                products = fetch_mercadolibre(term)
+                products = fetch_mercadolibre(term, limit=MELI_BATCH_SIZE)
             except Exception as exc:
                 errors.append(f"Mercado Libre '{term}': {exc}")
                 print(f"[mercadolibre] error trayendo '{term}': {exc}")
