@@ -229,6 +229,8 @@ const esc=v=>String(v??"").replace(
     }[c])
 );
 
+const mediaSrc=url=>url?API+"/media/image?url="+encodeURIComponent(url):"";
+
 const money=(v,c)=>{
     if(v==null||v==="") return "Consultar";
 
@@ -527,7 +529,7 @@ try{
     <div class="media">
         <img
             id="mainImg"
-            src="${esc(gallery[0])}"
+            src="${esc(mediaSrc(gallery[0]))}"
             alt="${esc(p.title)}"
         >
     </div>
@@ -535,7 +537,8 @@ try{
     <div class="gallery">
         ${gallery.slice(0,10).map(x=>`
             <img
-                src="${esc(x)}"
+                src="${esc(mediaSrc(x))}"
+                data-original="${esc(x)}"
                 alt="${esc(p.title)}"
                 loading="lazy"
             >
@@ -662,6 +665,11 @@ try{
     </div>
 
     <div class="status" id="actionStatus"></div>
+
+    <div class="meta">
+        <div>Fuente original<br><b>${p.product_url?'<a href="'+esc(p.product_url)+'" target="_blank" rel="nofollow sponsored noopener">Abrir publicación</a>':"No disponible"}</b></div>
+        <div>Actualizado<br><b>${esc(p.updated_at||"Fuente externa")}</b></div>
+    </div>
 
     <button class="cta" id="buy">
         ${buttonText}
