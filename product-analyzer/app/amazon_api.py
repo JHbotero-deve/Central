@@ -460,6 +460,53 @@ def _map_fallback_item(
     }
 
 
+def fetch_amazon_seed_products(existing_ids: set[str], limit: int = 10) -> list[tuple[str, dict[str, Any]]]:
+    """Seed real Amazon products from known ASIN links when search APIs are unavailable."""
+    seeds = [
+        ("Electronics", "B0CN5HYDHZ"),
+        ("Electronics", "B0DM83L2R2"),
+        ("Computers", "B0DZMLL649"),
+        ("Computers", "B0D2NHPXK7"),
+        ("Computers", "B0DSJVKHZG"),
+        ("Computers", "B0D7JL9RKL"),
+        ("Computers", "B0BYLNF9XF"),
+        ("Computers", "B0CQNBG45Z"),
+        ("Electronics", "B0C6RC1DVL"),
+        ("Electronics", "B08CZCXV9M"),
+    ]
+    results = []
+    seen = set(existing_ids)
+    for category, asin in seeds:
+        if asin in seen or len(results) >= limit:
+            continue
+        url = f"https://www.amazon.com/dp/{asin}"
+        try:
+            response = requests.get(url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140.0 Safari/537.36", "Accept-Language": "en-US,en;q=0.9"}, timeout=20, allow_redirects=True)
+            if not response.ok:
+                continue
+            html = response.text
+            title_match = re.search(r'<meta[^>]+property=["\\']og:title["\\'][^>]+content=["\\']([^"\\']+)', html, re.I)
+            title = title_match.group(1).strip() if title_match else ""
+            if not title:
+                title_match = re.search(r'<span[^>]+id=["\\']productTitle["\\'][^>]*>(.*?)</span>', html, re.I | re.S)
+                title = re.sub(r"<[^>]+>", " ", title_match.group(1)).strip() if title_match else ""
+            image = _amazon_image_from_html(url)
+            price_match = re.search(r'<span[^>]+class=["\\'][^"\\']*(?:a-price-whole)[^"\\']*["\\'][^>]*>([0-9,]+)</span>.*?<span[^>]+class=["\\'][^"\\']*(?:a-price-fraction)[^"\\']*["\\'][^>]*>([0-9]+)</span>', html, re.I | re.S)
+            if not price_match:
+                price_match = re.search(r'\\$\\s*([0-9][0-9,]*(?:\\.[0-9]{1,2})?)', html)
+                amount = float(price_match.group(1).replace(",", "")) if price_match else None
+            else:
+                amount = float(price_match.group(1).replace(",", "") + "." + price_match.group(2))
+            if not title or not image or not amount or amount <= 0:
+                continue
+            product = {"platform":"amazon","external_id":asin,"title":title[:500],"image_url":image,"gallery_urls":[image],"product_url":url,"price":amount,"currency":"USD","rating":None,"reviews_count":0,"sales_estimate":None,"source_metadata":{"import_method":"amazon_seed","metadata_source":"amazon_product_page","marketplace":MARKETPLACE,"asin":asin}}
+            results.append((category, product)); seen.add(asin)
+        except (requests.RequestException, ValueError) as exc:
+            print(f"[amazon] seed {asin} error: {exc}")
+    print(f"[amazon] seed real: {len(results)} productos válidos")
+    return results
+
+
 def fetch_amazon_products(
     existing_ids: set[str],
     limit: int = 15,
