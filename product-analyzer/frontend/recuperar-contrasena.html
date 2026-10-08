@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Central — Recuperar contraseña</title>
+<link rel="stylesheet" href="/central.css">
+<style>body{margin:0;background:#f3eee5;color:#20241f;font:14px/1.5 Inter,system-ui,sans-serif}.box{width:min(460px,calc(100% - 32px));margin:70px auto;background:#fffdf8;border:1px solid #d8d0c4;border-radius:14px;padding:28px}.field{width:100%;box-sizing:border-box;padding:12px;margin:7px 0 12px;border:1px solid #c9c0b2;border-radius:8px}.btn{border:1px solid #c9c0b2;background:#20241f;color:#fff;border-radius:8px;padding:10px 14px;font-weight:700;cursor:pointer}.muted{color:#6c706b}.msg{min-height:24px;margin-top:12px}.ok{color:#46612f}.err{color:#8b3f38}.back{display:inline-block;margin-top:16px;color:#55652f}</style></head>
+<body><main class="box"><div id="request">
+<h1>Recuperar contraseña</h1><p class="muted">Escribe tu correo. Te enviaremos un enlace para crear una nueva contraseña.</p>
+<form id="forgot"><input class="field" id="email" type="email" autocomplete="email" placeholder="Correo" required><button class="btn">Enviar enlace</button></form><div id="msg" class="msg"></div></div>
+<div id="reset" hidden><h1>Nueva contraseña</h1><p class="muted">Crea una nueva contraseña para Central.</p>
+<form id="resetForm"><input class="field" id="password" type="password" minlength="12" autocomplete="new-password" placeholder="Nueva contraseña" required><input class="field" id="confirm" type="password" minlength="12" autocomplete="new-password" placeholder="Repite la contraseña" required><button class="btn">Cambiar contraseña</button></form><div id="resetMsg" class="msg"></div></div>
+<a class="back" href="/tarjetas">Volver al acceso</a></main>
+<script>
+(()=>{"use strict";const API="/api/v1",q=new URLSearchParams(location.search),token=q.get("token"),$=id=>document.getElementById(id);
+if(token){$("request").hidden=true;$("reset").hidden=false}
+$("forgot").addEventListener("submit",async e=>{e.preventDefault();$("msg").textContent="Enviando…";const r=await fetch(API+"/auth/password/forgot",{method:"POST",headers:{"Content-Type":"application/json","Accept":"application/json"},body:JSON.stringify({email:$("email").value.trim()})});const d=await r.json().catch(()=>({}));$("msg").className="msg "+(r.ok?"ok":"err");$("msg").textContent=d.message||d.detail||"No fue posible procesar la solicitud."});
+$("resetForm").addEventListener("submit",async e=>{e.preventDefault();if($("password").value!==$("confirm").value){$("resetMsg").className="msg err";$("resetMsg").textContent="Las contraseñas no coinciden.";return}$("resetMsg").textContent="Guardando…";const r=await fetch(API+"/auth/password/reset",{method:"POST",headers:{"Content-Type":"application/json","Accept":"application/json"},body:JSON.stringify({token,new_password:$("password").value})});const d=await r.json().catch(()=>({}));$("resetMsg").className="msg "+(r.ok?"ok":"err");$("resetMsg").textContent=r.ok?"Contraseña actualizada. Ya puedes ingresar.":(d.detail||"No fue posible cambiar la contraseña.");if(r.ok)setTimeout(()=>location.href="/tarjetas",900)});
+})();
+</script></body></html>
