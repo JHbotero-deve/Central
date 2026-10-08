@@ -154,23 +154,32 @@ document.addEventListener("click",e=>{
   if(p)showRadarSpecs(p);
 });
 async function load(){
-try{
-const [top,items,intel,pipeline]=await Promise.all([get("/opportunities/top?limit=12"),get("/products?limit=50"),get("/intelligence/overview"),get("/pipeline/metrics")]);
-radarProducts=top;
-$("featured").innerHTML=top.length?top.map(card).join(""):'<div class="empty">No hay oportunidades reales disponibles.</div>';
-
-renderIntelligence(intel);
-$("count").textContent=items.length;
-const last=items.map(x=>x.updated_at).filter(Boolean).sort().pop();
-$("last").textContent=date(last);
-$("mlCount").textContent=items.filter(x=>x.platform==="mercadolibre").length;
-$("amzCount").textContent=items.filter(x=>x.platform==="amazon").length;
-$("updated").textContent=new Date().toLocaleTimeString("es-CO");
-const run=pipeline.latest;
-const runStatus=run?.status==="success"?"OK":"ATENCIÓN";
-$("pipelineMeta").textContent=run?("Último ciclo: "+runStatus+" · "+date(run.finished_at)+" · Amazon "+Number(run.amazon_products||0)+" · Mercado Libre "+Number(run.mercadolibre_products||0)+" · TikTok "+Number(run.tiktok_products||0)+" · Telegram preparados "+Number(run.telegram_prepared||0)+(Number(run.error_count||0)?" · errores "+Number(run.error_count):"")):"Sin ejecuciones registradas";
-status(run?.status==="success"?"ok":"warn","Central conectado");
-}catch(e){console.error(e);$("featured").innerHTML='<div class="empty">API no disponible.</div>';status("error","API no disponible")}
+  const [itemsResult,topResult,intelResult,pipelineResult]=await Promise.allSettled([
+    get("/products?limit=50"),get("/opportunities/top?limit=12"),get("/intelligence/overview"),get("/pipeline/metrics")
+  ]);
+  const items=itemsResult.status==="fulfilled"?itemsResult.value:[];
+  const top=topResult.status==="fulfilled"?topResult.value:[];
+  if(itemsResult.status==="fulfilled"){
+    $("count").textContent=items.length;
+    const last=items.map(x=>x.updated_at).filter(Boolean).sort().pop();
+    $("last").textContent=date(last);
+    $("mlCount").textContent=items.filter(x=>String(x.platform||"").toLowerCase()==="mercadolibre").length;
+    $("amzCount").textContent=items.filter(x=>String(x.platform||"").toLowerCase()==="amazon").length;
+    $("updated").textContent=new Date().toLocaleTimeString("es-CO");
+  }
+  if(topResult.status==="fulfilled"){
+    radarProducts=top;
+    $("featured").innerHTML=top.length?top.map(card).join(""):'<div class="empty">No hay oportunidades reales disponibles.</div>';
+  }else if(!items.length){
+    $("featured").innerHTML='<div class="empty">No hay productos disponibles.</div>';
+  }
+  if(intelResult.status==="fulfilled") renderIntelligence(intelResult.value);
+  if(pipelineResult.status==="fulfilled"){
+    const pipeline=pipelineResult.value,run=pipeline.latest;
+    const runStatus=run?.status==="success"?"OK":"ATENCIÓN";
+    $("pipelineMeta").textContent=run?("Último ciclo: "+runStatus+" · "+date(run.finished_at)+" · Amazon "+Number(run.amazon_products||0)+" · Mercado Libre "+Number(run.mercadolibre_products||0)+" · TikTok "+Number(run.tiktok_products||0)+" · Telegram preparados "+Number(run.telegram_prepared||0)+(Number(run.error_count||0)?" · errores "+Number(run.error_count):"")):"Sin ejecuciones registradas";
+  }
+  status(itemsResult.status==="fulfilled"?"ok":"error",itemsResult.status==="fulfilled"?"Central conectado":"Productos no disponibles");
 }
 async function submitManual(e){
   e.preventDefault();
