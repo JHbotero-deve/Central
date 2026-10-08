@@ -1,5 +1,6 @@
 import html
 import os
+import re
 import time
 from urllib.parse import urlparse
 
@@ -270,6 +271,117 @@ def _add_url(argument):
         return None, "No fue posible agregar el producto desde la URL.", None
 
 
+def _extract_urls(text):
+    return list(dict.fromkeys(re.findall(r"https?://[^\\s<>]+", text or "")))
+
+
+def _category_from_text(text):
+    value = (text or "").lower()
+    groups = {
+        "calzado": ("tenis", "zapatilla", "zapato", "sneaker"),
+        "ropa": ("camiseta", "camisa", "pantalon", "jean", "pijama", "chaqueta"),
+        "electronica": ("celular", "audifono", "audífono", "smartwatch", "mouse", "teclado", "monitor", "ssd", "webcam", "consola"),
+        "hogar": ("lampara", "lámpara", "organizador", "aspiradora", "cocina"),
+        "fitness": ("gimnasio", "fitness", "banda resistencia", "reloj deportivo"),
+        "accesorios": ("cargador", "power bank", "soporte celular", "mochila"),
+    }
+    for category, terms in groups.items():
+        if any(term in value for term in terms):
+            return category
+    return "otros"
+
+
+def _ingest_telegram_url(url, context=""):
+    category = _category_from_text(context)
+    try:
+        product = import_url(url, category)
+        if product["platform"] not in {"amazon", "mercadolibre", "tiktok"}:
+            return None, "Fuente no habilitada."
+        conn = get_connection()
+        try:
+            product_id = upsert_product(conn, product["platform"], category, product)
+            score = score_product(conn, product_id, float(product.get("price") or 0))
+        finally:
+            conn.close()
+        message = (
+            f"<b>Producto capturado</b> · ID {product_id}\n"
+            f"{html.escape(product['title'])}\n"
+            f"Fuente: {html.escape(product['platform'])}\n"
+            f"Precio: {product['price']:,.0f} {html.escape(product['currency'])}\n"
+            f"Score: {float(score):.1f}/100\n"
+            f"<b>Listo para publicar:</b> /publicar {product_id}"
+        )
+        return product_id, message
+    except Exception as exc:
+        print(f"[telegram-bot] captura URL fallida: {type(exc).__name__}")
+        return None, "No se pudo importar esa URL."
+
+
+def _publish_product(product_id):
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT p.id,p.title,p.current_price,p.currency,p.previous_price,p.image_url,
+                       p.image_gallery,p.product_url,p.affiliate_url,
+                       pl.name AS platform,s.opportunity_score
+                FROM products p
+                JOIN platforms pl ON pl.id=p.platform_id
+                LEFT JOIN product_scores s ON s.product_id=p.id
+                WHERE p.id=%s AND p.is_active=TRUE AND p.is_blocked=FALSE
+                """,
+                (product_id,),
+            )
+            product = cur.fetchone()
+            if not product:
+                return None, "Producto activo no encontrado."
+            image_url = product["image_url"] or ((product["image_gallery"] or [None])[0])
+            product_url = product["affiliate_url"] or product["product_url"]
+            if not image_url or not product_url:
+                return None, "El producto necesita imagen y enlace de origen."
+            discount = 0.0
+            if product["previous_price"] and product["current_price"] and product["previous_price"] > product["current_price"]:
+                discount = (product["previous_price"] - product["current_price"]) / product["previous_price"] * 100
+            if str(product["platform"]).lower() != "personal" and discount < 1 and float(product["opportunity_score"] or 0) < 50:
+                return None, "No hay una señal suficiente de oportunidad para publicar."
+            price_display = f"{product['current_price']:,.0f} {product['currency'] or 'COP'}" if product["current_price"] is not None else "Consultar"
+            cur.execute(
+                """
+                INSERT INTO published_cards (
+                    product_id,title,subtitle,price_display,image_url,product_url,
+                    sale_price,cost_price,profit_amount,profit_margin_pct,
+                    opportunity_score,footer,accent,is_published,published_at,updated_at
+                )
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,0,0,%s,%s,%s,TRUE,NOW(),NOW())
+                ON CONFLICT(product_id) DO UPDATE SET
+                    title=EXCLUDED.title,subtitle=EXCLUDED.subtitle,
+                    price_display=EXCLUDED.price_display,image_url=EXCLUDED.image_url,
+                    product_url=EXCLUDED.product_url,sale_price=EXCLUDED.sale_price,
+                    cost_price=EXCLUDED.cost_price,opportunity_score=EXCLUDED.opportunity_score,
+                    footer=EXCLUDED.footer,accent=EXCLUDED.accent,
+                    is_published=TRUE,updated_at=NOW()
+                RETURNING id
+                """,
+                (
+                    product["id"],product["title"],
+                    f"{product['platform']} · producto verificado",
+                    price_display,image_url,product_url,
+                    product["current_price"],product["current_price"],
+                    float(product["opportunity_score"] or 0),
+                    "Producto real · fuente verificada","#b6f23a"
+                ),
+            )
+            publication_id=cur.fetchone()["id"]
+        conn.commit()
+        return publication_id, f"Publicado correctamente. Tarjeta {publication_id}."
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
 def _model_product(argument):
     parts = [part.strip() for part in argument.split("|")]
     if len(parts) < 10:
@@ -324,6 +436,8 @@ def _handle(token, chat_id, text):
             "/buscar producto — buscar en los datos modelados\n"
             "/modelar — registrar y puntuar un producto\n"
             "/agregar — importar un producto desde Amazon o Mercado Libre por URL\n"
+            "/publicar ID — publicar un producto validado\n"
+            "También puedes enviar una URL sola: Central la captura y la deja lista para publicar.\n"
             "/estado — estado del catálogo\n"
             "/help — ayuda"
         ))
@@ -379,6 +493,16 @@ def _handle(token, chat_id, text):
         if result is None:
             return _send(token, chat_id, f"<b>Error de modelado</b>\n{html.escape(str(error))}")
         return _send(token, chat_id, f"<b>Producto modelado</b>\nID: {result}\nOportunidad: {float(error):.1f}/100")
+
+    if command == "/publicar":
+        try:
+            product_id = int(argument.strip())
+        except ValueError:
+            return _send(token, chat_id, "Uso: /publicar ID")
+        result, message = _publish_product(product_id)
+        if result is None:
+            return _send(token, chat_id, f"<b>No publicado</b>\n{html.escape(message)}")
+        return _send(token, chat_id, f"<b>{html.escape(message)}</b>")
 
     if command == "/estado":
         conn = get_connection()
@@ -463,13 +587,19 @@ def run_bot():
                 raise RuntimeError(payload.get("description", "respuesta inválida"))
             for update in payload.get("result", []):
                 offset = update["update_id"] + 1
-                message = update.get("message") or {}
+                message = update.get("message") or update.get("channel_post") or {}
                 chat = message.get("chat") or {}
-                text = message.get("text") or ""
+                text = message.get("text") or message.get("caption") or ""
                 chat_id = chat.get("id")
-                if chat_id is None or not _allowed_chat(chat_id) or not text:
+                if chat_id is None or not _allowed_chat(chat_id):
                     continue
-                _handle(token, chat_id, text)
+                if text.startswith("/"):
+                    _handle(token, chat_id, text)
+                    continue
+                for url in _extract_urls(text)[:3]:
+                    clean_url = url.rstrip(".,);]}")
+                    _, result = _ingest_telegram_url(clean_url, text)
+                    _send(token, chat_id, result)
         except requests.HTTPError as exc:
             response = getattr(exc, "response", None)
             status = response.status_code if response is not None else "?"
