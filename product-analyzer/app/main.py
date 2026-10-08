@@ -253,6 +253,7 @@ def run_pipeline():
     telegram_prepared = 0
     conn = get_connection()
     product_ids = []
+    new_product_ids = []
     try:
         try:
             product_ids.extend(ingest_amazon(conn))
@@ -272,9 +273,22 @@ def run_pipeline():
             if not products:
                 print(f"[mercadolibre] sin resultados reales para '{term}'.")
                 continue
+            mercadolibre_count += len(products)
             for product in products:
                 try:
-                    product_ids.append(upsert_product(conn, "mercadolibre", category, product))
+                    with conn.cursor() as cur:
+                        cur.execute("""
+                            SELECT p.id
+                            FROM products p
+                            JOIN platforms pl ON pl.id = p.platform_id
+                            WHERE pl.name = 'mercadolibre' AND p.external_id = %s
+                        """, (product.get("external_id"),))
+                        existed = cur.fetchone()
+                    product_id = upsert_product(conn, "mercadolibre", category, product)
+                    product_ids.append(product_id)
+                    if not existed:
+                        new_product_ids.append(product_id)
+                
                 except Exception as exc:
                     conn.rollback()
                     print(f"[mercadolibre] error insertando producto: {exc}")
@@ -291,7 +305,8 @@ def run_pipeline():
             for row in cur.fetchall():
                 averages[(row["category"], row["currency"])] = float(row["avg_price"] or 0)
 
-        for product_id in set(product_ids):
+        # Telegram solo procesa productos realmente nuevos; no repite el catálogo viejo en cada ciclo.
+        for product_id in set(new_product_ids):
             with conn.cursor() as cur:
                 cur.execute("""
                     SELECT c.name AS category, p.currency
