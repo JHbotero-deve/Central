@@ -206,10 +206,46 @@ def ingest_amazon(conn) -> list[int]:
     return ids
 
 
+def backfill_mongo_images(limit=150):
+    from mongo_store import store_product_image
+    conn = get_connection()
+    rows = []
+    done = 0
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT id, external_id, image_url, source_metadata
+                FROM products
+                WHERE is_active = TRUE
+                  AND COALESCE(image_url, '') <> ''
+                  AND COALESCE(source_metadata->>'mongo_image_id', '') = ''
+                ORDER BY id
+                LIMIT %s
+            """, (limit,))
+            rows = cur.fetchall()
+            for row in rows:
+                try:
+                    mongo_id = store_product_image(row["image_url"], product_id=row["id"], external_id=row["external_id"])
+                    if not mongo_id:
+                        continue
+                    metadata = dict(row["source_metadata"] or {})
+                    metadata["mongo_image_id"] = mongo_id
+                    cur.execute("UPDATE products SET source_metadata=%s, updated_at=NOW() WHERE id=%s", (Json(metadata), row["id"]))
+                    done += 1
+                except Exception as exc:
+                    print(f"[mongo] backfill {row['id']}: {exc}")
+        conn.commit()
+    finally:
+        conn.close()
+    print(f"[mongo] imágenes migradas: {done}/{len(rows)}")
+    return done
+
+
 def run_pipeline():
     started_at = __import__("datetime").datetime.now()
     print("== Iniciando ciclo de ingesta y análisis ==")
     expired_products = expire_catalog()
+    backfill_mongo_images()
     errors = []
     amazon_count = 0
     mercadolibre_count = 0
