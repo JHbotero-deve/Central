@@ -19,12 +19,20 @@ AMAZON_QUERIES = [
     ("accesorios", "power bank"),
     ("hogar", "smart home"),
     ("electronica", "fire tv stick"),
+    ("electronica", "4k monitor"),
+    ("electronica", "webcam"),
+    ("electronica", "portable speaker"),
+    ("electronica", "ssd 1tb"),
+    ("electronica", "smartphone accessories"),
+    ("accesorios", "bluetooth keyboard"),
+    ("accesorios", "wireless charger"),
 ]
 MELI_QUERIES = [
     "audifonos bluetooth", "smartwatch", "mouse gamer", "teclado mecanico",
-    "cargador usb c", "power bank", "camara seguridad wifi", "parlante bluetooth",
+    "cargador usb c", "power bank", "camara seguridad wifi", "parlante bluetooth", "camara deportiva", "disco ssd", "teclado bluetooth",
+    "cargador inalambrico", "monitor 4k", "webcam", "memoria micro sd",
 ]
-MAX_PER_SOURCE = 50
+MAX_PER_SOURCE = 100
 BATCH = "REAL-PROMO-2026-10-07"
 
 
@@ -85,7 +93,7 @@ def amazon_products(conn):
         if imported >= MAX_PER_SOURCE:
             break
         try:
-            for item in search_products(query, 10):
+            for item in search_products(query, 20):
                 if imported >= MAX_PER_SOURCE:
                     break
                 product = _map_item(item, category) or _map_fallback_item(item, category)
@@ -121,7 +129,7 @@ def mercado_libre_products(conn):
         if imported >= MAX_PER_SOURCE:
             break
         try:
-            for product in fetch_mercadolibre(query, limit=15):
+            for product in fetch_mercadolibre(query, limit=20):
                 if imported >= MAX_PER_SOURCE:
                     break
                 key = str(product.get("external_id") or "").upper()
@@ -220,9 +228,8 @@ def main():
             total = cur.fetchone()["total"]
 
         print(f"REAL_PROMO_READY amazon={amazon} mercadolibre={meli} total_tienda={total}")
-        if amazon == 0 and meli == 0:
-            fallback_total = publish_fallbacks(conn)
-            print(f"[REAL] Fallback web verificado publicado: {fallback_total}")
+        fallback_total = publish_fallbacks(conn)
+        print(f"[REAL] Fallback web verificado complementario publicado/actualizado: {fallback_total}")
     finally:
         conn.close()
 
