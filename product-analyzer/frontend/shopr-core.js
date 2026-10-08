@@ -14,26 +14,29 @@ const unpack=d=>{d=String(d||"");const m=d.match(/\n*\[\[central:([A-Za-z0-9+\/=
 const theme=()=>{try{return JSON.parse(localStorage.getItem("central_theme"))||THEMES[0]}catch{return THEMES[0]}};
 const setTheme=t=>{localStorage.setItem("central_theme",JSON.stringify(t));applyTheme()};
 const applyTheme=()=>document.documentElement.style.setProperty("--bg",theme()[1]);
-const tok=()=>localStorage.getItem(KEY)||"";
-const setTok=t=>t?localStorage.setItem(KEY,t):localStorage.removeItem(KEY);
+let sessionReady=false;
+const tok=()=>sessionReady?"session":"";
+const setTok=t=>{sessionReady=!!t};
 
 async function api(path,opt={}){
-  const h={Accept:"application/json",...(opt.headers||{})};if(tok())h.Authorization="Bearer "+tok();
-  const r=await fetch(API+path,{cache:"no-store",...opt,headers:h});let b=null;try{b=await r.json()}catch{}
+  const h={Accept:"application/json",...(opt.headers||{})};
+  const r=await fetch(API+path,{cache:"no-store",credentials:"include",...opt,headers:h});let b=null;try{b=await r.json()}catch{}
   if(!r.ok){const d=b&&b.detail;const e=new Error(typeof d==="string"?d:(d?JSON.stringify(d):"HTTP "+r.status));e.status=r.status;throw e}
   return b}
 async function login(u,p){
-  const tries=[{t:"application/json",b:JSON.stringify({username:u,password:p})},
-    {t:"application/x-www-form-urlencoded",b:new URLSearchParams({username:u,password:p}).toString()},
-    {t:"application/json",b:JSON.stringify({email:u,password:p})}];
-  let last="Credenciales invalidas";
-  for(const x of tries){
-    const r=await fetch(API+"/auth/login",{method:"POST",headers:{"Content-Type":x.t,Accept:"application/json"},body:x.b});
-    const j=await r.json().catch(()=>({}));
-    if(r.ok){const k=j.access_token||j.token;if(!k)throw new Error("La respuesta no trae token");return k}
-    if(typeof j.detail==="string")last=j.detail;
-    if(r.status!==422&&r.status!==400)break}
-  throw new Error(last)}
+  const r=await fetch(API+"/auth/login",{method:"POST",credentials:"include",headers:{"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({email:String(u||"").trim(),password:String(p||"")})});
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok)throw new Error(typeof j.detail==="string"?j.detail:"Credenciales invalidas");
+  sessionReady=true; return true;
+}
+async function session(){
+  const r=await fetch(API+"/auth/me",{credentials:"include",headers:{Accept:"application/json"},cache:"no-store"});
+  sessionReady=r.ok; return r.ok;
+}
+async function logout(){
+  await fetch(API+"/auth/logout",{method:"POST",credentials:"include",headers:{Accept:"application/json"}});
+  sessionReady=false;
+}
 
 function mkLinks(mt,plat,p,g){
   const L=Object.assign({},mt.links||{}),aff=g("affiliate_url")||g("product_url")||"";
@@ -83,5 +86,5 @@ function cardHtml(m){
   const im=imgOk(v.img)?`<img src="${esc(imgOk(v.img))}" alt="${esc(m.title)}" loading="lazy" referrerpolicy="no-referrer">`:'<span class="sh-noimg">Sin imagen</span>';
   return `<button type="button" class="sh-card" data-id="${esc(m.id)}"><div class="sh-cim ${m.plate?"plate":""}">${im}</div><div class="sh-cb"><span class="sh-cbrand">${esc(m.brand||m.cat)}</span><span class="sh-ctitle">${esc(m.title)}</span><span class="sh-cprice">${money(m.price,m.currency)}</span></div></button>`}
 
-return{API,GLOWS,THEMES,esc,url,imgOk,nn,money,pack,unpack,fromApi,detailHtml,mountDetail,cardHtml,api,login,tok,setTok,theme,setTheme,applyTheme,KEY}
+return{API,GLOWS,THEMES,esc,url,imgOk,nn,money,pack,unpack,fromApi,detailHtml,mountDetail,cardHtml,api,login,session,logout,tok,setTok,theme,setTheme,applyTheme,KEY}
 })();
