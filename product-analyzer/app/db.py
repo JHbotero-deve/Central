@@ -66,6 +66,7 @@ def upsert_product(conn, platform_name: str, category_name: str, product: dict):
 
         cur.execute(
             """
+            INSERT INTO products (
                 platform_id, category_id, seller_id, external_id, title,
                 image_url, image_gallery, product_url, affiliate_url, current_price, currency, rating,
                 reviews_count, sales_estimate, source_metadata,
