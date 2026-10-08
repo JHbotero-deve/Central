@@ -467,10 +467,22 @@ def fetch_amazon_products(
 
     searches = [
         ("Electronics", "wireless headphones"),
+        ("Electronics", "bluetooth earbuds"),
         ("Electronics", "smart watch"),
+        ("Electronics", "power bank"),
+        ("Electronics", "USB C charger"),
+        ("Computers", "mechanical keyboard"),
+        ("Computers", "gaming mouse"),
+        ("Computers", "webcam"),
+        ("Computers", "portable SSD"),
+        ("Computers", "4k monitor"),
         ("HomeAndKitchen", "home gadgets"),
-        ("Computers", "computer accessories"),
+        ("HomeAndKitchen", "security camera wifi"),
+        ("SportsAndOutdoors", "fitness accessories"),
         ("VideoGames", "gaming accessories"),
+        ("VideoGames", "game controller"),
+        ("Shoes", "mens sneakers"),
+        ("Shoes", "womens sneakers"),
     ]
 
     results: list[tuple[str, dict[str, Any]]] = []
