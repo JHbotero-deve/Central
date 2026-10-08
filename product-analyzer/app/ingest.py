@@ -233,10 +233,7 @@ def fetch_mercadolibre(query, limit=20):
     except (RuntimeError, requests.RequestException) as exc:
         if isinstance(exc, RuntimeError) and "403" not in str(exc):
             raise
-        print(f"[Mercado Libre] búsqueda de publicaciones bloqueada para '{query}'; probando catálogo: {exc}")
-        catalog_products = _catalog_search(query, limit)
-        if catalog_products:
-            return catalog_products
+        print(f"[Mercado Libre] API bloqueada para '{query}'; usando búsqueda web real: {exc}")
         data = _public_search(query, limit)
     products = []
 
