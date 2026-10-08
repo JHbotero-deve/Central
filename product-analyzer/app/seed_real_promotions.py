@@ -212,6 +212,7 @@ def main():
         amazon = amazon_products(conn)
         meli = mercado_libre_products(conn)
 
+        conn.close()
         fallback_total = 0
         for attempt in range(1, 6):
             try:
