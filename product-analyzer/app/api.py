@@ -915,3 +915,105 @@ def active_catalog(_: dict = Depends(require_admin)):
                 WHERE p.is_active = TRUE AND p.is_blocked = FALSE
                 ORDER BY p.updated_at DESC
                 LIMIT 200
+
+            """)
+            return cur.fetchall()
+    finally:
+        conn.close()
+
+
+class ProductStatus(BaseModel):
+    active: bool
+
+
+@core_router.patch("/products/{product_id}/status")
+def update_product_status(product_id: int, payload: ProductStatus, _: dict = Depends(require_admin)):
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE products
+                SET is_active=%s,
+                    is_blocked=CASE WHEN %s THEN FALSE ELSE TRUE END,
+                    updated_at=NOW()
+                WHERE id=%s
+                RETURNING id, is_active, is_blocked, updated_at
+            """, (payload.active, payload.active, product_id))
+            result = cur.fetchone()
+            if not result:
+                raise HTTPException(status_code=404, detail="Producto no encontrado")
+            if not payload.active:
+                cur.execute("UPDATE published_cards SET is_published=FALSE, updated_at=NOW() WHERE product_id=%s", (product_id,))
+        conn.commit()
+        return result
+    except HTTPException:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+@core_router.delete("/products/{product_id}")
+def remove_product(product_id: int, _: dict = Depends(require_admin)):
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE products
+                SET is_active=FALSE, is_blocked=TRUE, updated_at=NOW()
+                WHERE id=%s
+                RETURNING id, title
+            """, (product_id,))
+            result = cur.fetchone()
+            if not result:
+                raise HTTPException(status_code=404, detail="Producto no encontrado")
+            cur.execute("UPDATE published_cards SET is_published=FALSE, updated_at=NOW() WHERE product_id=%s", (product_id,))
+        conn.commit()
+        return {"status":"removed","product":result}
+    except HTTPException:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+@core_router.get("/comparison")
+def price_comparison(limit: int = Query(100, ge=1, le=500), _: dict = Depends(require_admin)):
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM product_price_comparison LIMIT %s", (limit,))
+            return cur.fetchall()
+    finally:
+        conn.close()
+
+
+@core_router.get("/opportunities/top")
+def top_opportunities(limit: int = Query(20, ge=1, le=100), _: dict = Depends(require_admin)):
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT p.id, p.title, pl.name AS platform, c.name AS category,
+                       p.current_price, p.currency, p.rating, p.reviews_count,
+                       p.sales_estimate, s.price_score, s.demand_score,
+                       s.trend_score, s.opportunity_score, p.product_url,
+                       CASE WHEN COALESCE(p.source_metadata->>'mongo_image_id','') <> ''
+                            THEN 'mongo://' || p.source_metadata->>'mongo_image_id'
+                            ELSE p.image_url END AS image_url,
+                       p.updated_at, p.catalog_expires_at, p.model_url, p.model_shape,
+                       p.source_metadata
+                FROM product_scores s
+                JOIN products p ON p.id = s.product_id
+                JOIN platforms pl ON pl.id = p.platform_id
+                LEFT JOIN categories c ON c.id = p.category_id
+                WHERE p.is_active = TRUE
+                ORDER BY s.opportunity_score DESC
+                LIMIT %s
+            """, (limit,))
+            return cur.fetchall()
+    finally:
+        conn.close()
+
+
+app.include_router(core_router, prefix="/api/v1")

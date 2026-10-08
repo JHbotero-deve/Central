@@ -1,6 +1,9 @@
 import html
 import os
 import time
+from io import BytesIO
+
+from PIL import Image, ImageOps
 from urllib.parse import urlparse
 
 import requests
@@ -90,8 +93,6 @@ def _send_product(token, chat_id, product):
     text = _format_product(product)
     if image_url.startswith(("http://", "https://")):
         try:
-            # Telegram no siempre puede descargar imágenes de Amazon/Mercado Libre.
-            # Descargamos la imagen desde Railway y la subimos directamente a Telegram.
             image_response = requests.get(
                 image_url,
                 headers={
@@ -102,35 +103,44 @@ def _send_product(token, chat_id, product):
                 allow_redirects=True,
             )
             image_response.raise_for_status()
-            content_type = (image_response.headers.get("Content-Type") or "").split(";", 1)[0].lower()
-            allowed_types = {"image/jpeg", "image/png", "image/webp", "image/gif", "image/avif"}
             data = image_response.content
-            if content_type in allowed_types and data and len(data) <= 10 * 1024 * 1024:
-                extension = {
-                    "image/jpeg": "jpg",
-                    "image/png": "png",
-                    "image/webp": "webp",
-                    "image/gif": "gif",
-                    "image/avif": "avif",
-                }.get(content_type, "jpg")
-                r = requests.post(
-                    f"{API_BASE}/bot{token}/sendPhoto",
-                    data={
-                        "chat_id": str(chat_id),
-                        "caption": text[:1024],
-                        "parse_mode": "HTML",
-                    },
-                    files={"photo": (f"product.{extension}", data, content_type)},
-                    timeout=25,
-                )
-                payload = r.json()
-                if r.ok and payload.get("ok"):
-                    return True
-                print(f"[telegram-bot] sendPhoto upload rejected: {payload.get('description', 'respuesta inválida')}")
-            else:
-                print("[telegram-bot] imagen omitida: formato no compatible o supera 10 MB")
-        except (requests.RequestException, ValueError) as exc:
-            print(f"[telegram-bot] image upload error: {exc}")
+            if data and len(data) <= 10 * 1024 * 1024:
+                with Image.open(BytesIO(data)) as source:
+                    source.load()
+                    image = ImageOps.exif_transpose(source).convert("RGB")
+                    max_side = 1600
+                    if max(image.size) > max_side:
+                        scale = max_side / max(image.size)
+                        image = image.resize(
+                            (max(100, round(image.width * scale)), max(100, round(image.height * scale))),
+                            Image.Resampling.LANCZOS,
+                        )
+                    if min(image.size) < 100:
+                        scale = 100 / min(image.size)
+                        image = image.resize(
+                            (max(100, round(image.width * scale)), max(100, round(image.height * scale))),
+                            Image.Resampling.LANCZOS,
+                        )
+                    output = BytesIO()
+                    image.save(output, format="JPEG", quality=88, optimize=True)
+                    photo = output.getvalue()
+                if photo and len(photo) <= 10 * 1024 * 1024:
+                    response = requests.post(
+                        f"{API_BASE}/bot{token}/sendPhoto",
+                        data={
+                            "chat_id": str(chat_id),
+                            "caption": text[:1024],
+                            "parse_mode": "HTML",
+                        },
+                        files={"photo": ("product.jpg", photo, "image/jpeg")},
+                        timeout=25,
+                    )
+                    payload = response.json()
+                    if response.ok and payload.get("ok"):
+                        return True
+                    print(f"[telegram-bot] sendPhoto upload rejected: {payload.get('description', 'respuesta inválida')}")
+        except (requests.RequestException, ValueError, OSError) as exc:
+            print(f"[telegram-bot] image upload error: {type(exc).__name__}: {exc}")
     return _send(token, chat_id, text)
 
 
@@ -419,21 +429,6 @@ def _clear_webhook(token):
         return False
 
 
-def _acquire_polling_lock():
-    conn = get_connection()
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT pg_try_advisory_lock(%s) AS locked", (834271,))
-            locked = bool(cur.fetchone()["locked"])
-        if not locked:
-            conn.close()
-            return None
-        return conn
-    except Exception:
-        conn.close()
-        raise
-
-
 def run_bot():
     token = _token()
     if not token:
@@ -443,18 +438,7 @@ def run_bot():
         print("[telegram-bot] Bot deshabilitado: falta TELEGRAM_CHAT_ID.")
         return
 
-    try:
-        lock_conn = _acquire_polling_lock()
-    except Exception as exc:
-        print(f"[telegram-bot] Bot deshabilitado: no se pudo obtener el bloqueo de polling ({type(exc).__name__}).")
-        return
-
-    if lock_conn is None:
-        print("[telegram-bot] Otra instancia ya posee el consumidor de Telegram; esta instancia se detiene.")
-        return
-
-    try:
-        _clear_webhook(token)
+    _clear_webhook(token)
         offset = None
         print("[telegram-bot] Bot interactivo iniciado.")
 
@@ -493,5 +477,3 @@ def run_bot():
             except (requests.RequestException, ValueError, RuntimeError) as exc:
                 print(f"[telegram-bot] polling error: {type(exc).__name__}")
                 time.sleep(max(POLL_INTERVAL, 5))
-    finally:
-        lock_conn.close()

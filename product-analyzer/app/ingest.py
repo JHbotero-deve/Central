@@ -57,7 +57,7 @@ def _get(url, params=None, include_auth=True, retry_auth=True):
         headers=_headers(include_auth),
         timeout=20,
     )
-    if response.status_code in (401, 403) and include_auth and retry_auth:
+    if response.status_code == 401 and include_auth and retry_auth:
         refreshed = _refresh_access_token()
         if refreshed:
             response = requests.get(
@@ -73,7 +73,13 @@ def _get(url, params=None, include_auth=True, retry_auth=True):
     if response.status_code == 401:
         raise RuntimeError("Mercado Libre rechazó el token de acceso")
     if response.status_code == 403:
-        raise RuntimeError("Mercado Libre rechazó la consulta (403)")
+        try:
+            payload = response.json()
+            reason = payload.get("message") or payload.get("error") or payload.get("code")
+        except ValueError:
+            reason = response.text[:180].strip()
+        suffix = f": {reason}" if reason else ""
+        raise RuntimeError(f"Mercado Libre rechazó la consulta (403){suffix}")
     response.raise_for_status()
     return response.json()
 
@@ -244,7 +250,17 @@ def fetch_mercadolibre(query, limit=20):
         if isinstance(exc, RuntimeError) and "403" not in str(exc):
             raise
         print(f"[Mercado Libre] API autenticada bloqueada para '{query}': {exc}")
-        catalog_products = _catalog_search(query, limit)
+        try:
+            data = _get(
+                MELI_SEARCH,
+                {"q": query, "limit": min(limit, 50)},
+                include_auth=False,
+                retry_auth=False,
+            )
+            print(f"[Mercado Libre] API pública OK '{query}': {len(data.get('results') or [])} resultados")
+        except (RuntimeError, requests.RequestException) as public_exc:
+            print(f"[Mercado Libre] API pública no disponible '{query}': {public_exc}")
+            catalog_products = _catalog_search(query, limit)
         if catalog_products:
             print(f"[Mercado Libre] usando catálogo autenticado '{query}': {len(catalog_products)} productos")
             return catalog_products
