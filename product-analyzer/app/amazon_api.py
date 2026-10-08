@@ -217,7 +217,7 @@ def _search_amazon_html(keywords: str, limit: int = 10) -> list[dict[str, Any]]:
         )
         response.raise_for_status()
         html = response.text
-        asins = re.findall(r'data-asin=["']([A-Z0-9]{10})["']', html, re.IGNORECASE)
+        asins = re.findall(r"data-asin=[\"']([A-Z0-9]{10})[\"']", html, re.IGNORECASE)
         results = []
         seen = set()
 
@@ -226,7 +226,7 @@ def _search_amazon_html(keywords: str, limit: int = 10) -> list[dict[str, Any]]:
             if asin in seen:
                 continue
             marker = re.search(
-                r'data-asin=["']' + re.escape(asin) + r'["']',
+                r"data-asin=[\"']" + re.escape(asin) + r"[\"']",
                 html,
                 re.IGNORECASE,
             )
@@ -235,7 +235,7 @@ def _search_amazon_html(keywords: str, limit: int = 10) -> list[dict[str, Any]]:
             seen.add(asin)
             start = marker.start()
             next_marker = re.search(
-                r'data-asin=["'][A-Z0-9]{10}["']',
+                r"data-asin=[\"'][A-Z0-9]{10}[\"']",
                 html[marker.end():],
                 re.IGNORECASE,
             )
@@ -243,24 +243,24 @@ def _search_amazon_html(keywords: str, limit: int = 10) -> list[dict[str, Any]]:
             chunk = html[start:end]
 
             title_match = re.search(
-                r'<span[^>]+class=["'][^"']*a-text-normal[^"']*["'][^>]*>(.*?)</span>',
+                r"<span[^>]+class=[\"'][^\"']*a-text-normal[^\"']*[\"'][^>]*>(.*?)</span>",
                 chunk, re.IGNORECASE | re.DOTALL)
             title = re.sub(r"<[^>]+>", " ", title_match.group(1)) if title_match else ""
             title = re.sub(r"\s+", " ", title).strip()
 
             image = None
-            dynamic = re.search(r'data-a-dynamic-image=["']([^"']+)["']', chunk, re.IGNORECASE)
+            dynamic = re.search(r"data-a-dynamic-image=[\"']([^\"']+)[\"']", chunk, re.IGNORECASE)
             if dynamic:
                 raw = dynamic.group(1).replace("&quot;", '"')
                 image_match = re.search(r'"(https?://[^"]+)"', raw)
                 image = image_match.group(1) if image_match else None
             if not image:
-                image_match = re.search(r'<img[^>]+src=["'](https?://[^"']+)["']', chunk, re.IGNORECASE)
+                image_match = re.search(r"<img[^>]+src=[\"'](https?://[^\"']+)[\"']", chunk, re.IGNORECASE)
                 image = image_match.group(1) if image_match else None
 
             price_match = re.search(
-                r'<span[^>]+class=["'][^"']*a-price-whole[^"']*["'][^>]*>([0-9,]+)</span>'
-                r'(?:.*?<span[^>]+class=["'][^"']*a-price-fraction[^"']*["'][^>]*>([0-9]+)</span>)?',
+                r"<span[^>]+class=[\"'][^\"']*a-price-whole[^\"']*[\"'][^>]*>([0-9,]+)</span>"
+                r"(?:.*?<span[^>]+class=[\"'][^\"']*a-price-fraction[^\"']*[\"'][^>]*>([0-9]+)</span>)?",
                 chunk, re.IGNORECASE | re.DOTALL)
             if not price_match:
                 continue
