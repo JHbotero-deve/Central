@@ -26,7 +26,6 @@
   <label class="ed-l">Usuario o correo<input class="ed-in" id="u" autocomplete="username"></label>
   <label class="ed-l">Contraseña<input class="ed-in" id="p" type="password" autocomplete="current-password"></label>
   <button class="ed-btn" id="loginBtn" type="button">Entrar</button>
-  <details><summary style="cursor:pointer;color:var(--muted);font-size:12px">Ya tengo un token</summary><div style="display:flex;flex-direction:column;gap:8px;margin-top:8px"><input class="ed-in" id="t" placeholder="Pega el token"><button class="ed-btn ghost" id="tokBtn" type="button">Usar token</button></div></details>
   <div id="authMsg" class="ed-msg err" hidden></div></div></section>
 
 <section id="panel" hidden><div class="ed-grid">
@@ -76,7 +75,7 @@ const num=v=>{v=String(v).trim().replace(",",".");return v===""||isNaN(Number(v)
 let V=[{name:"",glow:0,img:""}];
 
 function show(el,k,t){el.hidden=false;el.className="ed-msg "+k;el.textContent=t}
-function gate(){const ok=!!S.tok();$("auth").hidden=ok;$("panel").hidden=!ok;$("logout").hidden=!ok;if(ok){renderVars();preview();loadMine();renderThemes()}}
+async function gate(){const ok=await S.session();$("auth").hidden=ok;$("panel").hidden=!ok;$("logout").hidden=!ok;if(ok){renderVars();preview();loadMine();renderThemes()}}
 function tab(n){["mine","add","theme"].forEach(x=>{$("tab-"+x).hidden=x!==n});document.querySelectorAll("[data-tab]").forEach(b=>b.classList.toggle("on",b.dataset.tab===n))}
 
 function renderVars(){
@@ -133,9 +132,8 @@ function renderThemes(){const cur=S.theme()[0];
   $("themes").querySelectorAll("[data-t]").forEach(b=>b.addEventListener("click",()=>{S.setTheme(S.THEMES[+b.dataset.t]);renderThemes()}))}
 
 $("loginBtn").addEventListener("click",async()=>{const b=$("loginBtn");b.disabled=true;$("authMsg").hidden=true;
-  try{S.setTok(await S.login($("u").value.trim(),$("p").value));gate()}catch(e){show($("authMsg"),"err",e.message)}finally{b.disabled=false}});
-$("tokBtn").addEventListener("click",()=>{const v=$("t").value.trim();if(v){S.setTok(v);gate()}});
-$("logout").addEventListener("click",e=>{e.preventDefault();S.setTok("");gate()});
+  try{await S.login($("u").value.trim(),$("p").value);gate()}catch(e){show($("authMsg"),"err",e.message)}finally{b.disabled=false}});
+$("logout").addEventListener("click",async e=>{e.preventDefault();await S.logout();gate()});
 
 $("save").addEventListener("click",async()=>{
   const m=model(),msg=$("msg");msg.hidden=true;
