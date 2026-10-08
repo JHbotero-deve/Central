@@ -174,3 +174,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# Ejecutado por Railway para la inyección inicial de promociones reales.
