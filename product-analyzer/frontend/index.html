@@ -216,7 +216,8 @@ async function submitManual(e){
     btn.textContent="Crear tarjeta";
   }
 }
-const manualForm=$("manualForm");\nif(manualForm) manualForm.addEventListener("submit",submitManual);
+const manualForm=$("manualForm");
+if(manualForm) manualForm.addEventListener("submit",submitManual);
 
 async function submitImport(e){
   e.preventDefault();
@@ -246,7 +247,8 @@ async function submitImport(e){
     btn.textContent="Importar";
   }
 }
-const importForm=$("importForm");\nif(importForm) importForm.addEventListener("submit",submitImport);
+const importForm=$("importForm");
+if(importForm) importForm.addEventListener("submit",submitImport);
 
 const viewers=new Map();
 function open3dInCard(p){
