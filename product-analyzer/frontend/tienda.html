@@ -170,11 +170,12 @@ function setCategories(){
   $("categories").innerHTML='<button class="cat active" data-cat="">Todos</button>'+cats.map(c=>'<button class="cat" data-cat="'+esc(c)+'">'+esc(c)+'</button>').join("");
 }
 function relevance(p){return Number(p.opportunity_score||0)*2+Number(p.rating||0)*10+Math.log10(Number(p.reviews_count||0)+1)*6+Math.log10(Number(p.sales_estimate||0)+1)*4}
-function discountPercent(p){const previous=Number(p.previous_price||0);const current=Number(p.current_price||0);if(previous<=0||current<=0||current>=previous)return 0;return ((previous-current)/previous)*100;} function applyFilter(){
+function discountPercent(p){const previous=Number(p.previous_price||0);const current=Number(p.sale_price??p.current_price??0);if(previous>0&&current>0&&current<previous)return ((previous-current)/previous)*100;const meta=p.source_metadata||{};const metaPct=Number(meta.promotion_discount_pct||meta.discount_pct||0);return Number.isFinite(metaPct)?metaPct:0;} function applyFilter(){
   const q=$("search").value.trim().toLowerCase(), c=$("category").value, sort=$("sort").value;
   filtered=products.filter(p=>(!q||[p.title,p.subtitle,p.category,p.platform,p.external_id].some(v=>String(v||"").toLowerCase().includes(q)))&&(!c||p.category===c));
-  if(quickMode==="rated")filtered=filtered.filter(p=>Number(p.rating||0)>0);if(quickMode==="discount")filtered=filtered.filter(p=>discountPercent(p)>50);
+  if(quickMode==="discount")filtered=filtered.filter(p=>discountPercent(p)>50);
   if(quickMode==="popular")filtered.sort((a,b)=>relevance(b)-relevance(a));
+  if(quickMode==="rated")filtered.sort((a,b)=>Number(b.rating||0)-Number(a.rating||0)||Number(b.reviews_count||0)-Number(a.reviews_count||0));
   if(sort==="price-asc")filtered.sort((a,b)=>Number(a.sale_price??a.current_price??Infinity)-Number(b.sale_price??b.current_price??Infinity));
   if(sort==="price-desc")filtered.sort((a,b)=>Number(b.sale_price??b.current_price??-1)-Number(a.sale_price??a.current_price??-1));
   if(sort==="rating")filtered.sort((a,b)=>Number(b.rating||0)-Number(a.rating||0));
@@ -225,7 +226,7 @@ function card(p){
     '<div class="card-media">'+media+
       '<span class="badge">'+esc(sourceLabel)+'</span>'+
       '<div class="card-image-actions">'+
-        '<button type="button" class="card-action card-action-secondary view-product" data-id="'+esc(id)+'">Specs</button>'+
+        '<a class="card-action card-action-secondary" href="'+esc(productUrl(p))+'">Ficha real</a>'+
         second+
       '</div>'+
     '</div>'+
@@ -286,7 +287,7 @@ function imgFail(im){
 }
 document.addEventListener("error",e=>{const im=e.target;if(im.matches&&im.matches("img[data-fb]"))imgFail(im)},true);
 document.addEventListener("load",e=>{const im=e.target;if(im.matches&&im.matches("img[data-fb]")&&im.naturalWidth<=1)imgFail(im)},true);
-$("search").oninput=applyFilter;$("category").onchange=applyFilter;$("sort").onchange=applyFilter;$("quick").onclick=e=>{const b=e.target.closest("[data-mode]");if(!b)return;quickMode=b.dataset.mode;document.querySelectorAll("#quick button").forEach(x=>x.classList.toggle("active",x===b));applyFilter()};
+$("search").oninput=applyFilter;$("category").onchange=applyFilter;$("sort").onchange=applyFilter;$("quick").onclick=e=>{const b=e.target.closest("[data-mode]");if(!b)return;quickMode=b.dataset.mode;document.querySelectorAll("#quick button").forEach(x=>x.classList.toggle("active",x===b));if(quickMode==="all"){$("search").value="";$("category").value="";$("sort").value="relevance";document.querySelectorAll(".cat").forEach(x=>x.classList.toggle("active",x.dataset.cat===""));}if(quickMode==="popular")$("sort").value="relevance";if(quickMode==="rated")$("sort").value="rating";applyFilter()};
 $("categories").onclick=e=>{const b=e.target.closest("[data-cat]");if(!b)return;$("category").value=b.dataset.cat;document.querySelectorAll(".cat").forEach(x=>x.classList.toggle("active",x===b));applyFilter()};
 function showProduct(p){
   if(!p)return;
