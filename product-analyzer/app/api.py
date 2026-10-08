@@ -84,7 +84,13 @@ app.add_middleware(
 core_router = APIRouter(tags=["core"])
 @core_router.get("/media/image")
 def proxy_product_image(url: str = Query(..., min_length=8, max_length=2_000_000)):
-    """Entrega imágenes públicas de productos con validación SSRF y caché corta."""
+    """Entrega imágenes persistidas en Mongo o imágenes públicas antiguas."""
+    if url.startswith("mongo://"):
+        from mongo_store import read_product_image
+        data, content_type = read_product_image(url[8:])
+        if not data:
+            raise HTTPException(status_code=404, detail="Imagen Mongo no encontrada")
+        return Response(content=data, media_type=content_type, headers={"Cache-Control":"public, max-age=86400"})
     try:
         _public_url(url)
         response = requests.get(
