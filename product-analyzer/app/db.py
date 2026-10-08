@@ -3,6 +3,7 @@ from urllib.parse import quote
 
 import psycopg2
 from psycopg2.extras import Json, RealDictCursor
+from mongo_store import store_product_image
 
 
 def get_connection():
@@ -53,9 +54,18 @@ def upsert_product(conn, platform_name: str, category_name: str, product: dict):
             )
             seller_id = cur.fetchone()["id"]
 
+        source_metadata = dict(product.get("source_metadata") or {})
+        if product.get("image_url") and not source_metadata.get("mongo_image_id"):
+            try:
+                mongo_id = store_product_image(product["image_url"], platform=platform_name, external_id=product.get("external_id"))
+                if mongo_id:
+                    source_metadata["mongo_image_id"] = mongo_id
+                    print(f"[mongo] imagen guardada {platform_name}/{product.get('external_id')}")
+            except Exception as exc:
+                print(f"[mongo] imagen no guardada: {exc}")
+
         cur.execute(
             """
-            INSERT INTO products (
                 platform_id, category_id, seller_id, external_id, title,
                 image_url, image_gallery, product_url, affiliate_url, current_price, currency, rating,
                 reviews_count, sales_estimate, source_metadata,
@@ -107,7 +117,7 @@ def upsert_product(conn, platform_name: str, category_name: str, product: dict):
                 product.get("rating"),
                 product.get("reviews_count", 0),
                 product.get("sales_estimate"),
-                Json(product.get("source_metadata") or {}),
+                Json(source_metadata),
             ),
         )
         product_id = cur.fetchone()["id"]
