@@ -313,6 +313,38 @@ def pipeline_summary(_: dict = Depends(require_admin)):
         conn.close()
 
 
+@core_router.get("/products/{product_id}")
+def get_product(product_id: int):
+    """Ficha pública completa de un producto real, enlazada a su fuente original."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT p.id, p.title, pl.name AS platform, c.name AS category,
+                       p.current_price, p.previous_price, p.currency, p.image_url,
+                       p.image_gallery, p.product_url, p.affiliate_url, p.stock,
+                       p.sku, p.external_id, p.description, p.rating, p.reviews_count,
+                       p.sales_estimate, p.source_metadata, p.updated_at,
+                       p.catalog_expires_at, p.model_url, p.model_shape,
+                       s.name AS seller_name, s.reputation AS seller_reputation
+                FROM products p
+                JOIN platforms pl ON pl.id = p.platform_id
+                LEFT JOIN categories c ON c.id = p.category_id
+                LEFT JOIN sellers s ON s.id = p.seller_id
+                WHERE p.id = %s AND p.is_active = TRUE
+                """,
+                (product_id,),
+            )
+            product = cur.fetchone()
+            if not product:
+                raise HTTPException(status_code=404, detail="Producto no encontrado")
+            product["checkout_mode"] = "CENTRAL" if str(product["platform"]).lower() == "personal" else "EXTERNAL"
+            return {"product": product}
+    finally:
+        conn.close()
+
+
 @core_router.get("/products")
 def list_products(
     category: Optional[str] = Query(None),
