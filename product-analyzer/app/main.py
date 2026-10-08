@@ -211,6 +211,89 @@ def ingest_amazon(conn) -> list[int]:
     return ids
 
 
+def backfill_missing_source_images(limit=100):
+    from amazon_api import _amazon_image_from_html
+    from mongo_store import store_product_image
+    conn = get_connection()
+    done = 0
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT p.id, p.external_id, p.product_url, p.source_metadata
+                FROM products p
+                JOIN platforms pl ON pl.id = p.platform_id
+                WHERE p.is_active = TRUE
+                  AND pl.name = 'amazon'
+                  AND COALESCE(p.image_url, '') = ''
+                ORDER BY p.updated_at DESC
+                LIMIT %s
+            """, (limit,))
+            rows = cur.fetchall()
+            for row in rows:
+                try:
+                    image = _amazon_image_from_html(row["product_url"])
+                    if not image:
+                        continue
+                    mongo_id = store_product_image(image, platform="amazon", external_id=row["external_id"], product_id=row["id"])
+                    metadata = dict(row["source_metadata"] or {})
+                    if mongo_id:
+                        metadata["mongo_image_id"] = mongo_id
+                    metadata["image_source"] = "amazon_product_page"
+                    cur.execute(
+                        "UPDATE products SET image_url=%s, image_gallery=%s, source_metadata=%s, updated_at=NOW() WHERE id=%s",
+                        (image, Json([image]), Json(metadata), row["id"]),
+                    )
+                    done += 1
+                except Exception as exc:
+                    print(f"[images] Amazon {row['id']}: {exc}")
+        conn.commit()
+    finally:
+        conn.close()
+    print(f"[images] Amazon recuperadas: {done}/{len(rows) if 'rows' in locals() else 0}")
+    return done
+
+
+def score_active_catalog():
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                WITH averages AS (
+                    SELECT p.category_id, p.currency, AVG(p.current_price) AS avg_price
+                    FROM products p
+                    WHERE p.is_active = TRUE AND p.current_price IS NOT NULL
+                    GROUP BY p.category_id, p.currency
+                ), history AS (
+                    SELECT product_id, MIN(price) AS first_price, MAX(price) AS last_price
+                    FROM price_history
+                    GROUP BY product_id
+                ), base AS (
+                    SELECT p.id,
+                           GREATEST(0, LEAST(100, CASE WHEN COALESCE(a.avg_price,0)=0 THEN 50 ELSE (2-(p.current_price/a.avg_price))*50 END)) AS price_score,
+                           LEAST(100, (COALESCE(p.rating,0)/5.0)*40 + LEAST(COALESCE(p.reviews_count,0)/5.0,30) + LEAST(COALESCE(p.sales_estimate,0)/10.0,30)) AS demand_score,
+                           GREATEST(0, LEAST(100, CASE WHEN COALESCE(h.first_price,0)=0 OR h.first_price=h.last_price THEN 50 ELSE 50+((h.first_price-h.last_price)/h.first_price)*100 END)) AS trend_score
+                    FROM products p
+                    LEFT JOIN averages a ON a.category_id=p.category_id AND a.currency=p.currency
+                    LEFT JOIN history h ON h.product_id=p.id
+                    WHERE p.is_active=TRUE AND p.current_price IS NOT NULL
+                )
+                INSERT INTO product_scores (product_id, price_score, demand_score, trend_score, opportunity_score, calculated_at)
+                SELECT id, ROUND(price_score::numeric,2), ROUND(demand_score::numeric,2), ROUND(trend_score::numeric,2),
+                       ROUND((price_score*0.4+demand_score*0.4+trend_score*0.2)::numeric,2), NOW()
+                FROM base
+                ON CONFLICT (product_id) DO UPDATE SET
+                    price_score=EXCLUDED.price_score, demand_score=EXCLUDED.demand_score,
+                    trend_score=EXCLUDED.trend_score, opportunity_score=EXCLUDED.opportunity_score,
+                    calculated_at=NOW()
+            """)
+            count = cur.rowcount
+        conn.commit()
+        print(f"[score] catálogo activo recalculado: {count}")
+        return count
+    finally:
+        conn.close()
+
+
 def backfill_mongo_images(limit=150):
     from mongo_store import store_product_image
     conn = get_connection()
@@ -250,7 +333,7 @@ def run_pipeline():
     started_at = __import__("datetime").datetime.now()
     print("== Iniciando ciclo de ingesta y análisis ==")
     expired_products = expire_catalog()
-    backfill_mongo_images()
+    backfill_missing_source_images()\n    backfill_mongo_images()
     errors = []
     amazon_count = 0
     mercadolibre_count = 0
@@ -336,7 +419,7 @@ def run_pipeline():
                         "url": build_url(product["title"], product["product_url"]),
                         "score": round(score, 1),
                     })
-        publish_real_discounts(conn)
+        score_active_catalog()\n    publish_real_discounts(conn)
     finally:
         conn.close()
 
