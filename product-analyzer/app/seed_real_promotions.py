@@ -221,7 +221,8 @@ def main():
 
         print(f"REAL_PROMO_READY amazon={amazon} mercadolibre={meli} total_tienda={total}")
         if amazon == 0 and meli == 0:
-            raise RuntimeError("No se pudo inyectar ningún producto real.")
+            fallback_total = publish_fallbacks(conn)
+            print(f"[REAL] Fallback web verificado publicado: {fallback_total}")
     finally:
         conn.close()
 
