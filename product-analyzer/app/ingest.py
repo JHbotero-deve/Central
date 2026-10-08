@@ -106,81 +106,88 @@ def _sale_price(item_id):
 
 
 def _public_search(query, limit=20):
-    """Fallback real-data search using DuckDuckGo HTML + structured data from ML pages."""
-    search_url = "https://html.duckduckgo.com/html/"
-    response = requests.get(
-        search_url,
-        params={"q": f'site:mercadolibre.com.co "{query}"', "kl": "co-es"},
-        headers={
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140 Safari/537.36",
-            "Accept-Language": "es-CO,es;q=0.9",
-        },
-        timeout=25,
-    )
-    response.raise_for_status()
-    html = response.text
-    urls = re.findall(r'nuddg=([^&"]+)', html, re.I)
-    if not urls:
-        urls = re.findall(r'href="(https?://(?:www\\.)?mercadolibre\\.com\\.co/[^"]+)"', html, re.I)
-    products, seen = [], set()
-
+    """Obtiene publicaciones reales de Mercado Libre mediante su página pública."""
+    import unicodedata
     from html import unescape
     from urllib.parse import unquote
 
-    for raw_url in urls:
-        permalink = unquote(unescape(raw_url))
-        if "mercadolibre.com.co" not in permalink:
-            continue
-        if "/MCO-" not in permalink and "/p/MCO" not in permalink:
-            continue
-        permalink = permalink.split("&rut=", 1)[0]
-        try:
-            page = requests.get(
-                permalink,
-                headers={
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140 Safari/537.36",
-                    "Accept-Language": "es-CO,es;q=0.9",
-                },
-                timeout=20,
-                allow_redirects=True,
-            )
-            if not page.ok:
-                continue
-            page_html = page.text
-            final_url = page.url
-            ids = re.findall(r'MCO[-_]?\\d{6,}', final_url + " " + page_html[:200000], re.I)
-            item_id = next((x.replace("_","-").upper() for x in ids if "-P" not in x.upper()), "")
-            if not item_id:
-                continue
-            if item_id in seen:
-                continue
+    slug = unicodedata.normalize("NFKD", query).encode("ascii", "ignore").decode("ascii")
+    slug = re.sub(r"[^a-zA-Z0-9]+", "-", slug).strip("-").lower()
+    listing_url = f"https://listado.mercadolibre.com.co/{slug}"
+    reader_url = "https://r.jina.ai/" + listing_url
 
-            title_match = re.search(r'<meta[^>]+property=["\']og:title["\'][^>]+content=["\']([^"\']+)', page_html, re.I)
-            image_match = re.search(r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)', page_html, re.I)
-            price_match = re.search(r'"price"\\s*:\\s*"?([0-9]+(?:[.,][0-9]+)?)"?', page_html, re.I)
-            if not price_match:
-                price_match = re.search(r'"amount"\\s*:\\s*([0-9]+(?:[.,][0-9]+)?)', page_html, re.I)
-            title = unescape(title_match.group(1)).strip() if title_match else ""
-            image = unescape(image_match.group(1)).strip() if image_match else ""
-            amount = float(price_match.group(1).replace(".", "").replace(",", ".")) if price_match else 0
-            if not title or amount <= 0:
-                continue
+    try:
+        response = requests.get(
+            reader_url,
+            headers={"User-Agent": "Mozilla/5.0", "Accept": "text/plain"},
+            timeout=30,
+        )
+        response.raise_for_status()
+        text = response.text
+    except requests.RequestException as exc:
+        print(f"[Mercado Libre] lector web no disponible '{query}': {exc}")
+        return {"results": [], "_source": "public_web"}
 
-            seen.add(item_id)
-            products.append({
-                "id": item_id,
-                "title": title[:500],
-                "thumbnail": image,
-                "permalink": final_url,
-                "price": amount,
-                "currency_id": "COP",
-            })
-            if len(products) >= min(max(limit, 1), 20):
-                break
-        except (requests.RequestException, ValueError):
+    products, seen = [], set()
+    # Markdown de Jina conserva los enlaces e imágenes de las tarjetas.
+    link_re = re.compile(r"\[([^\]]{8,500})\]\((https?://[^)]+mercadolibre\\.com\\.co/[^)]+)\)", re.I)
+    image_re = re.compile(r"!\[[^\]]*\]\((https?://[^)]+)\)", re.I)
+    matches = list(link_re.finditer(text))
+
+    for idx, match in enumerate(matches):
+        title = unescape(re.sub(r"\\s+", " ", match.group(1))).strip()
+        permalink = unquote(match.group(2))
+        if "/listado/" in permalink or "/categorias/" in permalink:
+            continue
+        if not title or permalink in seen:
             continue
 
-    print(f"[Mercado Libre] fallback web real '{query}': {len(products)} productos")
+        window = text[match.end(): matches[idx + 1].start() if idx + 1 < len(matches) else min(len(text), match.end() + 1800)]
+        price_match = re.search(r"\$\\s*([0-9][0-9.]{2,})", window)
+        if not price_match:
+            continue
+        amount = float(price_match.group(1).replace(".", ""))
+        if amount <= 0:
+            continue
+
+        image_match = image_re.search(text[max(0, match.start()-1200):match.end()+1200])
+        image = image_match.group(1) if image_match else ""
+
+        # Si la tarjeta no trae imagen, consultamos la página del producto a través del lector.
+        if not image:
+            try:
+                detail = requests.get(
+                    "https://r.jina.ai/" + permalink,
+                    headers={"User-Agent": "Mozilla/5.0", "Accept": "text/plain"},
+                    timeout=20,
+                )
+                if detail.ok:
+                    dm = image_re.search(detail.text)
+                    if dm:
+                        image = dm.group(1)
+            except requests.RequestException:
+                pass
+
+        item_match = re.search(r"(MCO[-_]\\d{6,})", permalink, re.I)
+        item_id = item_match.group(1).replace("_", "-").upper() if item_match else ""
+        if not item_id:
+            # Las URLs de publicación pueden no incluir el ID; se genera una clave estable.
+            import hashlib
+            item_id = "WEB-" + hashlib.sha1(permalink.encode("utf-8")).hexdigest()[:16].upper()
+
+        seen.add(permalink)
+        products.append({
+            "id": item_id,
+            "title": title[:500],
+            "thumbnail": image,
+            "permalink": permalink,
+            "price": amount,
+            "currency_id": "COP",
+        })
+        if len(products) >= min(max(limit, 1), 20):
+            break
+
+    print(f"[Mercado Libre] página pública real '{query}': {len(products)} productos")
     return {"results": products, "_source": "public_web"}
 
 
