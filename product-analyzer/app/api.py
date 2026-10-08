@@ -7,7 +7,7 @@ import time
 
 import requests
 from typing import Optional
-from urllib.parse import quote
+from urllib.parse import quote, urljoin, urlparse, urlunparse
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query
 from fastapi.responses import Response
@@ -84,26 +84,43 @@ app.add_middleware(
 core_router = APIRouter(tags=["core"])
 @core_router.get("/media/image")
 def proxy_product_image(url: str = Query(..., min_length=8, max_length=2_000_000)):
-    """Entrega imágenes persistidas en Mongo o imágenes públicas antiguas."""
+    """Entrega imágenes públicas de fuentes comerciales permitidas."""
     if url.startswith("mongo://"):
         from mongo_store import read_product_image
         data, content_type = read_product_image(url[8:])
         if not data:
             raise HTTPException(status_code=404, detail="Imagen Mongo no encontrada")
         return Response(content=data, media_type=content_type, headers={"Cache-Control":"public, max-age=86400"})
+
+    current = url.strip()
     try:
-        _public_url(url)
-        response = requests.get(
-            url,
-            headers={
-                "User-Agent": "Mozilla/5.0 (compatible; CentralImageProxy/1.0)",
-                "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
-            },
-            timeout=12,
-            allow_redirects=True,
-        )
-        response.raise_for_status()
-        _public_url(response.url)
+        for _ in range(4):
+            parsed = urlparse(current)
+            if parsed.scheme == "http":
+                current = urlunparse(("https", parsed.netloc, parsed.path, parsed.params, parsed.query, parsed.fragment))
+            _public_url(current)
+            response = requests.get(
+                current,
+                headers={
+                    "User-Agent": "Mozilla/5.0 (compatible; CentralImageProxy/1.0)",
+                    "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+                },
+                timeout=12,
+                allow_redirects=False,
+            )
+            if 300 <= response.status_code < 400:
+                location = response.headers.get("Location")
+                if not location:
+                    raise HTTPException(status_code=502, detail="La fuente de imagen devolvió una redirección sin destino")
+                current = urljoin(current, location)
+                continue
+            response.raise_for_status()
+            _public_url(response.url)
+            break
+        else:
+            raise HTTPException(status_code=502, detail="Demasiadas redirecciones de imagen")
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"No fue posible obtener la imagen: {exc}")
 
@@ -898,140 +915,3 @@ def active_catalog(_: dict = Depends(require_admin)):
                 WHERE p.is_active = TRUE AND p.is_blocked = FALSE
                 ORDER BY p.updated_at DESC
                 LIMIT 200
-            """)
-            return cur.fetchall()
-    finally:
-        conn.close()
-
-
-class ProductStatus(BaseModel):
-    active: bool
-
-
-@core_router.patch("/products/{product_id}/status")
-def update_product_status(product_id: int, payload: ProductStatus, _: dict = Depends(require_admin)):
-    conn = get_connection()
-    try:
-        with conn.cursor() as cur:
-            cur.execute("""
-                UPDATE products
-                SET is_active=%s,
-                    is_blocked=CASE WHEN %s THEN FALSE ELSE TRUE END,
-                    updated_at=NOW()
-                WHERE id=%s
-                RETURNING id, is_active, is_blocked, updated_at
-            """, (payload.active, payload.active, product_id))
-            result = cur.fetchone()
-            if not result:
-                raise HTTPException(status_code=404, detail="Producto no encontrado")
-            if not payload.active:
-                cur.execute("UPDATE published_cards SET is_published=FALSE, updated_at=NOW() WHERE product_id=%s", (product_id,))
-        conn.commit()
-        return result
-    except HTTPException:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
-
-
-@core_router.delete("/products/{product_id}")
-def remove_product(product_id: int, _: dict = Depends(require_admin)):
-    conn = get_connection()
-    try:
-        with conn.cursor() as cur:
-            cur.execute("""
-                UPDATE products
-                SET is_active=FALSE, is_blocked=TRUE, updated_at=NOW()
-                WHERE id=%s
-                RETURNING id, title
-            """, (product_id,))
-            result = cur.fetchone()
-            if not result:
-                raise HTTPException(status_code=404, detail="Producto no encontrado")
-            cur.execute("UPDATE published_cards SET is_published=FALSE, updated_at=NOW() WHERE product_id=%s", (product_id,))
-        conn.commit()
-        return {"status":"removed","product":result}
-    except HTTPException:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
-
-
-@core_router.get("/products/{product_id}")
-def get_product(product_id: int):
-    conn = get_connection()
-    try:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT p.*, pl.name AS platform, c.name AS category,
-                       s.opportunity_score
-                FROM products p
-                JOIN platforms pl ON pl.id = p.platform_id
-                LEFT JOIN categories c ON c.id = p.category_id
-                LEFT JOIN product_scores s ON s.product_id = p.id
-                WHERE p.id = %s
-                """,
-                (product_id,),
-            )
-            product = cur.fetchone()
-            if not product:
-                raise HTTPException(status_code=404, detail="Producto no encontrado")
-            cur.execute(
-                """
-                SELECT price, recorded_at
-                FROM price_history
-                WHERE product_id = %s
-                ORDER BY recorded_at ASC
-                """,
-                (product_id,),
-            )
-            history = cur.fetchall()
-        return {"product": product, "price_history": history}
-    finally:
-        conn.close()
-
-
-@core_router.get("/comparison")
-def price_comparison(limit: int = Query(100, ge=1, le=500), _: dict = Depends(require_admin)):
-    conn = get_connection()
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT * FROM product_price_comparison LIMIT %s", (limit,))
-            return cur.fetchall()
-    finally:
-        conn.close()
-
-
-@core_router.get("/opportunities/top")
-def top_opportunities(limit: int = Query(20, ge=1, le=100), _: dict = Depends(require_admin)):
-    conn = get_connection()
-    try:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT p.id, p.title, pl.name AS platform, c.name AS category,
-                       p.current_price, p.currency, p.rating, p.reviews_count,
-                       p.sales_estimate, s.price_score, s.demand_score,
-                       s.trend_score, s.opportunity_score, p.product_url,
-                       CASE WHEN COALESCE(p.source_metadata->>'mongo_image_id','') <> '' THEN 'mongo://' || p.source_metadata->>'mongo_image_id' ELSE p.image_url END AS image_url, p.updated_at, p.catalog_expires_at,
-                       p.model_url, p.model_shape, p.source_metadata
-                FROM product_scores s
-                JOIN products p ON p.id = s.product_id
-                JOIN platforms pl ON pl.id = p.platform_id
-                LEFT JOIN categories c ON c.id = p.category_id
-                WHERE p.is_active = TRUE
-                ORDER BY s.opportunity_score DESC
-                LIMIT %s
-                """,
-                (limit,),
-            )
-            return cur.fetchall()
-    finally:
-        conn.close()
-
-
-app.include_router(core_router, prefix="/api/v1")
-
