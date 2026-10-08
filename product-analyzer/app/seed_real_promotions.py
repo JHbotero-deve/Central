@@ -1,7 +1,7 @@
 """
 Inyección controlada de promociones reales para la tienda Central.
-Despublica las tarjetas actuales y publica hasta 50 productos reales de Amazon
-y 50 de Mercado Libre, sin duplicar por plataforma + external_id.
+Despublica las tarjetas actuales y publica hasta 100 productos reales de Amazon
+y 100 de Mercado Libre, sin duplicar por plataforma + external_id.
 """
 
 from datetime import datetime
