@@ -5,7 +5,10 @@ import hmac
 import json
 import os
 import secrets
+import smtplib
+import ssl
 import time
+from email.message import EmailMessage
 from typing import Any
 
 from fastapi import APIRouter, Cookie, Depends, Header, HTTPException, Response
@@ -18,6 +21,7 @@ TOKEN_TTL_SECONDS = 8 * 60 * 60
 AUTH_COOKIE = "central_session"
 MAX_FAILED_LOGINS = 8
 PBKDF2_ROUNDS = 310_000
+RESET_TTL_SECONDS = 30 * 60
 
 class LoginPayload(BaseModel):
     email: str
@@ -72,6 +76,54 @@ def _decode(token: str) -> dict[str, Any]:
         raise
     except Exception as exc:
         raise HTTPException(status_code=401, detail="Token invalido") from exc
+
+def _ensure_reset_table() -> None:
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS central_password_resets (
+                    id BIGSERIAL PRIMARY KEY,
+                    user_id BIGINT NOT NULL REFERENCES central_users(id) ON DELETE CASCADE,
+                    token_hash TEXT NOT NULL UNIQUE,
+                    expires_at TIMESTAMPTZ NOT NULL,
+                    used_at TIMESTAMPTZ,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                )
+            """)
+        conn.commit()
+    finally:
+        conn.close()
+
+def _send_reset_email(email: str, reset_url: str) -> None:
+    host = os.getenv("CENTRAL_SMTP_HOST", "").strip()
+    port = int(os.getenv("CENTRAL_SMTP_PORT", "587") or "587")
+    username = os.getenv("CENTRAL_SMTP_USER", "").strip()
+    password = os.getenv("CENTRAL_SMTP_PASSWORD", "")
+    sender = os.getenv("CENTRAL_SMTP_FROM", username).strip()
+    if not host or not username or not password or not sender:
+        raise HTTPException(status_code=503, detail="Correo de recuperacion no configurado")
+    msg = EmailMessage()
+    msg["Subject"] = "Central — Recuperación de contraseña"
+    msg["From"] = sender
+    msg["To"] = email
+    msg.set_content(f"Solicitaste recuperar tu contraseña de Central.\n\nAbre este enlace para crear una nueva contraseña:\n{reset_url}\n\nEl enlace vence en 30 minutos. Si no solicitaste el cambio, ignora este mensaje.")
+    context = ssl.create_default_context()
+    if port == 465:
+        with smtplib.SMTP_SSL(host, port, context=context, timeout=20) as smtp:
+            smtp.login(username, password)
+            smtp.send_message(msg)
+    else:
+        with smtplib.SMTP(host, port, timeout=20) as smtp:
+            smtp.starttls(context=context)
+            smtp.login(username, password)
+            smtp.send_message(msg)
+
+def _hash_reset_token(token: str) -> str:
+    return hashlib.sha256(token.encode()).hexdigest()
+
+def _app_url() -> str:
+    return os.getenv("CENTRAL_APP_URL", "https://central-7ykr.vercel.app").strip().rstrip("/")
 
 def _ensure_auth_table() -> None:
     conn = get_connection()
@@ -194,6 +246,67 @@ def login(payload: LoginPayload, response: Response):
 @router.post("/logout")
 def logout(response: Response):
     response.delete_cookie(AUTH_COOKIE, path="/")
+    return {"ok": True}
+
+class PasswordResetRequest(BaseModel):
+    email: str
+
+class PasswordResetConfirm(BaseModel):
+    token: str = Field(min_length=32, max_length=128)
+    new_password: str = Field(min_length=12, max_length=256)
+
+@router.post("/password/forgot")
+def forgot_password(payload: PasswordResetRequest):
+    _ensure_auth_table()
+    _ensure_reset_table()
+    email = payload.email.strip().lower()
+    generic = {"ok": True, "message": "Si el correo existe, recibirás un enlace para recuperar la contraseña."}
+    if "@" not in email or len(email) > 320:
+        return generic
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id,email,is_active FROM central_users WHERE email=%s", (email,))
+            user = cur.fetchone()
+            if not user or not user["is_active"]:
+                return generic
+            token = secrets.token_urlsafe(48)
+            cur.execute("UPDATE central_password_resets SET used_at=NOW() WHERE user_id=%s AND used_at IS NULL", (user["id"],))
+            cur.execute("INSERT INTO central_password_resets(user_id,token_hash,expires_at) VALUES (%s,%s,NOW()+INTERVAL '30 minutes')", (user["id"], _hash_reset_token(token)))
+        conn.commit()
+    finally:
+        conn.close()
+    try:
+        _send_reset_email(email, f"{_app_url()}/recuperar-contrasena?token={token}")
+    except Exception:
+        audit_event("password_reset_email_failure", email=email)
+        raise HTTPException(status_code=503, detail="No fue posible enviar el correo de recuperacion")
+    audit_event("password_reset_requested", email=email)
+    return generic
+
+@router.post("/password/reset")
+def reset_password(payload: PasswordResetConfirm):
+    _ensure_auth_table()
+    _ensure_reset_table()
+    token_hash = _hash_reset_token(payload.token)
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT r.id,r.user_id,u.email
+                FROM central_password_resets r
+                JOIN central_users u ON u.id=r.user_id
+                WHERE r.token_hash=%s AND r.used_at IS NULL AND r.expires_at>NOW() AND u.is_active=TRUE
+            """, (token_hash,))
+            row = cur.fetchone()
+            if not row:
+                raise HTTPException(status_code=400, detail="Enlace invalido o expirado")
+            cur.execute("UPDATE central_users SET password_hash=%s,updated_at=NOW() WHERE id=%s", (hash_password(payload.new_password), row["user_id"]))
+            cur.execute("UPDATE central_password_resets SET used_at=NOW() WHERE id=%s", (row["id"],))
+        conn.commit()
+    finally:
+        conn.close()
+    audit_event("password_reset_completed", user_id=row["user_id"], email=row["email"])
     return {"ok": True}
 
 def current_user(
