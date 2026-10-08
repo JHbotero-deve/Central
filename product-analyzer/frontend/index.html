@@ -17,7 +17,7 @@
 .radar-card{border-radius:26px!important;overflow:hidden!important;background:#11151b!important;border:1px solid rgba(255,255,255,.10)!important;box-shadow:0 22px 55px rgba(0,0,0,.16)!important}
 .radar-card:hover{transform:translateY(-5px)!important;border-color:rgba(255,138,0,.45)!important;box-shadow:0 30px 70px rgba(0,0,0,.24)!important}
 .radar-card .card-media{height:auto!important;aspect-ratio:1/1.08!important;background:radial-gradient(circle at 50% 35%,rgba(255,138,0,.18),transparent 36%),linear-gradient(145deg,#1a1f27,#080a0e)!important;border:0!important}
-.radar-card .card-media img{padding:26px!important;mix-blend-mode:normal!important}
+.radar-card .card-media img{padding:0!important;width:100%!important;height:100%!important;object-fit:cover!important;mix-blend-mode:normal!important}
 .radar-card-actions{position:absolute;left:14px;right:14px;bottom:14px;z-index:8;display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .radar-action{min-height:42px;padding:10px 12px;border-radius:13px;border:1px solid rgba(255,255,255,.16);font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;text-align:center;cursor:pointer;text-decoration:none;backdrop-filter:blur(12px)}
 .radar-specs{background:rgba(8,10,14,.72);color:#fff}
@@ -61,7 +61,7 @@ function card(p){
   const gallery=Array.isArray(p.image_gallery)?p.image_gallery.filter(Boolean):[];
   const images=[p.image_url,...gallery].filter((url,i,a)=>url&&a.indexOf(url)===i);
   const image=images.length
-    ? '<img src="'+esc(images[0])+'" alt="'+esc(p.title)+'" loading="lazy" data-images="'+esc(JSON.stringify(images))+'" data-index="0" data-direct="1" onerror="const a=JSON.parse(this.dataset.images||\'[]\');const i=Number(this.dataset.index||0);if(this.dataset.direct===\'1\'){this.dataset.direct=\'0\';this.src=\'/api/v1/media/image?url=\'+encodeURIComponent(a[i])}else{const n=i+1;if(a[n]){this.dataset.index=String(n);this.dataset.direct=\'1\';this.src=a[n]}else{this.style.display=\'none\';this.nextElementSibling.style.display=\'block\'}}"><span class="noimg" style="display:none">Sin imagen</span>'
+    ? '<img src="/api/v1/media/image?url='+encodeURIComponent(images[0])+'" alt="'+esc(p.title)+'" loading="lazy" data-images="'+esc(JSON.stringify(images))+'" data-index="0" data-direct="0" onerror="const a=JSON.parse(this.dataset.images||\'[]\');const i=Number(this.dataset.index||0);if(this.dataset.direct===\'0\'){this.dataset.direct=\'1\';this.src=a[i]}else{const n=i+1;if(a[n]){this.dataset.index=String(n);this.dataset.direct=\'0\';this.src=\'/api/v1/media/image?url=\'+encodeURIComponent(a[n])}else{this.style.display=\'none\';this.nextElementSibling.style.display=\'block\'}}"><span class="noimg" style="display:none">Sin imagen</span>'
     : '<span class="noimg">Sin imagen</span>';
   const platform=String(p.platform||"Origen").toLowerCase();
   const label=platform==="amazon"?"Amazon":platform==="mercadolibre"||platform==="mercado libre"?"Mercado Libre":platform==="tiktok"?"TikTok":p.product_url?"Origen":"Boopy";
