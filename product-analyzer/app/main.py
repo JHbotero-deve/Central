@@ -208,7 +208,7 @@ def ingest_amazon(conn) -> list[int]:
             with conn.cursor() as cur:
                 cur.execute("SELECT COUNT(*) AS total FROM published_cards pc JOIN products p ON p.id = pc.product_id JOIN platforms pl ON pl.id = p.platform_id WHERE pl.name = 'amazon' AND pc.is_published = TRUE")
                 published = int(cur.fetchone()["total"] or 0)
-                if published < 30 and product.get("image_url"):
+                if published < 30:
                     cur.execute("SELECT affiliate_url, product_url FROM products WHERE id = %s", (product_id,))
                     link_row = cur.fetchone() or {}
                     affiliate_link = link_row.get("affiliate_url") or link_row.get("product_url")
