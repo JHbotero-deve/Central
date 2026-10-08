@@ -505,6 +505,8 @@ def fetch_amazon_seed_products(existing_ids: set[str], limit: int = 10) -> list[
 
     print(f"[amazon] seed real verificado: {len(results)} productos válidos")
     return results
+
+
 def fetch_amazon_products(
     existing_ids: set[str],
     limit: int = 15,
