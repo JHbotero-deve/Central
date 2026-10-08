@@ -207,29 +207,65 @@ def main():
     conn = get_connection()
     try:
         ensure_catalog(conn)
-        with conn.cursor() as cur:
-            cur.execute("""
-                UPDATE published_cards
-                SET is_published=FALSE, updated_at=NOW()
-                WHERE is_published=TRUE
-            """)
-            print(f"[REAL] Tarjetas anteriores ocultas: {cur.rowcount}")
-        conn.commit()
-
+        # Primero ingerimos/publicamos; al final ocultamos solo lo que no pertenece
+        # al nuevo lote. Así un fallo parcial nunca deja la tienda vacía.
         amazon = amazon_products(conn)
         meli = mercado_libre_products(conn)
 
-        with conn.cursor() as cur:
-            cur.execute("""
-                SELECT COUNT(*) AS total
-                FROM published_cards pc JOIN products p ON p.id=pc.product_id
-                WHERE pc.is_published=TRUE AND p.is_active=TRUE
-            """)
-            total = cur.fetchone()["total"]
+        fallback_total = 0
+        for attempt in range(1, 6):
+            try:
+                fallback_conn = get_connection()
+                try:
+                    fallback_total = publish_fallbacks(fallback_conn)
+                finally:
+                    fallback_conn.close()
+                break
+            except Exception as exc:
+                print(f"[REAL] Fallback intento {attempt}/5: {exc}")
+                if attempt == 5:
+                    raise
+                import time
+                time.sleep(2)
 
-        print(f"REAL_PROMO_READY amazon={amazon} mercadolibre={meli} total_tienda={total}")
-        fallback_total = publish_fallbacks(conn)
-        print(f"[REAL] Fallback web verificado complementario publicado/actualizado: {fallback_total}")
+        conn = get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT p.id
+                    FROM products p
+                    WHERE p.is_active = TRUE
+                      AND COALESCE(p.source_metadata->>'promotion_batch','') = %s
+                """, (BATCH,))
+                batch_ids = [int(row["id"]) for row in cur.fetchall()]
+                if batch_ids:
+                    cur.execute("""
+                        UPDATE published_cards
+                        SET is_published=FALSE, updated_at=NOW()
+                        WHERE is_published=TRUE
+                          AND product_id <> ALL(%s)
+                    """, (batch_ids,))
+                    hidden = cur.rowcount
+                else:
+                    hidden = 0
+            conn.commit()
+        finally:
+            conn.close()
+
+        verify_conn = get_connection()
+        try:
+            with verify_conn.cursor() as cur:
+                cur.execute("""
+                    SELECT COUNT(*) AS total
+                    FROM published_cards pc
+                    JOIN products p ON p.id=pc.product_id
+                    WHERE pc.is_published=TRUE AND p.is_active=TRUE
+                """)
+                total = cur.fetchone()["total"]
+        finally:
+            verify_conn.close()
+
+        print(f"REAL_PROMO_READY amazon={amazon} mercadolibre={meli} fallback={fallback_total} hidden_old={hidden} total_tienda={total}")
     finally:
         conn.close()
 
