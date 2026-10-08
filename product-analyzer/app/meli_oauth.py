@@ -211,7 +211,7 @@ def get_meli_tokens() -> tuple[str | None, str | None]:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT access_token_encrypted, refresh_token_encrypted
+                SELECT access_token_encrypted, refresh_token_encrypted, expires_at
                 FROM meli_oauth_tokens
                 WHERE id=1
                 """
@@ -219,6 +219,19 @@ def get_meli_tokens() -> tuple[str | None, str | None]:
             row = cur.fetchone()
     finally:
         conn.close()
+
+    env_access = _env("MELI_ACCESS_TOKEN")
+    env_refresh = _env("MELI_REFRESH_TOKEN")
+    env_expires = _env("MELI_ACCESS_TOKEN_EXPIRES_AT")
+
+    if env_access and env_refresh and env_expires:
+        try:
+            env_expires_at = datetime.fromisoformat(env_expires.replace("Z", "+00:00"))
+            db_expires_at = row["expires_at"] if row else None
+            if db_expires_at is None or db_expires_at <= env_expires_at:
+                return env_access, env_refresh
+        except ValueError:
+            pass
 
     if not row:
         return None, None
