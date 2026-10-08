@@ -69,5 +69,5 @@ function cardHtml(m){
   const im=imgOk(v.img)?`<img src="${esc(imgOk(v.img))}" alt="${esc(m.title)}" loading="lazy" referrerpolicy="no-referrer">`:'<span class="sh-noimg">Sin imagen</span>';
   return `<button type="button" class="sh-card" data-id="${esc(m.id)}"><div class="sh-cim ${m.plate?"plate":""}">${im}</div><div class="sh-cb"><span class="sh-cbrand">${esc(m.brand||m.cat)}</span><span class="sh-ctitle">${esc(m.title)}</span><span class="sh-cprice">${money(m.price,m.currency)}</span></div></button>`}
 
-return{API,GLOWS,THEMES,esc,url,imgOk,nn,money,pack,unpack,fromApi,detailHtml,mountDetail,cardHtml,api,login,session,logout,tok,setTok,theme,setTheme,applyTheme,KEY}
+return{API,GLOWS,THEMES,esc,url,imgOk,nn,money,pack,unpack,fromApi,detailHtml,mountDetail,cardHtml,api,theme,setTheme,applyTheme}
 })();
