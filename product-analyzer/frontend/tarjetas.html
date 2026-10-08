@@ -19,17 +19,9 @@
 .admin-card-status{display:inline-flex;width:max-content;padding:2px 6px;border:1px solid color-mix(in srgb,var(--ok) 45%,var(--line));border-radius:999px;color:var(--ok);font-weight:700}
 </style></head>
 <body><div class="sh-wrap">
-<header class="sh-top"><a class="sh-logo" href="/vitrina">CENTRAL</a><div style="display:flex;gap:8px"><a class="sh-pill" href="/vitrina">Ver vitrina</a><a class="sh-pill" href="#" id="logout" hidden>Salir</a></div></header>
+<header class="sh-top"><a class="sh-logo" href="/vitrina">CENTRAL</a><div style="display:flex;gap:8px"><a class="sh-pill" href="/vitrina">Ver vitrina</a></div></header>
 
-<section id="auth" class="ed-side" style="max-width:420px;margin:30px 0" hidden><div class="ed-body">
-  <strong>Acceso de administrador</strong>
-  <label class="ed-l">Usuario o correo<input class="ed-in" id="u" autocomplete="username"></label>
-  <label class="ed-l">Contraseña<input class="ed-in" id="p" type="password" autocomplete="current-password"></label>
-  <button class="ed-btn" id="loginBtn" type="button">Entrar</button>
-  <a href="/recuperar-contrasena" style="display:inline-block;margin-top:10px;color:#55652f">¿Olvidaste tu contraseña?</a>
-  <div id="authMsg" class="ed-msg err" hidden></div></div></section>
-
-<section id="panel" hidden><div class="ed-grid">
+<section id="panel"><div class="ed-grid">
  <aside class="ed-side">
   <div class="ed-tabs"><button type="button" data-tab="mine">Productos</button><button type="button" data-tab="add" class="on">Agregar</button><button type="button" data-tab="theme">Tema</button></div>
 
@@ -76,7 +68,7 @@ const num=v=>{v=String(v).trim().replace(",",".");return v===""||isNaN(Number(v)
 let V=[{name:"",glow:0,img:""}];
 
 function show(el,k,t){el.hidden=false;el.className="ed-msg "+k;el.textContent=t}
-async function gate(){const ok=await S.session();$("auth").hidden=ok;$("panel").hidden=!ok;$("logout").hidden=!ok;if(ok){renderVars();preview();loadMine();renderThemes()}}
+function gate(){renderVars();preview();loadMine();renderThemes()}
 function tab(n){["mine","add","theme"].forEach(x=>{$("tab-"+x).hidden=x!==n});document.querySelectorAll("[data-tab]").forEach(b=>b.classList.toggle("on",b.dataset.tab===n))}
 
 function renderVars(){
