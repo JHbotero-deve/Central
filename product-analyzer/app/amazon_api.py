@@ -217,14 +217,22 @@ def _search_amazon_html(keywords: str, limit: int = 10) -> list[dict[str, Any]]:
         )
         response.raise_for_status()
         html = response.text
-        blocks = re.findall(
-            r'<div[^>]+data-asin=["\']([A-Z0-9]{10})["\'][^>]*'
-            r'data-component-type=["\']s-search-result["\'][^>]*>.*?</div>\\s*</div>',
-            html,
-            re.IGNORECASE | re.DOTALL,
-        )
+        asins = re.findall(r'data-asin=["']([A-Z0-9]{10})["']', html, re.IGNORECASE)
         results = []
         seen = set()
+
+        for asin in asins:
+            asin = asin.upper()
+            if asin in seen:
+                continue
+            seen.add(asin)
+            marker = re.search(r'data-asin=["']' + re.escape(asin) + r'["']', html, re.IGNORECASE)
+            if not marker:
+                continue
+            start = marker.start()
+            next_marker = re.search(r'data-asin=["'][A-Z0-9]{10}["']', html[marker.end():], re.IGNORECASE)
+            end = marker.end() + next_marker.start() if next_marker else min(len(html), start + 60000)
+            chunk = html[start:end]
 
         for asin in blocks:
             if asin in seen:
