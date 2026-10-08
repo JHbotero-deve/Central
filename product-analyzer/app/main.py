@@ -203,46 +203,8 @@ def ingest_amazon(conn) -> list[int]:
         try:
             product_id = upsert_product(conn, "amazon", category, product)
             ids.append(product_id)
-            # Las primeras 30 fichas Amazon quedan publicadas automáticamente
-            # para convertir tráfico en ventas y generar atribución.
-            with conn.cursor() as cur:
-                cur.execute("SELECT COUNT(*) AS total FROM published_cards pc JOIN products p ON p.id = pc.product_id JOIN platforms pl ON pl.id = p.platform_id WHERE pl.name = 'amazon' AND pc.is_published = TRUE")
-                published = int(cur.fetchone()["total"] or 0)
-                if published < 30:
-                    cur.execute("SELECT affiliate_url, product_url FROM products WHERE id = %s", (product_id,))
-                    link_row = cur.fetchone() or {}
-                    affiliate_link = link_row.get("affiliate_url") or link_row.get("product_url")
-                    if not affiliate_link:
-                        continue
-                    cur.execute("""
-                        INSERT INTO published_cards (
-                            product_id, title, subtitle, price_display, image_url, product_url,
-                            sale_price, cost_price, profit_amount, profit_margin_pct,
-                            opportunity_score, footer, accent, is_published, published_at, updated_at
-                        )
-                        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,0,0,0,%s,%s,TRUE,NOW(),NOW())
-                        ON CONFLICT (product_id) DO UPDATE SET
-                            image_url=EXCLUDED.image_url,
-                            product_url=EXCLUDED.product_url,
-                            price_display=EXCLUDED.price_display,
-                            sale_price=EXCLUDED.sale_price,
-                            updated_at=NOW(),
-                            is_published=TRUE
-                    """, (
-                        product_id,
-                        product["title"],
-                        "Oferta Amazon · compra segura en Amazon",
-                        f"{product['price']:,.2f} {product['currency'] or 'USD'}",
-                        product.get("image_url"),
-                        affiliate_link,
-                        product.get("price"),
-                        product.get("price"),
-                        "Amazon · enlace afiliado",
-                        "#b6f23a",
-                    ))
-                    published += 1
             conn.commit()
-            print(f"[amazon] {product['external_id']} -> {product['title']} | publicado={published <= 30}")
+            print(f"[amazon] {product['external_id']} -> {product['title']} | importado; publicación pendiente de verificación")
         except Exception as exc:
             conn.rollback()
             print(f"[amazon] error insertando {product.get('external_id')}: {exc}")
