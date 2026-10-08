@@ -269,7 +269,9 @@ async function load(){
     if(!r.ok)throw Error("HTTP "+r.status);
     const d=await r.json();const list=Array.isArray(d)?d:(d.items||d.publications||d.data||[]);
     if(!Array.isArray(list)||!list.length)throw Error("sin publicaciones");
-    products=list;localStorage.setItem("central_products_cache",JSON.stringify(products));setCategories();applyFilter();return;
+    const seen=new Set();
+    const unique=list.filter(p=>{const k=String(p.product_id||p.id||p.external_id||p.product_url||p.affiliate_url||p.title||"").trim().toLowerCase();if(!k||seen.has(k))return false;seen.add(k);return true;});
+    products=unique;localStorage.setItem("central_products_cache",JSON.stringify(products));setCategories();applyFilter();return;
   }catch(e){console.error("Error cargando catalogo:",endpoint,e)}
   if(products.length){setCategories();applyFilter();return}
   $("grid").innerHTML='<div class="empty"><b>Catálogo vacío</b>Vuelve pronto: estamos preparando nuestros productos.</div>';renderFeature();
