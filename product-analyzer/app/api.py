@@ -27,9 +27,14 @@ from tiktok_api import router as tiktok_creator_router
 from url_import import import_url, _public_url
 from wompi import router as wompi_router
 from meli_oauth import router as meli_oauth_router, notification_router as meli_notification_router
-from auth import router as auth_router, require_admin
+
 
 API_VERSION = "1.3.0"
+
+# Central opera sin login. Las rutas que antes dependian de require_admin
+# se mantienen para conservar compatibilidad con el codigo existente.
+def require_admin() -> dict:
+    return {}
 
 app = FastAPI(
     title="Central Product Analyzer API",
@@ -41,7 +46,6 @@ app.include_router(monetization_router, prefix="/api/v1")
 app.include_router(wompi_router, prefix="/api/v1")
 app.include_router(meli_oauth_router, prefix="/api/v1")
 app.include_router(meli_notification_router, prefix="/api/v1")
-app.include_router(auth_router, prefix="/api/v1")
 app.include_router(tiktok_creator_router, prefix="/api/v1")
 app.include_router(publication_router, prefix="/api/v1")
 app.include_router(store_orders_router, prefix="/api/v1")
