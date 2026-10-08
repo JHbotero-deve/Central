@@ -106,66 +106,83 @@ def _sale_price(item_id):
 
 
 def _public_search(query, limit=20):
-    """Fallback real-data search using Mercado Libre's public web index."""
-    search_url = "https://www.bing.com/search"
+    """Fallback real-data search using DuckDuckGo HTML + structured data from ML pages."""
+    search_url = "https://html.duckduckgo.com/html/"
     response = requests.get(
         search_url,
-        params={"q": f'site:mercadolibre.com.co "{query}"', "count": min(limit, 20)},
+        params={"q": f'site:mercadolibre.com.co "{query}"', "kl": "co-es"},
         headers={
-            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/140 Safari/537.36",
-            "Accept-Language": "es-CO,es;q=0.9,en;q=0.7",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140 Safari/537.36",
+            "Accept-Language": "es-CO,es;q=0.9",
         },
         timeout=25,
     )
     response.raise_for_status()
     html = response.text
-    products = []
-    seen = set()
+    urls = re.findall(r'nuddg=([^&"]+)', html, re.I)
+    if not urls:
+        urls = re.findall(r'href="(https?://(?:www\\.)?mercadolibre\\.com\\.co/[^"]+)"', html, re.I)
+    products, seen = [], set()
 
-    links = re.findall(r"<a[^>]+href=[\"'](https://(?:articulo|www)\.mercadolibre\.com\.co/[^\"']+)[\"'][^>]*>(.*?)</a>", html, re.I | re.S)
-    for permalink, raw_title in links:
-        match = re.search(r"(MCO-\d+)", permalink)
-        if not match:
+    from html import unescape
+    from urllib.parse import unquote
+
+    for raw_url in urls:
+        permalink = unquote(unescape(raw_url))
+        if "mercadolibre.com.co" not in permalink:
             continue
-        item_id = match.group(1)
-        if item_id in seen:
+        if "/MCO-" not in permalink and "/p/MCO" not in permalink:
             continue
-        title = re.sub(r"<[^>]+>", " ", raw_title)
-        title = re.sub(r"\s+", " ", title).strip()
-        if not title:
-            continue
+        permalink = permalink.split("&rut=", 1)[0]
         try:
             page = requests.get(
                 permalink,
-                headers={"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/140 Safari/537.36", "Accept-Language": "es-CO,es;q=0.9"},
+                headers={
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140 Safari/537.36",
+                    "Accept-Language": "es-CO,es;q=0.9",
+                },
                 timeout=20,
                 allow_redirects=True,
             )
             if not page.ok:
                 continue
             page_html = page.text
-            price_match = re.search(r'"price"\s*:\s*"?([0-9.]+)"?', page_html)
-            image_match = re.search(r"<meta[^>]+property=[\"']og:image[\"'][^>]+content=[\"']([^\"']+)", page_html, re.I)
-            amount = float(price_match.group(1).replace(".", "")) if price_match else None
-            image = image_match.group(1) if image_match else ""
-            if not amount or amount <= 0:
+            final_url = page.url
+            ids = re.findall(r'MCO[-_]?\\d{6,}', final_url + " " + page_html[:200000], re.I)
+            item_id = next((x.replace("_","-").upper() for x in ids if "-P" not in x.upper()), "")
+            if not item_id:
                 continue
+            if item_id in seen:
+                continue
+
+            title_match = re.search(r'<meta[^>]+property=["\']og:title["\'][^>]+content=["\']([^"\']+)', page_html, re.I)
+            image_match = re.search(r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)', page_html, re.I)
+            price_match = re.search(r'"price"\\s*:\\s*"?([0-9]+(?:[.,][0-9]+)?)"?', page_html, re.I)
+            if not price_match:
+                price_match = re.search(r'"amount"\\s*:\\s*([0-9]+(?:[.,][0-9]+)?)', page_html, re.I)
+            title = unescape(title_match.group(1)).strip() if title_match else ""
+            image = unescape(image_match.group(1)).strip() if image_match else ""
+            amount = float(price_match.group(1).replace(".", "").replace(",", ".")) if price_match else 0
+            if not title or amount <= 0:
+                continue
+
+            seen.add(item_id)
+            products.append({
+                "id": item_id,
+                "title": title[:500],
+                "thumbnail": image,
+                "permalink": final_url,
+                "price": amount,
+                "currency_id": "COP",
+            })
+            if len(products) >= min(max(limit, 1), 20):
+                break
         except (requests.RequestException, ValueError):
             continue
-        seen.add(item_id)
-        products.append({
-            "id": item_id,
-            "title": title[:500],
-            "thumbnail": image,
-            "permalink": permalink,
-            "price": amount,
-            "currency_id": "COP",
-        })
-        if len(products) >= min(max(limit, 1), 20):
-            break
 
     print(f"[Mercado Libre] fallback web real '{query}': {len(products)} productos")
     return {"results": products, "_source": "public_web"}
+
 
 
 def _catalog_search(query, limit=20):
