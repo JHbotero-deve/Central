@@ -485,15 +485,15 @@ def fetch_amazon_seed_products(existing_ids: set[str], limit: int = 10) -> list[
             if not response.ok:
                 continue
             html = response.text
-            title_match = re.search(r'<meta[^>]+property=["\\']og:title["\\'][^>]+content=["\\']([^"\\']+)', html, re.I)
+            title_match = re.search(r"""<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)""", html, re.I)
             title = title_match.group(1).strip() if title_match else ""
             if not title:
-                title_match = re.search(r'<span[^>]+id=["\\']productTitle["\\'][^>]*>(.*?)</span>', html, re.I | re.S)
+                title_match = re.search(r"""<span[^>]+id=["']productTitle["'][^>]*>(.*?)</span>""", html, re.I | re.S)
                 title = re.sub(r"<[^>]+>", " ", title_match.group(1)).strip() if title_match else ""
             image = _amazon_image_from_html(url)
-            price_match = re.search(r'<span[^>]+class=["\\'][^"\\']*(?:a-price-whole)[^"\\']*["\\'][^>]*>([0-9,]+)</span>.*?<span[^>]+class=["\\'][^"\\']*(?:a-price-fraction)[^"\\']*["\\'][^>]*>([0-9]+)</span>', html, re.I | re.S)
+            price_match = re.search(r"""<span[^>]+class=["'](?:[^"']*a-price-whole)[^"']*["'][^>]*>([0-9,]+)</span>.*?<span[^>]+class=["'](?:[^"']*a-price-fraction)[^"']*["'][^>]*>([0-9]+)</span>""", html, re.I | re.S)
             if not price_match:
-                price_match = re.search(r'\\$\\s*([0-9][0-9,]*(?:\\.[0-9]{1,2})?)', html)
+                price_match = re.search(r"""\$\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)""", html)
                 amount = float(price_match.group(1).replace(",", "")) if price_match else None
             else:
                 amount = float(price_match.group(1).replace(",", "") + "." + price_match.group(2))
