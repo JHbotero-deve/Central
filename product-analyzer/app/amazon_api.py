@@ -221,57 +221,56 @@ def _search_amazon_html(keywords: str, limit: int = 10) -> list[dict[str, Any]]:
         results = []
         seen = set()
 
-        for asin in asins:
-            asin = asin.upper()
+        for raw_asin in asins:
+            asin = raw_asin.upper()
             if asin in seen:
                 continue
-            seen.add(asin)
-            marker = re.search(r'data-asin=["']' + re.escape(asin) + r'["']', html, re.IGNORECASE)
+            marker = re.search(
+                r'data-asin=["']' + re.escape(asin) + r'["']',
+                html,
+                re.IGNORECASE,
+            )
             if not marker:
                 continue
+            seen.add(asin)
             start = marker.start()
-            next_marker = re.search(r'data-asin=["'][A-Z0-9]{10}["']', html[marker.end():], re.IGNORECASE)
+            next_marker = re.search(
+                r'data-asin=["'][A-Z0-9]{10}["']',
+                html[marker.end():],
+                re.IGNORECASE,
+            )
             end = marker.end() + next_marker.start() if next_marker else min(len(html), start + 60000)
             chunk = html[start:end]
 
-        for asin in blocks:
-            if asin in seen:
-                continue
-            seen.add(asin)
-            marker = f'data-asin="{asin}"'
-            start = html.find(marker)
-            if start < 0:
-                marker = f"data-asin='{asin}'"
-                start = html.find(marker)
-            if start < 0:
-                continue
-            chunk = html[start:start + 45000]
-
             title_match = re.search(
-                r'<span[^>]+class=["\'][^"\']*a-text-normal[^"\']*["\'][^>]*>(.*?)</span>',
+                r'<span[^>]+class=["'][^"']*a-text-normal[^"']*["'][^>]*>(.*?)</span>',
                 chunk, re.IGNORECASE | re.DOTALL)
             title = re.sub(r"<[^>]+>", " ", title_match.group(1)) if title_match else ""
-            title = re.sub(r"\\s+", " ", title).strip()
+            title = re.sub(r"\s+", " ", title).strip()
 
             image = None
-            dynamic = re.search(r'data-a-dynamic-image=["\']([^"\']+)["\']', chunk, re.IGNORECASE)
+            dynamic = re.search(r'data-a-dynamic-image=["']([^"']+)["']', chunk, re.IGNORECASE)
             if dynamic:
                 raw = dynamic.group(1).replace("&quot;", '"')
-                m = re.search(r'"(https?://[^"]+)"', raw)
-                image = m.group(1) if m else None
+                image_match = re.search(r'"(https?://[^"]+)"', raw)
+                image = image_match.group(1) if image_match else None
             if not image:
-                m = re.search(r'<img[^>]+src=["\'](https?://[^"\']+)["\']', chunk, re.IGNORECASE)
-                image = m.group(1) if m else None
+                image_match = re.search(r'<img[^>]+src=["'](https?://[^"']+)["']', chunk, re.IGNORECASE)
+                image = image_match.group(1) if image_match else None
 
             price_match = re.search(
-                r'<span[^>]+class=["\'][^"\']*a-price-whole[^"\']*["\'][^>]*>([0-9,]+)</span>'
-                r'(?:.*?<span[^>]+class=["\'][^"\']*a-price-fraction[^"\']*["\'][^>]*>([0-9]+)</span>)?',
+                r'<span[^>]+class=["'][^"']*a-price-whole[^"']*["'][^>]*>([0-9,]+)</span>'
+                r'(?:.*?<span[^>]+class=["'][^"']*a-price-fraction[^"']*["'][^>]*>([0-9]+)</span>)?',
                 chunk, re.IGNORECASE | re.DOTALL)
             if not price_match:
                 continue
 
             try:
-                amount = float(price_match.group(1).replace(",", "") + "." + (price_match.group(2) or "00"))
+                amount = float(
+                    price_match.group(1).replace(",", "")
+                    + "."
+                    + (price_match.group(2) or "00")
+                )
             except ValueError:
                 continue
 
@@ -281,13 +280,14 @@ def _search_amazon_html(keywords: str, limit: int = 10) -> list[dict[str, Any]]:
             results.append({
                 "asin": asin,
                 "detailPageURL": f"https://www.amazon.com/dp/{asin}",
-                "itemInfo": {"title": {"displayValue": title}},
+                "itemInfo": {"title": {"displayValue": title[:500]}},
                 "offersV2": {"listings": [{"price": {"amount": amount, "currency": "USD"}}]},
                 "images": {"primary": {"large": {"url": image}}},
             })
             if len(results) >= min(max(limit, 1), 20):
                 break
 
+        print(f"[amazon] búsqueda HTML real '{keywords}': {len(results)} productos")
         return results
     except requests.RequestException as exc:
         print(f"[amazon] fallback búsqueda HTML error: {exc}")
