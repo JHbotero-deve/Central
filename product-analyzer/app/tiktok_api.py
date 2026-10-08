@@ -1,5 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
-from auth import require_admin
+from fastapi import APIRouter, HTTPException, Query
 
 from db import get_connection
 from tiktok_creator import creator_configured, get_creator_profile, sync_showcase
@@ -40,7 +39,7 @@ def creator_profile():
 
 
 @router.post("/sync")
-def creator_sync(limit: int = Query(200, ge=1, le=2000), _: dict = Depends(require_admin)):
+def creator_sync(limit: int = Query(200, ge=1, le=2000)):
     if not creator_configured():
         raise HTTPException(status_code=503, detail="TikTok Creator no está configurado")
     try:
