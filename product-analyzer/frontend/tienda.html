@@ -61,89 +61,25 @@
 @media(max-width:1050px){.shell{width:min(100% - 32px,920px)}.hero{grid-template-columns:1fr;min-height:auto;padding:60px 0 20px}.stage{height:380px}.feature{grid-template-columns:1fr}.feature-media{min-height:430px}}
 @media(max-width:700px){.shell{width:calc(100% - 24px)}.topbar{height:66px}.top-actions .admin-link{display:none}.hero h1{font-size:54px}.toolbar{position:relative;top:auto;grid-template-columns:1fr;border-radius:20px}.count{min-height:34px}.feature-media{min-height:320px}.feature-info{padding:28px}.grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.card-body{padding:12px}.card-price{font-size:18px}.cart-fab{right:12px;bottom:12px}.drawer{padding:7px}.drawer-box{border-radius:17px;padding:18px}}
 </style>
-<style id="central-figma-card-v2">
-/* Figma card layer — solo visual, no toca carrito/API */
-.card{
-  border-radius:28px!important;
-  background:#11151b!important;
-  border-color:rgba(255,255,255,.10)!important;
-  box-shadow:0 24px 55px rgba(0,0,0,.18)!important;
-  perspective:1200px;
-}
+<style id="central-figma-card-v3">
+/* Tarjeta final: imagen protagonista + 2 acciones dentro de la imagen */
+.card{border-radius:26px!important;overflow:hidden!important;background:#11151b!important;border:1px solid rgba(255,255,255,.10)!important;box-shadow:0 22px 55px rgba(0,0,0,.16)!important}
+.card:hover{transform:translateY(-5px)!important;border-color:rgba(255,138,0,.45)!important;box-shadow:0 30px 70px rgba(0,0,0,.24)!important}
+.card-media{aspect-ratio:1/1.08!important;height:auto!important;margin:0!important;border-radius:0!important;border:0!important;background:radial-gradient(circle at 50% 35%,rgba(255,138,0,.18),transparent 36%),linear-gradient(145deg,#1a1f27,#080a0e)!important;box-shadow:none!important;transform:none!important;position:relative!important}
+.card-media:before{border-color:rgba(255,138,0,.22)!important}
+.card-media img{padding:26px!important;mix-blend-mode:normal!important}
+.card-image-actions{position:absolute;left:14px;right:14px;bottom:14px;z-index:8;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.card-action{min-height:42px;padding:10px 12px;border-radius:13px;border:1px solid rgba(255,255,255,.16);font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;text-align:center;cursor:pointer;backdrop-filter:blur(12px);text-decoration:none}
+.card-action-secondary{background:rgba(8,10,14,.72);color:#fff}
+.card-action-primary{background:#ff8a00;border-color:#ff8a00;color:#080a0e}
+.card-action:hover{transform:translateY(-1px)}
+.card-body{padding:15px 16px 17px!important;background:#11151b!important}
+.card-body .category{color:#ff8a00!important}
+.card h3{color:#fff!important;margin:7px 0 5px!important}
+.card-price{color:#fff!important;margin:12px 0 0!important}
+.card-share{display:none!important}
+.card-info,.card-buy{display:none!important}
 
-.card:hover{
-  transform:translateY(-5px)!important;
-  border-color:rgba(255,138,0,.38)!important;
-  box-shadow:0 30px 70px rgba(0,0,0,.25)!important;
-}
-
-.card-media{
-  aspect-ratio:1/1.08!important;
-  margin:12px!important;
-  border-radius:22px!important;
-  background:
-    radial-gradient(circle at 50% 35%,rgba(255,138,0,.18),transparent 35%),
-    linear-gradient(145deg,#1a1f27,#080a0e)!important;
-  border:1px solid rgba(255,255,255,.10)!important;
-  box-shadow:0 30px 70px rgba(0,0,0,.30)!important;
-  transform:rotateX(var(--card-rx,0deg)) rotateY(var(--card-ry,0deg));
-  transform-style:preserve-3d;
-  transition:transform .15s ease;
-}
-
-.card-media img{
-  padding:32px!important;
-  mix-blend-mode:normal!important;
-  transition:transform .3s ease!important;
-}
-
-.card:hover .card-media img{
-  transform:scale(1.04)!important;
-}
-
-.card-body{
-  padding:4px 18px 18px!important;
-}
-
-.card-body .category{
-  color:#ff8a00!important;
-}
-
-.card h3{
-  color:#fff!important;
-  font-size:19px!important;
-}
-
-.card small{
-  color:rgba(255,255,255,.45)!important;
-}
-
-.card-price{
-  color:#fff!important;
-}
-
-.card-buy{
-  background:#ff8a00!important;
-  border-color:#ff8a00!important;
-  color:#080a0e!important;
-}
-
-.card-buy:hover{
-  background:#ff9d2e!important;
-  border-color:#ff9d2e!important;
-}
-
-.card-info{
-  border-color:rgba(255,255,255,.12)!important;
-  color:#fff!important;
-}
-
-.badge{
-  background:rgba(0,0,0,.55)!important;
-  border-color:rgba(255,255,255,.10)!important;
-  color:rgba(255,255,255,.72)!important;
-}
-</style>
 </head>
 <body>
 <div class="shell">
@@ -271,15 +207,14 @@ function renderFeature(selected){
 function shareUrl(p){return new URL(productUrl(p),location.origin).href}
 function card(p){
   const own=isOwn(p), ext=externalUrl(p), src=imageSrc(p), model=p.model_url||"";
-  let price=p.price_display||money(p.sale_price??p.current_price,p.currency), ask=false;
-  if(price==="Consultar"&&ext){price="Ver precio en la tienda";ask=true}
+  const id=p.product_id||p.id;
   const source=String(p.platform||"Central").toLowerCase();
-  const sourceLabel=source==="amazon"?"Amazon":source==="mercadolibre"||source==="mercado libre"?"Mercado Libre":own?"Central":p.platform||"Origen";
-  const buy=own
-    ? '<button class="card-buy" data-id="'+esc(p.product_id||p.id)+'">Añadir al carrito</button>'
+  const sourceLabel=source==="amazon"?"Amazon":source==="mercadolibre"||source==="mercado libre"?"Mercado Libre":source==="tiktok"?"TikTok":own?"Central":p.platform||"Origen";
+  const second=own
+    ? '<button type="button" class="card-action card-action-primary add" data-id="'+esc(id)+'">Comprar aquí</button>'
     : ext
-      ? '<a class="card-buy" href="'+esc(ext)+'" target="_blank" rel="nofollow sponsored noopener">Comprar en '+esc(sourceLabel)+'</a>'
-      : '<a class="card-buy" href="'+productUrl(p)+'">Ver información</a>';
+      ? '<button type="button" class="card-action card-action-primary external-offer" data-id="'+esc(id)+'">Abrir '+esc(sourceLabel)+'</button>'
+      : '<a class="card-action card-action-primary" href="'+esc(productUrl(p))+'">Abrir ficha</a>';
   const media=model
     ? '<model-viewer class="card-3d" src="'+esc(model)+'" alt="'+esc(p.title)+'" camera-controls auto-rotate shadow-intensity="1" exposure="1" loading="lazy"></model-viewer>'
     : src
@@ -288,24 +223,16 @@ function card(p){
   return '<article class="card">'+
     '<div class="card-media">'+media+
       '<span class="badge">'+esc(sourceLabel)+'</span>'+
-      (model?'<span class="media-3d">3D · arrastra para rotar</span>':'')+
+      '<div class="card-image-actions">'+
+        '<button type="button" class="card-action card-action-secondary view-product" data-id="'+esc(id)+'">Specs</button>'+
+        second+
+      '</div>'+
     '</div>'+
     '<div class="card-body">'+
       '<div class="card-topline"><span class="category">'+esc(p.category||"Producto")+'</span>'+(p.rating!=null?'<span class="rating">★ '+esc(Number(p.rating).toFixed(1))+'</span>':'')+'</div>'+
       '<h3>'+esc(p.title)+'</h3>'+
-      '<small>'+esc(p.subtitle||"Producto publicado en Central")+'</small>'+
-      (p.external_id?'<div class="ref">Ref. '+esc(p.external_id)+'</div>':'')+
-      '<div class="card-price'+(ask?' ask':'')+'">'+esc(price)+'</div>'+
-      '<div class="card-actions">'+
-        '<button type="button" class="card-info view-product" data-id="'+esc(p.product_id||p.id)+'">Ver información</button>'+
-        buy+
-      '</div>'+
-      '<div class="card-share" aria-label="Compartir producto">'+
-        '<button type="button" class="share-btn" data-share="whatsapp" data-id="'+esc(p.product_id||p.id)+'">WhatsApp</button>'+
-        '<button type="button" class="share-btn" data-share="telegram" data-id="'+esc(p.product_id||p.id)+'">Telegram</button>'+
-        '<button type="button" class="share-btn" data-share="copy" data-id="'+esc(p.product_id||p.id)+'">Copiar link</button>'+
-      '</div>'+
-    '</div></article>'
+      '<div class="card-price">'+esc(p.price_display||money(p.sale_price??p.current_price,p.currency))+'</div>'+
+    '</div></article>';
 }
 function renderGrid(){
   $("grid").innerHTML=filtered.length?filtered.map(card).join(""):'<div class="empty"><b>No hay productos</b>No hay productos disponibles.</div>';
