@@ -10,6 +10,8 @@ MELI_ITEM = "https://api.mercadolibre.com/items/{id}"
 MELI_PRICES = "https://api.mercadolibre.com/items/{id}/prices"
 MELI_SALE_PRICE = "https://api.mercadolibre.com/items/{id}/sale_price"
 MELI_OAUTH = "https://api.mercadolibre.com/oauth/token"
+MELI_PRODUCTS_SEARCH = "https://api.mercadolibre.com/products/search"
+MELI_PRODUCT = "https://api.mercadolibre.com/products/{id}"
 
 
 def _headers(include_auth=True):
@@ -166,13 +168,58 @@ def _public_search(query, limit=20):
     return {"results": products, "_source": "public_web"}
 
 
+def _catalog_search(query, limit=20):
+    """Mercado Libre catalog search: alternativa vigente al /sites/MCO/search bloqueado."""
+    try:
+        data = _get(MELI_PRODUCTS_SEARCH, {
+            "status": "active", "site_id": "MCO", "q": query, "limit": min(limit, 20)
+        }, include_auth=True)
+    except (RuntimeError, requests.RequestException) as exc:
+        print(f"[Mercado Libre] catalog search '{query}' no disponible: {exc}")
+        return []
+    products = []
+    for result in data.get("results", []):
+        product_id = result.get("id")
+        if not product_id:
+            continue
+        try:
+            detail = _get(MELI_PRODUCT.format(id=product_id), include_auth=True)
+        except (RuntimeError, requests.RequestException):
+            continue
+        winner = detail.get("buy_box_winner") or {}
+        price = winner.get("price")
+        if not price:
+            continue
+        pictures = detail.get("pictures") or []
+        image = (pictures[0].get("url") if pictures else "") or ""
+        item_id = winner.get("item_id") or product_id
+        products.append({
+            "external_id": item_id,
+            "title": detail.get("name") or result.get("name") or query,
+            "image_url": image,
+            "product_url": winner.get("permalink") or detail.get("permalink") or "",
+            "price": float(price),
+            "currency": winner.get("currency_id") or "COP",
+            "rating": None,
+            "reviews_count": 0,
+            "sales_estimate": winner.get("sold_quantity") or detail.get("sold_quantity"),
+            "seller": {"external_id": str(winner.get("seller_id") or "") or None, "name": None, "reputation": None},
+            "source_metadata": {"catalog_product_id": product_id, "catalog": True, "buy_box_winner": winner},
+        })
+    print(f"[Mercado Libre] catalogo real '{query}': {len(products)} productos")
+    return products
+
+
 def fetch_mercadolibre(query, limit=20):
     try:
         data = _get(MELI_SEARCH, {"q": query, "limit": min(limit, 50)}, include_auth=False)
     except (RuntimeError, requests.RequestException) as exc:
         if isinstance(exc, RuntimeError) and "403" not in str(exc):
             raise
-        print(f"[Mercado Libre] API no disponible para '{query}'; usando búsqueda web real como respaldo: {exc}")
+        print(f"[Mercado Libre] búsqueda de publicaciones bloqueada para '{query}'; probando catálogo: {exc}")
+        catalog_products = _catalog_search(query, limit)
+        if catalog_products:
+            return catalog_products
         data = _public_search(query, limit)
     products = []
 
