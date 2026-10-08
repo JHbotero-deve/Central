@@ -1,5 +1,5 @@
 window.Shopr=(()=>{"use strict";
-const API="/api/v1",KEY="central_admin_token";
+const API="/api/v1";
 const GLOWS=[["Rojo Fuego","#ff3b1f"],["Naranja","#ff7a1a"],["Ámbar","#ffb300"],["Verde","#2ecc71"],["Azul","#3b82f6"],["Violeta","#8b5cf6"],["Blanco","#e9e9f0"],["Negro","#1c1c20"]];
 const THEMES=[["Negro","#0a0a0a"],["Pizarra","#10151c"],["Marino","#0a1226"],["Violeta","#150b26"],["Bosque","#0a1a12"],["Carbón","#171717"],["Vino","#1f0a12"]];
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -14,29 +14,12 @@ const unpack=d=>{d=String(d||"");const m=d.match(/\n*\[\[central:([A-Za-z0-9+\/=
 const theme=()=>{try{return JSON.parse(localStorage.getItem("central_theme"))||THEMES[0]}catch{return THEMES[0]}};
 const setTheme=t=>{localStorage.setItem("central_theme",JSON.stringify(t));applyTheme()};
 const applyTheme=()=>document.documentElement.style.setProperty("--bg",theme()[1]);
-let sessionReady=false;
-const tok=()=>sessionReady?"session":"";
-const setTok=t=>{sessionReady=!!t};
-
 async function api(path,opt={}){
   const h={Accept:"application/json",...(opt.headers||{})};
-  const r=await fetch(API+path,{cache:"no-store",credentials:"include",...opt,headers:h});let b=null;try{b=await r.json()}catch{}
+  const r=await fetch(API+path,{cache:"no-store",...opt,headers:h});let b=null;try{b=await r.json()}catch{}
   if(!r.ok){const d=b&&b.detail;const e=new Error(typeof d==="string"?d:(d?JSON.stringify(d):"HTTP "+r.status));e.status=r.status;throw e}
   return b}
-async function login(u,p){
-  const r=await fetch(API+"/auth/login",{method:"POST",credentials:"include",headers:{"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({email:String(u||"").trim(),password:String(p||"")})});
-  const j=await r.json().catch(()=>({}));
-  if(!r.ok)throw new Error(typeof j.detail==="string"?j.detail:"Credenciales invalidas");
-  sessionReady=true; return true;
-}
-async function session(){
-  const r=await fetch(API+"/auth/me",{credentials:"include",headers:{Accept:"application/json"},cache:"no-store"});
-  sessionReady=r.ok; return r.ok;
-}
-async function logout(){
-  await fetch(API+"/auth/logout",{method:"POST",credentials:"include",headers:{Accept:"application/json"}});
-  sessionReady=false;
-}
+
 
 function mkLinks(mt,plat,p,g){
   const L=Object.assign({},mt.links||{}),aff=g("affiliate_url")||g("product_url")||"";
