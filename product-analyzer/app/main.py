@@ -420,7 +420,8 @@ def run_pipeline():
                         "url": build_url(product["title"], product["product_url"]),
                         "score": round(score, 1),
                     })
-        score_active_catalog()\n    publish_real_discounts(conn)
+        score_active_catalog()
+        publish_real_discounts(conn)
     finally:
         conn.close()
 
