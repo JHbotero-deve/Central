@@ -168,7 +168,7 @@ def _public_search(query, limit=20):
 
 def fetch_mercadolibre(query, limit=20):
     try:
-        data = _get(MELI_SEARCH, {"q": query, "limit": min(limit, 50)}, include_auth=True)
+        data = _get(MELI_SEARCH, {"q": query, "limit": min(limit, 50)}, include_auth=False)
     except (RuntimeError, requests.RequestException) as exc:
         if isinstance(exc, RuntimeError) and "403" not in str(exc):
             raise
