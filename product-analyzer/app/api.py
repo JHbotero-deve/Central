@@ -139,6 +139,14 @@ def telegram_status():
         return {"configured": True, "connected": False, "username": None, "name": None}
 
 
+@core_router.get("/media/mongo/{file_id}")
+def mongo_product_image(file_id: str):
+    from mongo_store import read_product_image
+    data, content_type = read_product_image(file_id)
+    if not data:
+        raise HTTPException(status_code=404, detail="Imagen no encontrada")
+    return Response(content=data, media_type=content_type, headers={"Cache-Control":"public, max-age=86400"})
+
 @core_router.get("/mongo/health")
 def mongo_health(_: dict = Depends(require_admin)):
     from mongo_store import health
