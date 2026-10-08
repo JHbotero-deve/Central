@@ -40,7 +40,7 @@ SEARCH_CONFIG = [
     ("electronica", "consola videojuegos"),
 ]
 SCORE_THRESHOLD = float(os.getenv("SCORE_THRESHOLD", "50"))
-AMAZON_BATCH_SIZE = int(os.getenv("AMAZON_BATCH_SIZE", "50"))
+AMAZON_BATCH_SIZE = int(os.getenv("AMAZON_BATCH_SIZE", "100"))
 MELI_BATCH_SIZE = int(os.getenv("MELI_BATCH_SIZE", "20"))
 
 def build_url(title: str, product_url: str | None) -> str:
@@ -200,12 +200,12 @@ def ingest_amazon(conn) -> list[int]:
         try:
             product_id = upsert_product(conn, "amazon", category, product)
             ids.append(product_id)
-            # Las primeras 10 fichas Amazon quedan publicadas automáticamente
+            # Las primeras 30 fichas Amazon quedan publicadas automáticamente
             # para convertir tráfico en ventas y generar atribución.
             with conn.cursor() as cur:
                 cur.execute("SELECT COUNT(*) AS total FROM published_cards pc JOIN products p ON p.id = pc.product_id JOIN platforms pl ON pl.id = p.platform_id WHERE pl.name = 'amazon' AND pc.is_published = TRUE")
                 published = int(cur.fetchone()["total"] or 0)
-                if published < 10 and product.get("image_url"):
+                if published < 30 and product.get("image_url"):
                     cur.execute("SELECT affiliate_url, product_url FROM products WHERE id = %s", (product_id,))
                     link_row = cur.fetchone() or {}
                     affiliate_link = link_row.get("affiliate_url") or link_row.get("product_url")
@@ -239,7 +239,7 @@ def ingest_amazon(conn) -> list[int]:
                     ))
                     published += 1
             conn.commit()
-            print(f"[amazon] {product['external_id']} -> {product['title']} | publicado={published < 10}")
+            print(f"[amazon] {product['external_id']} -> {product['title']} | publicado={published <= 30}")
         except Exception as exc:
             conn.rollback()
             print(f"[amazon] error insertando {product.get('external_id')}: {exc}")
