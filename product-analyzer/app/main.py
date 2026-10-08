@@ -191,7 +191,10 @@ def ingest_amazon(conn) -> list[int]:
         """)
         existing_ids = {str(row["external_id"]).upper() for row in cur.fetchall()}
 
-    products = fetch_amazon_products(existing_ids, AMAZON_BATCH_SIZE)\n    if not products:\n        print("[amazon] búsqueda automática sin resultados; usando seed ASIN reales.")\n        products = fetch_amazon_seed_products(existing_ids, min(10, AMAZON_BATCH_SIZE))
+    products = fetch_amazon_products(existing_ids, AMAZON_BATCH_SIZE)
+    if not products:
+        print("[amazon] búsqueda automática sin resultados; usando seed ASIN reales.")
+        products = fetch_amazon_seed_products(existing_ids, min(10, AMAZON_BATCH_SIZE))
     if not products:
         print("[amazon] Creators API sin resultados. Amazon queda como fuente opcional; se conserva el catalogo existente.")
         return ids
