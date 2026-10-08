@@ -61,6 +61,89 @@
 @media(max-width:1050px){.shell{width:min(100% - 32px,920px)}.hero{grid-template-columns:1fr;min-height:auto;padding:60px 0 20px}.stage{height:380px}.feature{grid-template-columns:1fr}.feature-media{min-height:430px}}
 @media(max-width:700px){.shell{width:calc(100% - 24px)}.topbar{height:66px}.top-actions .admin-link{display:none}.hero h1{font-size:54px}.toolbar{position:relative;top:auto;grid-template-columns:1fr;border-radius:20px}.count{min-height:34px}.feature-media{min-height:320px}.feature-info{padding:28px}.grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.card-body{padding:12px}.card-price{font-size:18px}.cart-fab{right:12px;bottom:12px}.drawer{padding:7px}.drawer-box{border-radius:17px;padding:18px}}
 </style>
+<style id="central-figma-card-v2">
+/* Figma card layer — solo visual, no toca carrito/API */
+.card{
+  border-radius:28px!important;
+  background:#11151b!important;
+  border-color:rgba(255,255,255,.10)!important;
+  box-shadow:0 24px 55px rgba(0,0,0,.18)!important;
+  perspective:1200px;
+}
+
+.card:hover{
+  transform:translateY(-5px)!important;
+  border-color:rgba(255,138,0,.38)!important;
+  box-shadow:0 30px 70px rgba(0,0,0,.25)!important;
+}
+
+.card-media{
+  aspect-ratio:1/1.08!important;
+  margin:12px!important;
+  border-radius:22px!important;
+  background:
+    radial-gradient(circle at 50% 35%,rgba(255,138,0,.18),transparent 35%),
+    linear-gradient(145deg,#1a1f27,#080a0e)!important;
+  border:1px solid rgba(255,255,255,.10)!important;
+  box-shadow:0 30px 70px rgba(0,0,0,.30)!important;
+  transform:rotateX(var(--card-rx,0deg)) rotateY(var(--card-ry,0deg));
+  transform-style:preserve-3d;
+  transition:transform .15s ease;
+}
+
+.card-media img{
+  padding:32px!important;
+  mix-blend-mode:normal!important;
+  transition:transform .3s ease!important;
+}
+
+.card:hover .card-media img{
+  transform:scale(1.04)!important;
+}
+
+.card-body{
+  padding:4px 18px 18px!important;
+}
+
+.card-body .category{
+  color:#ff8a00!important;
+}
+
+.card h3{
+  color:#fff!important;
+  font-size:19px!important;
+}
+
+.card small{
+  color:rgba(255,255,255,.45)!important;
+}
+
+.card-price{
+  color:#fff!important;
+}
+
+.card-buy{
+  background:#ff8a00!important;
+  border-color:#ff8a00!important;
+  color:#080a0e!important;
+}
+
+.card-buy:hover{
+  background:#ff9d2e!important;
+  border-color:#ff9d2e!important;
+}
+
+.card-info{
+  border-color:rgba(255,255,255,.12)!important;
+  color:#fff!important;
+}
+
+.badge{
+  background:rgba(0,0,0,.55)!important;
+  border-color:rgba(255,255,255,.10)!important;
+  color:rgba(255,255,255,.72)!important;
+}
+</style>
 </head>
 <body>
 <div class="shell">
@@ -352,5 +435,4 @@ renderCart();load();loadTelegram();
 </script>
 </body>
 </html>
-
 
