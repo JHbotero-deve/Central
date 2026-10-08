@@ -480,12 +480,13 @@ def fetch_amazon_seed_products(existing_ids: set[str], limit: int = 10) -> list[
             continue
 
         url = f"https://www.amazon.com/dp/{asin}"
+        image = _amazon_image_from_html(url)
         product = {
             "platform": "amazon",
             "external_id": asin,
             "title": title[:500],
-            "image_url": None,
-            "gallery_urls": [],
+            "image_url": image,
+            "gallery_urls": [image] if image else [],
             "product_url": url,
             "price": price,
             "currency": "USD",
@@ -495,6 +496,7 @@ def fetch_amazon_seed_products(existing_ids: set[str], limit: int = 10) -> list[
             "source_metadata": {
                 "import_method": "amazon_seed_verified",
                 "metadata_source": "verified_amazon_listing",
+                "image_source": "amazon_product_page" if image else None,
                 "marketplace": MARKETPLACE,
                 "asin": asin,
                 "price_note": "Precio observado en ficha pública; puede variar en Amazon.",
