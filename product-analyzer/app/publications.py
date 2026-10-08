@@ -57,7 +57,7 @@ def list_publications(
             cur.execute(
                 f"""
                 SELECT pc.id, pc.product_id, pc.title, pc.subtitle, pc.price_display,
-                       COALESCE(NULLIF(pc.image_url, ''), NULLIF(p.image_url, '')) AS image_url,
+                       CASE WHEN COALESCE(p.source_metadata->>'mongo_image_id','') <> '' THEN 'mongo://' || p.source_metadata->>'mongo_image_id' ELSE COALESCE(NULLIF(pc.image_url, ''), NULLIF(p.image_url, '')) END AS image_url,
                        COALESCE(NULLIF(pc.product_url, ''), NULLIF(p.product_url, '')) AS product_url,
                        pc.sale_price, pc.cost_price,
                        pc.profit_amount, pc.profit_margin_pct, pc.opportunity_score, pc.footer,
