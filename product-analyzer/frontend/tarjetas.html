@@ -123,11 +123,7 @@ async function loadMine(){
 function renderThemes(){const cur=S.theme()[0];
   $("themes").innerHTML=S.THEMES.map((t,i)=>`<button type="button" class="ed-t ${t[0]===cur?"on":""}" data-t="${i}" style="background:${t[1]}">${t[0]}</button>`).join("");
   $("themes").querySelectorAll("[data-t]").forEach(b=>b.addEventListener("click",()=>{S.setTheme(S.THEMES[+b.dataset.t]);renderThemes()}))}
-
-$("loginBtn").addEventListener("click",async()=>{const b=$("loginBtn");b.disabled=true;$("authMsg").hidden=true;
-  try{await S.login($("u").value.trim(),$("p").value);gate()}catch(e){show($("authMsg"),"err",e.message)}finally{b.disabled=false}});
-$("logout").addEventListener("click",async e=>{e.preventDefault();await S.logout();gate()});
-
+ 
 $("save").addEventListener("click",async()=>{
   const m=model(),msg=$("msg");msg.hidden=true;
   if(f("title").length<2)return show(msg,"err","El nombre necesita al menos 2 caracteres");
@@ -151,7 +147,7 @@ $("save").addEventListener("click",async()=>{
     show(msg,"ok","Tarjeta creada");
     ["title","brand","description","tag","price","prev","rating","reviews","feat1","feat2","feat3","feat4","l_amz","l_meli","l_wmp"].forEach(id=>$(id).value="");
     V=[{name:"",glow:0,img:""}];renderVars();preview();loadMine()}
-  catch(e){if(e.status===401){S.setTok("");gate();show($("authMsg"),"err","Sesión vencida, entra de nuevo")}else show(msg,"err",e.message)}
+  catch(e){show(msg,"err",e.message)}
   finally{b.disabled=false}});
 gate();})();
 </script></body></html>
