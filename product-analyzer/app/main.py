@@ -333,7 +333,8 @@ def run_pipeline():
     started_at = __import__("datetime").datetime.now()
     print("== Iniciando ciclo de ingesta y análisis ==")
     expired_products = expire_catalog()
-    backfill_missing_source_images()\n    backfill_mongo_images()
+    backfill_missing_source_images()
+    backfill_mongo_images()
     errors = []
     amazon_count = 0
     mercadolibre_count = 0
