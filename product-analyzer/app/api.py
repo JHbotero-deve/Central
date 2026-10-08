@@ -997,7 +997,7 @@ def top_opportunities(limit: int = Query(20, ge=1, le=100), _: dict = Depends(re
                        p.sales_estimate, s.price_score, s.demand_score,
                        s.trend_score, s.opportunity_score, p.product_url,
                        CASE WHEN COALESCE(p.source_metadata->>'mongo_image_id','') <> ''
-                            THEN 'mongo://' || p.source_metadata->>'mongo_image_id'
+                            THEN 'mongo://' || (p.source_metadata->>'mongo_image_id')
                             ELSE p.image_url END AS image_url,
                        p.updated_at, p.catalog_expires_at, p.model_url, p.model_shape,
                        p.source_metadata
