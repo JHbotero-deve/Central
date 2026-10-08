@@ -9,13 +9,8 @@ from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
 
 from db import get_connection
-from auth import require_admin
 
 router = APIRouter(prefix="/store", tags=["commerce"])
-
-
-def _admin_key(user: dict = Depends(require_admin)):
-    return user
 
 
 class OrderLookup(BaseModel):
@@ -108,7 +103,7 @@ def request_return(payload: ReturnPayload):
 
 
 @router.get("/deliveries")
-def list_deliveries(_: None = Depends(_admin_key)):
+def list_deliveries():
     conn = get_connection()
     try:
         with conn.cursor() as cur:
@@ -125,7 +120,7 @@ def list_deliveries(_: None = Depends(_admin_key)):
 
 
 @router.patch("/orders/{reference}/delivery")
-def update_delivery(reference: str, payload: DeliveryUpdate, _: None = Depends(_admin_key)):
+def update_delivery(reference: str, payload: DeliveryUpdate):
     conn = get_connection()
     try:
         with conn.cursor() as cur:
@@ -149,7 +144,7 @@ def update_delivery(reference: str, payload: DeliveryUpdate, _: None = Depends(_
 
 
 @router.get("/leads")
-def list_leads(_: None = Depends(_admin_key)):
+def list_leads():
     conn = get_connection()
     try:
         with conn.cursor() as cur:
@@ -246,7 +241,7 @@ def dispatch_lead(order_id: int) -> bool:
 
 
 @router.post("/leads/{lead_id}/deliver")
-def deliver_lead(lead_id: int, _: None = Depends(_admin_key)):
+def deliver_lead(lead_id: int):
     conn = get_connection()
     try:
         with conn.cursor() as cur:
@@ -262,7 +257,7 @@ def deliver_lead(lead_id: int, _: None = Depends(_admin_key)):
 
 
 @router.get("/returns")
-def list_returns(_: None = Depends(_admin_key)):
+def list_returns():
     conn = get_connection()
     try:
         with conn.cursor() as cur:
