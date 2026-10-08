@@ -4,7 +4,7 @@ from psycopg2.extras import Json
 
 import schedule
 
-from amazon_api import fetch_amazon_products
+from amazon_api import fetch_amazon_products, fetch_amazon_seed_products
 from analysis import score_product
 from db import get_connection, upsert_product
 from ingest import fetch_mercadolibre
@@ -191,7 +191,7 @@ def ingest_amazon(conn) -> list[int]:
         """)
         existing_ids = {str(row["external_id"]).upper() for row in cur.fetchall()}
 
-    products = fetch_amazon_products(existing_ids, AMAZON_BATCH_SIZE)
+    products = fetch_amazon_products(existing_ids, AMAZON_BATCH_SIZE)\n    if not products:\n        print("[amazon] búsqueda automática sin resultados; usando seed ASIN reales.")\n        products = fetch_amazon_seed_products(existing_ids, min(10, AMAZON_BATCH_SIZE))
     if not products:
         print("[amazon] Creators API sin resultados. Amazon queda como fuente opcional; se conserva el catalogo existente.")
         return ids
