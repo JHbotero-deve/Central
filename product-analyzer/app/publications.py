@@ -8,7 +8,6 @@ from pydantic import BaseModel, Field
 
 from db import get_connection
 from notifications import send_telegram_publication
-from auth import require_admin
 
 router = APIRouter(tags=["publications"])
 
@@ -23,11 +22,6 @@ def es_admin(x_admin_key: Optional[str]) -> bool:
     # compare_digest evita ataques de tiempo; se usa bytes para aceptar cualquier carácter
     return secrets.compare_digest(x_admin_key.encode(), clave.encode())
 
-
-def verificar_admin(x_admin_key: Optional[str]) -> None:
-    """Corta la petición con 401 si no es administrador."""
-    if not es_admin(x_admin_key):
-        raise HTTPException(status_code=401, detail="No autorizado")
 
 
 class PublicationPayload(BaseModel):
@@ -101,7 +95,7 @@ def list_publications(
 
 
 @router.post("/publications")
-def publish_card(payload: PublicationPayload, _: dict = Depends(require_admin)):
+def publish_card(payload: PublicationPayload):
     conn = get_connection()
     try:
         with conn.cursor() as cur:
@@ -189,7 +183,7 @@ def publish_card(payload: PublicationPayload, _: dict = Depends(require_admin)):
 
 
 @router.patch("/publications/{publication_id}")
-def update_publication(publication_id: int, payload: PublicationPayload, _: dict = Depends(require_admin)):
+def update_publication(publication_id: int, payload: PublicationPayload):
     conn = get_connection()
     try:
         with conn.cursor() as cur:
@@ -261,7 +255,7 @@ def update_publication(publication_id: int, payload: PublicationPayload, _: dict
 
 
 @router.post("/publications/{publication_id}/telegram")
-def publish_publication_telegram(publication_id: int, _: dict = Depends(require_admin)):
+def publish_publication_telegram(publication_id: int):
     conn = get_connection()
     try:
         with conn.cursor() as cur:
