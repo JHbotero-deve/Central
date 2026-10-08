@@ -205,7 +205,12 @@ def ingest_amazon(conn) -> list[int]:
             with conn.cursor() as cur:
                 cur.execute("SELECT COUNT(*) AS total FROM published_cards pc JOIN products p ON p.id = pc.product_id JOIN platforms pl ON pl.id = p.platform_id WHERE pl.name = 'amazon' AND pc.is_published = TRUE")
                 published = int(cur.fetchone()["total"] or 0)
-                if published < 10:
+                if published < 10 and product.get("image_url"):
+                    cur.execute("SELECT affiliate_url, product_url FROM products WHERE id = %s", (product_id,))
+                    link_row = cur.fetchone() or {}
+                    affiliate_link = link_row.get("affiliate_url") or link_row.get("product_url")
+                    if not affiliate_link:
+                        continue
                     cur.execute("""
                         INSERT INTO published_cards (
                             product_id, title, subtitle, price_display, image_url, product_url,
@@ -226,12 +231,13 @@ def ingest_amazon(conn) -> list[int]:
                         "Oferta Amazon · compra segura en Amazon",
                         f"{product['price']:,.2f} {product['currency'] or 'USD'}",
                         product.get("image_url"),
-                        product.get("affiliate_url") or product.get("product_url"),
+                        affiliate_link,
                         product.get("price"),
                         product.get("price"),
                         "Amazon · enlace afiliado",
                         "#b6f23a",
                     ))
+                    published += 1
             conn.commit()
             print(f"[amazon] {product['external_id']} -> {product['title']} | publicado={published < 10}")
         except Exception as exc:
