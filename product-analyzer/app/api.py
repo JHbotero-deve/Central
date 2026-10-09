@@ -282,13 +282,13 @@ def _sync_store_catalog():
             "control videojuegos", "impresora", "proyector", "tablet android",
             "organizador escritorio", "luz led escritorio",
         )
-        meli_target = 100
+        meli_target = 300
         try:
             for query in meli_queries:
                 if len(meli_imported) >= meli_target:
                     break
                 try:
-                    products = fetch_mercadolibre(query, limit=30)
+                    products = fetch_mercadolibre(query, limit=50)
                     for product in products:
                         if len(meli_imported) >= meli_target:
                             break
