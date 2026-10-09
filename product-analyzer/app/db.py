@@ -17,6 +17,10 @@ def get_connection():
 
 
 def _affiliate_url(product: dict) -> str | None:
+    # Si el importador entregó un enlace afiliado (por ejemplo, AliExpress),
+    # se conserva tal cual y no se reemplaza por la URL de destino.
+    provided=(product.get("affiliate_url") or "").strip()
+    if provided: return provided
     url=(product.get("product_url") or "").strip()
     if product.get("platform")!="amazon" or not url: return None
     tag=(os.getenv("AMAZON_PARTNER_TAG") or os.getenv("AMAZON_ASSOCIATE_TAG") or "").strip()
