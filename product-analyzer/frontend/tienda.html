@@ -162,7 +162,7 @@ let filtered=[], active=null, quickMode="all";
 function mediaSrc(url){return url?API+"/media/image?url="+encodeURIComponent(url):""}function imageSrc(p){return p.image_url||((p.image_gallery||[]).find(Boolean)||"")}function imageFallback(p){const src=imageSrc(p);if(!src)return "";if(src.includes("images-na.ssl-images-amazon.com/images/P/"))return src.replace("images-na.ssl-images-amazon.com/images/P/","m.media-amazon.com/images/P/");return src}
 function saveCart(){localStorage.setItem("central_cart",JSON.stringify(cart));renderCart()}
 function isOwn(p){return String(p.checkout_mode||"").toUpperCase()==="CENTRAL"||String(p.platform||"").toLowerCase()==="personal"}
-function externalUrl(p){return p.product_url||p.affiliate_url||""}
+function externalUrl(p){return p.affiliate_url||p.product_url||""}
 
 function setCategories(){
   const cats=[...new Set(products.map(p=>p.category).filter(Boolean))].sort();
@@ -211,7 +211,7 @@ function card(p){
   const own=isOwn(p), ext=externalUrl(p), src=imageSrc(p), model=p.model_url||"";
   const id=p.product_id||p.id;
   const source=String(p.platform||"Central").toLowerCase();
-  const sourceLabel=source==="amazon"?"Amazon":source==="mercadolibre"||source==="mercado libre"?"Mercado Libre":source==="tiktok"?"TikTok":own?"Central":p.platform||"Origen";
+  const sourceLabel=source==="amazon"?"Amazon":source==="mercadolibre"||source==="mercado libre"?"Mercado Libre":source==="tiktok"?"TikTok":source==="aliexpress"?"AliExpress":own?"Central":p.platform||"Origen";
   const second=own
     ? '<button type="button" class="card-action card-action-primary add" data-id="'+esc(id)+'">Comprar aquí</button>'
     : ext
