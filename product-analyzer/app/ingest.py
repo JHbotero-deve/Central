@@ -136,12 +136,12 @@ def _public_search(query, limit=20):
 
     products, seen = [], set()
     # Markdown de Jina conserva los enlaces e imágenes de las tarjetas.
-    link_re = re.compile(r"\[([^\]]{8,500})\]\((https?://[^)]+mercadolibre\\.com\\.co/[^)]+)\)", re.I)
+    link_re = re.compile(r"\[([^\]]{8,500})\]\((https?://[^)]+mercadolibre\.com\.co/[^)]+)\)", re.I)
     image_re = re.compile(r"!\[[^\]]*\]\((https?://[^)]+)\)", re.I)
     matches = list(link_re.finditer(text))
 
     for idx, match in enumerate(matches):
-        title = unescape(re.sub(r"\\s+", " ", match.group(1))).strip()
+        title = unescape(re.sub(r"\s+", " ", match.group(1))).strip()
         permalink = unquote(match.group(2))
         if "/listado/" in permalink or "/categorias/" in permalink:
             continue
@@ -149,7 +149,7 @@ def _public_search(query, limit=20):
             continue
 
         window = text[match.end(): matches[idx + 1].start() if idx + 1 < len(matches) else min(len(text), match.end() + 1800)]
-        price_match = re.search(r"\$\\s*([0-9][0-9.]{2,})", window)
+        price_match = re.search(r"\$\s*([0-9][0-9.]{2,})", window)
         if not price_match:
             continue
         amount = float(price_match.group(1).replace(".", ""))
@@ -174,7 +174,7 @@ def _public_search(query, limit=20):
             except requests.RequestException:
                 pass
 
-        item_match = re.search(r"(MCO[-_]\\d{6,})", permalink, re.I)
+        item_match = re.search(r"(MCO[-_]\d{6,})", permalink, re.I)
         item_id = item_match.group(1).replace("_", "-").upper() if item_match else ""
         if not item_id:
             # Las URLs de publicación pueden no incluir el ID; se genera una clave estable.
@@ -250,6 +250,7 @@ def fetch_mercadolibre(query, limit=20):
         if isinstance(exc, RuntimeError) and "403" not in str(exc):
             raise
         print(f"[Mercado Libre] API autenticada bloqueada para '{query}': {exc}")
+        catalog_products = []
         try:
             data = _get(
                 MELI_SEARCH,
