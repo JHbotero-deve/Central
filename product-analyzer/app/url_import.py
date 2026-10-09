@@ -10,6 +10,7 @@ import requests
 AMAZON_HOST_RE = re.compile(r"(^|\.)amazon\.[a-z.]+$", re.I)
 MELI_HOST_RE = re.compile(r"(^|\.)(mercadolibre|mercadolivre)\.[a-z.]+$", re.I)
 TIKTOK_HOST_RE = re.compile(r"(^|\.)tiktok(?:shop)?\.com$", re.I)
+ALIEXPRESS_HOST_RE = re.compile(r"(^|\.)aliexpress\.[a-z.]+$", re.I)
 ASIN_RE = re.compile(r"(?:/dp/|/gp/product/)([A-Z0-9]{10})(?:[/?]|$)", re.I)
 BLOCKED_HOSTS = {"localhost", "metadata.google.internal", "host.docker.internal"}
 
@@ -38,7 +39,20 @@ def detect_platform(url: str) -> str:
         return "mercadolibre"
     if TIKTOK_HOST_RE.search(host):
         return "tiktok"
-    raise ValueError("La URL debe pertenecer a Amazon, Mercado Libre o TikTok Shop.")
+    if ALIEXPRESS_HOST_RE.search(host):
+        return "aliexpress"
+    raise ValueError("La URL debe pertenecer a Amazon, Mercado Libre, TikTok Shop o AliExpress.")
+
+
+def _aliexpress_affiliate_url(url: str) -> str | None:
+    """Conserva los enlaces cortos promocionales; no confunde una URL normal con una afiliada."""
+    parsed = urlparse(url)
+    host = (parsed.hostname or "").lower().rstrip(".")
+    if host in {"s.click.aliexpress.com", "a.aliexpress.com"}:
+        return url.strip()
+    if ALIEXPRESS_HOST_RE.search(host) and re.search(r"(?:^|&)(?:aff_[a-z0-9_]+|aff_platform|aff_trace_key|terminal_id)=", parsed.query, re.I):
+        return url.strip()
+    return None
 
 
 def _asin(url: str) -> str | None:
@@ -182,7 +196,16 @@ def import_url(
     url = url.strip()
     _public_url(url)
     platform = detect_platform(url)
-    metadata = _metadata(url)
+    try:
+        metadata = _metadata(url)
+    except requests.RequestException as exc:
+        # AliExpress puede bloquear la lectura automática. Permite importación manual
+        # solo si los tres datos comerciales se aportaron explícitamente.
+        if platform != "aliexpress" or not (title and image_url and price is not None):
+            if platform == "aliexpress":
+                raise ValueError("AliExpress no entregó los metadatos. Completa nombre, precio e imagen real y vuelve a importar.") from exc
+            raise
+        metadata = {"resolved_url": url, "gallery_urls": []}
     resolved_url = metadata.get("resolved_url") or url
     external_id = _asin(resolved_url) if platform == "amazon" else None
     if not external_id:
@@ -192,7 +215,7 @@ def import_url(
     final_title = (title or metadata.get("title") or "").strip()
     final_image = (image_url or metadata.get("image_url") or "").strip() or None
     final_price = price if price is not None else metadata.get("price")
-    final_currency = metadata.get("currency") or currency
+    final_currency = (currency if price is not None else metadata.get("currency")) or currency
     if not final_title:
         raise ValueError("No fue posible obtener el nombre real del producto.")
     if not final_image:
@@ -211,6 +234,7 @@ def import_url(
         "image_url": final_image,
         "gallery_urls": gallery[:24],
         "product_url": resolved_url,
+        "affiliate_url": _aliexpress_affiliate_url(url) if platform == "aliexpress" else None,
         "price": float(final_price),
         "currency": str(final_currency).upper()[:10] if final_currency else "USD",
         "rating": float(metadata["rating"]) if metadata.get("rating") not in (None, "") else None,
