@@ -1,35 +1,24 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-from app.db import SessionLocal, Product
+from fastapi import APIRouter, HTTPException
+from app.db import products_collection
+from bson import ObjectId
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
 @router.get("/products")
-def list_admin_products(db: Session = Depends(get_db)):
-    return db.query(Product).all()
+def list_admin_products():
+    products = list(products_collection.find({}, {"_id": 0}))
+    return products
 
-@router.put("/products/{product_id}")
-def update_product(product_id: int, data: dict, db: Session = Depends(get_db)):
-    product = db.query(Product).filter(Product.id == product_id).first()
-    if not product:
+@router.put("/products/{external_id}")
+def update_product(external_id: str, data: dict):
+    result = products_collection.update_one({"external_id": external_id}, {"$set": data})
+    if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
-    for key, value in data.items():
-        setattr(product, key, value)
-    db.commit()
-    return {"status": "success", "message": "Tarjeta actualizada"}
+    return {"status": "success", "message": "Tarjeta corregida"}
 
-@router.delete("/products/{product_id}")
-def delete_product(product_id: int, db: Session = Depends(get_db)):
-    product = db.query(Product).filter(Product.id == product_id).first()
-    if not product:
+@router.delete("/products/{external_id}")
+def delete_product(external_id: str):
+    result = products_collection.delete_one({"external_id": external_id})
+    if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
-    db.delete(product)
-    db.commit()
     return {"status": "success", "message": "Tarjeta eliminada"}
