@@ -1,4 +1,5 @@
 from sqlalchemy.exc import SQLAlchemyError
+from app.db import Product
 
 def safe_ingest_product(db_session, product_data):
     try:
