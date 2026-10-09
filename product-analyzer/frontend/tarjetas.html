@@ -97,10 +97,10 @@ function renderVars(){
    <div class="ed-glows">${S.GLOWS.map((g,gi)=>`<button type="button" class="ed-g ${gi===v.glow?"on":""}" data-g="${gi}" title="${g[0]}" style="background:${g[1]}"></button>`).join("")}</div></div>`}).join("");
   $("addVar").hidden=V.length>=4;
 }
-function model(){return{id:"preview",title:f("title")||"Nombre del producto",brand:f("brand"),tag:f("tag"),cat:f("category"),desc:f("description"),platform:f("productType"),
+function model(){return{id:"preview",title:f("title")||"Nombre del producto",brand:f("brand"),tag:f("tag"),cat:f("category"),desc:f("description"),
   price:num(f("price")),prev:num(f("prev")),currency:f("currency"),rating:num(f("rating"))||0,reviews:parseInt(f("reviews"),10)||0,
   features:[1,2,3,4].map(i=>f("feat"+i)).filter(Boolean),variants:V.map(v=>({...v})),
-  links:{amazon:f("l_amz"),meli:f("l_meli"),wompi:f("l_wmp")},fallback:"",platform:"personal",plate:$("plate").checked}}
+  links:{amazon:f("l_amz"),meli:f("l_meli"),wompi:f("l_wmp")},fallback:"",platform:f("productType"),plate:$("plate").checked}}
 function preview(){S.mountDetail($("preview"),model(),0)}
 
 function resize(file,max=700){return new Promise((res,rej)=>{const im=new Image(),u=URL.createObjectURL(file);
