@@ -14,8 +14,16 @@ const unpack=d=>{d=String(d||"");const m=d.match(/\n*\[\[central:([A-Za-z0-9+\/=
 const theme=()=>{try{return JSON.parse(localStorage.getItem("central_theme"))||THEMES[0]}catch{return THEMES[0]}};
 const setTheme=t=>{localStorage.setItem("central_theme",JSON.stringify(t));applyTheme()};
 const applyTheme=()=>document.documentElement.style.setProperty("--bg",theme()[1]);
+let adminKey="";
 async function api(path,opt={}){
+  const method=String(opt.method||"GET").toUpperCase();
+  const protectedWrite=(method!=="GET"&&(/^\/(products|catalog)(\/|\?|$)/.test(path)||/^\/publications(\/|\?|$)/.test(path)))||/^\/catalog(\/|\?|$)/.test(path)||(/^\/publications(\/|\?|$)/.test(path)&&/[?&]include_unpublished=true/.test(path));
   const h={Accept:"application/json",...(opt.headers||{})};
+  if(protectedWrite){
+    if(!adminKey)adminKey=window.prompt("Clave administrativa de Central (ADMIN_API_KEY):")||"";
+    if(!adminKey)throw new Error("Operación cancelada: falta la clave administrativa.");
+    h["X-Admin-Key"]=adminKey;
+  }
   const r=await fetch(API+path,{cache:"no-store",...opt,headers:h});let b=null;try{b=await r.json()}catch{}
   if(!r.ok){const d=b&&b.detail;const e=new Error(typeof d==="string"?d:(d?JSON.stringify(d):"HTTP "+r.status));e.status=r.status;throw e}
   return b}
