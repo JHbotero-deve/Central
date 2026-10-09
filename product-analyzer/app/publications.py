@@ -15,12 +15,18 @@ CAMPOS_PRIVADOS = ("cost_price", "profit_amount", "profit_margin_pct", "opportun
 
 
 def es_admin(x_admin_key: Optional[str]) -> bool:
-    """True si la cabecera X-Admin-Key coincide con la variable de entorno ADMIN_API_KEY."""
-    clave = os.getenv("ADMIN_API_KEY", "")
+    """True si la cabecera X-Admin-Key coincide con ADMIN_API_KEY."""
+    clave = os.getenv("ADMIN_API_KEY", "").strip()
     if not clave or not x_admin_key:
         return False
-    # compare_digest evita ataques de tiempo; se usa bytes para aceptar cualquier carácter
-    return secrets.compare_digest(x_admin_key.encode(), clave.encode())
+    return secrets.compare_digest(x_admin_key.strip().encode(), clave.encode())
+
+
+def require_publication_admin(x_admin_key: Optional[str] = Header(default=None)):
+    if not os.getenv("ADMIN_API_KEY", "").strip():
+        raise HTTPException(status_code=503, detail="ADMIN_API_KEY no está configurada")
+    if not es_admin(x_admin_key):
+        raise HTTPException(status_code=401, detail="Se requiere una clave administrativa válida")
 
 
 
@@ -96,7 +102,7 @@ def list_publications(
 
 
 @router.post("/publications")
-def publish_card(payload: PublicationPayload):
+def publish_card(payload: PublicationPayload, _: None = Depends(require_publication_admin)):
     conn = get_connection()
     try:
         with conn.cursor() as cur:
@@ -184,7 +190,7 @@ def publish_card(payload: PublicationPayload):
 
 
 @router.patch("/publications/{publication_id}")
-def update_publication(publication_id: int, payload: PublicationPayload):
+def update_publication(publication_id: int, payload: PublicationPayload, _: None = Depends(require_publication_admin)):
     conn = get_connection()
     try:
         with conn.cursor() as cur:
@@ -255,8 +261,30 @@ def update_publication(publication_id: int, payload: PublicationPayload):
         conn.close()
 
 
+@router.delete("/publications/{publication_id}")
+def delete_publication(publication_id: int, _: None = Depends(require_publication_admin)):
+    """Elimina la ficha publicada sin borrar el producto del catálogo."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM published_cards WHERE id=%s RETURNING id,product_id", (publication_id,))
+            removed = cur.fetchone()
+            if not removed:
+                raise HTTPException(status_code=404, detail="Publicación no encontrada")
+        conn.commit()
+        return {"status": "removed", "publication": removed}
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
 @router.post("/publications/{publication_id}/telegram")
-def publish_publication_telegram(publication_id: int):
+def publish_publication_telegram(publication_id: int, _: None = Depends(require_publication_admin)):
     conn = get_connection()
     try:
         with conn.cursor() as cur:
