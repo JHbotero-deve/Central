@@ -1,10 +1,12 @@
 import html
+import io
 import os
 import re
 import time
 from urllib.parse import urlparse
 
 import requests
+from PIL import Image, UnidentifiedImageError
 
 from analysis import score_product
 from db import get_connection, upsert_product
@@ -46,7 +48,7 @@ def _send(token, chat_id, text):
             return False
         return True
     except (requests.RequestException, ValueError) as exc:
-        print(f"[telegram-bot] send error: {exc}")
+        print(f"[telegram-bot] send error: {type(exc).__name__}")
         return False
 
 
@@ -91,37 +93,30 @@ def _send_product(token, chat_id, product):
     text = _format_product(product)
     if image_url.startswith(("http://", "https://")):
         try:
-            # Telegram no siempre puede descargar imágenes de Amazon/Mercado Libre.
-            # Descargamos la imagen desde Railway y la subimos directamente a Telegram.
             image_response = requests.get(
                 image_url,
                 headers={
                     "User-Agent": "Mozilla/5.0 (compatible; CentralTelegram/1.0)",
-                    "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+                    "Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
                 },
                 timeout=15,
                 allow_redirects=True,
             )
             image_response.raise_for_status()
-            content_type = (image_response.headers.get("Content-Type") or "").split(";", 1)[0].lower()
-            allowed_types = {"image/jpeg", "image/png", "image/webp", "image/gif", "image/avif"}
             data = image_response.content
-            if content_type in allowed_types and data and len(data) <= 10 * 1024 * 1024:
-                extension = {
-                    "image/jpeg": "jpg",
-                    "image/png": "png",
-                    "image/webp": "webp",
-                    "image/gif": "gif",
-                    "image/avif": "avif",
-                }.get(content_type, "jpg")
+            if data and len(data) <= 10 * 1024 * 1024:
+                with Image.open(io.BytesIO(data)) as source:
+                    source.seek(0)
+                    source.load()
+                    image = source.convert("RGB")
+                    image.thumbnail((1280, 1280), Image.Resampling.LANCZOS)
+                    output = io.BytesIO()
+                    image.save(output, format="JPEG", quality=88, optimize=True)
+                    normalized = output.getvalue()
                 r = requests.post(
                     f"{API_BASE}/bot{token}/sendPhoto",
-                    data={
-                        "chat_id": str(chat_id),
-                        "caption": text[:1024],
-                        "parse_mode": "HTML",
-                    },
-                    files={"photo": (f"product.{extension}", data, content_type)},
+                    data={"chat_id": str(chat_id), "caption": text[:1024], "parse_mode": "HTML"},
+                    files={"photo": ("product.jpg", normalized, "image/jpeg")},
                     timeout=25,
                 )
                 payload = r.json()
@@ -129,9 +124,9 @@ def _send_product(token, chat_id, product):
                     return True
                 print(f"[telegram-bot] sendPhoto upload rejected: {payload.get('description', 'respuesta inválida')}")
             else:
-                print("[telegram-bot] imagen omitida: formato no compatible o supera 10 MB")
-        except (requests.RequestException, ValueError) as exc:
-            print(f"[telegram-bot] image upload error: {exc}")
+                print("[telegram-bot] imagen omitida: vacía o supera 10 MB")
+        except (requests.RequestException, ValueError, OSError, UnidentifiedImageError) as exc:
+            print(f"[telegram-bot] image upload error: {type(exc).__name__}")
     return _send(token, chat_id, text)
 
 
@@ -272,7 +267,7 @@ def _add_url(argument):
 
 
 def _extract_urls(text):
-    return list(dict.fromkeys(re.findall(r"https?://[^\\s<>]+", text or "")))
+    return list(dict.fromkeys(re.findall(r"https?://[^\s<>]+", text or "")))
 
 
 def _category_from_text(text):
@@ -539,7 +534,7 @@ def _clear_webhook(token):
             return False
         return True
     except (requests.RequestException, ValueError) as exc:
-        print(f"[telegram-bot] error limpiando webhook: {exc}")
+        print(f"[telegram-bot] error limpiando webhook: {type(exc).__name__}")
         return False
 
 
@@ -567,48 +562,57 @@ def run_bot():
         print("[telegram-bot] Bot deshabilitado: falta TELEGRAM_CHAT_ID.")
         return
 
-    _clear_webhook(token)
-    offset = None
-    print("[telegram-bot] Bot interactivo iniciado.")
+    try:
+        lock_conn = _acquire_polling_lock()
+    except Exception as exc:
+        print(f"[telegram-bot] no se pudo adquirir el bloqueo de polling: {type(exc).__name__}")
+        return
+    if lock_conn is None:
+        print("[telegram-bot] otra instancia mantiene el bloqueo de polling; esta instancia termina.")
+        return
 
-    while True:
-        try:
-            params = {"timeout": 25}
-            if offset is not None:
-                params["offset"] = offset
-            response = requests.get(
-                f"{API_BASE}/bot{token}/getUpdates",
-                params=params,
-                timeout=35,
-            )
-            response.raise_for_status()
-            payload = response.json()
-            if not payload.get("ok"):
-                raise RuntimeError(payload.get("description", "respuesta inválida"))
-            for update in payload.get("result", []):
-                offset = update["update_id"] + 1
-                message = update.get("message") or update.get("channel_post") or {}
-                chat = message.get("chat") or {}
-                text = message.get("text") or message.get("caption") or ""
-                chat_id = chat.get("id")
-                if chat_id is None or not _allowed_chat(chat_id):
-                    continue
-                if text.startswith("/"):
-                    _handle(token, chat_id, text)
-                    continue
-                for url in _extract_urls(text)[:3]:
-                    clean_url = url.rstrip(".,);]}")
-                    _, result = _ingest_telegram_url(clean_url, text)
-                    _send(token, chat_id, result)
-        except requests.HTTPError as exc:
-            response = getattr(exc, "response", None)
-            status = response.status_code if response is not None else "?"
-            if status == 409:
-                print("[telegram-bot] polling bloqueado por otro consumidor externo.")
-                time.sleep(max(POLL_INTERVAL, 20))
-            else:
+    try:
+        _clear_webhook(token)
+        offset = None
+        print("[telegram-bot] Bot interactivo iniciado.")
+        while True:
+            try:
+                params = {"timeout": 25}
+                if offset is not None:
+                    params["offset"] = offset
+                response = requests.get(f"{API_BASE}/bot{token}/getUpdates", params=params, timeout=35)
+                response.raise_for_status()
+                payload = response.json()
+                if not payload.get("ok"):
+                    raise RuntimeError(payload.get("description", "respuesta inválida"))
+                for update in payload.get("result", []):
+                    offset = update["update_id"] + 1
+                    message = update.get("message") or update.get("channel_post") or {}
+                    chat = message.get("chat") or {}
+                    text = message.get("text") or message.get("caption") or ""
+                    chat_id = chat.get("id")
+                    if chat_id is None or not _allowed_chat(chat_id):
+                        continue
+                    if text.startswith("/"):
+                        _handle(token, chat_id, text)
+                        continue
+                    for url in _extract_urls(text)[:3]:
+                        clean_url = url.rstrip(".,);]}")
+                        _, result = _ingest_telegram_url(clean_url, text)
+                        _send(token, chat_id, result)
+            except requests.HTTPError as exc:
+                response = getattr(exc, "response", None)
+                status = response.status_code if response is not None else "?"
+                if status == 409:
+                    print("[telegram-bot] Telegram devolvió 409: hay otro consumidor de getUpdates. Se detiene esta instancia.")
+                    return
                 print(f"[telegram-bot] polling HTTP error: {status}")
                 time.sleep(max(POLL_INTERVAL, 5))
-        except (requests.RequestException, ValueError, RuntimeError) as exc:
-            print(f"[telegram-bot] polling error: {type(exc).__name__}")
-            time.sleep(max(POLL_INTERVAL, 5))
+            except (requests.RequestException, ValueError, RuntimeError) as exc:
+                print(f"[telegram-bot] polling error: {type(exc).__name__}")
+                time.sleep(max(POLL_INTERVAL, 5))
+    finally:
+        try:
+            lock_conn.close()
+        except Exception:
+            pass
