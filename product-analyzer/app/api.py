@@ -228,12 +228,22 @@ def _sync_store_catalog():
     try:
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT p.external_id, pl.name AS platform
+                SELECT p.external_id, p.title, p.product_url, pl.name AS platform
                 FROM products p
                 JOIN platforms pl ON pl.id = p.platform_id
                 WHERE p.is_active = TRUE AND pl.name IN ('amazon', 'mercadolibre')
             """)
-            existing = {(str(row["platform"]).lower(), str(row["external_id"]).upper()) for row in cur.fetchall()}
+            existing_rows = cur.fetchall()
+            existing = {(str(row["platform"]).lower(), str(row["external_id"]).upper()) for row in existing_rows}
+            meli_seen_titles = {
+                " ".join(str(row.get("title") or "").lower().split())
+                for row in existing_rows if str(row.get("platform") or "").lower() == "mercadolibre"
+            }
+            meli_seen_urls = {
+                str(row.get("product_url") or "").split("?")[0].rstrip("/").lower()
+                for row in existing_rows
+                if str(row.get("platform") or "").lower() == "mercadolibre" and row.get("product_url")
+            }
         try:
             amazon_products = fetch_amazon_products(
                 {external_id for platform, external_id in existing if platform == "amazon"},
@@ -260,33 +270,65 @@ def _sync_store_catalog():
         except Exception as exc:
             conn.rollback()
             errors.append(f"Amazon: {exc}")
-        meli_queries = ("soporte celular", "audifonos bluetooth", "smartwatch", "mouse gamer", "lampara led")
+        # Meta por sincronización: hasta 100 productos nuevos y únicos de Mercado Libre.
+        # Se usan búsquedas variadas para evitar repetir los mismos resultados de una sola consulta.
+        meli_queries = (
+            "audifonos bluetooth", "smartwatch", "mouse gamer", "lampara led",
+            "soporte celular", "teclado mecanico", "parlante bluetooth", "cargador usb c",
+            "camara seguridad wifi", "disco ssd", "memoria ram", "silla ergonomica",
+            "mochila portatil", "audifonos gamer", "monitor gamer", "router wifi",
+            "freidora aire", "cafetera", "licuadora", "aspiradora robot",
+            "power bank", "reloj inteligente", "webcam full hd", "microfono usb",
+            "control videojuegos", "impresora", "proyector", "tablet android",
+            "organizador escritorio", "luz led escritorio",
+        )
+        meli_target = 100
         try:
             for query in meli_queries:
-                if len(meli_imported) >= 5:
+                if len(meli_imported) >= meli_target:
                     break
                 try:
-                    products = fetch_mercadolibre(query, limit=10)
+                    products = fetch_mercadolibre(query, limit=30)
                     for product in products:
-                        if len(meli_imported) >= 5:
+                        if len(meli_imported) >= meli_target:
                             break
-                        key = ("mercadolibre", str(product.get("external_id") or "").upper())
-                        if not key[1] or key in existing:
+                        external_id = str(product.get("external_id") or "").strip()
+                        key = ("mercadolibre", external_id.upper())
+                        title_key = " ".join(str(product.get("title") or "").lower().split())
+                        product_url = str(product.get("product_url") or "").split("?")[0].rstrip("/").lower()
+                        if (
+                            not external_id
+                            or not title_key
+                            or key in existing
+                            or title_key in meli_seen_titles
+                            or (product_url and product_url in meli_seen_urls)
+                        ):
                             continue
-                        product_id = upsert_product(conn, "mercadolibre", "accesorios", product)
-                        with conn.cursor() as cur:
-                            cur.execute("""
-                                SELECT AVG(p.current_price) AS avg_price
-                                FROM products p
-                                JOIN categories c ON c.id = p.category_id
-                                WHERE p.is_active = TRUE AND c.name = %s
-                                  AND p.currency = %s AND p.current_price IS NOT NULL
-                            """, ("accesorios", product.get("currency") or "COP"))
-                            average = cur.fetchone()["avg_price"]
-                        product["_score"] = score_product(conn, product_id, float(average or 0))
-                        conn.commit()
-                        existing.add(key)
-                        meli_imported.append({"id": product_id, "item_id": product["external_id"], "title": product["title"]})
+                        try:
+                            product_id = upsert_product(conn, "mercadolibre", "accesorios", product)
+                            with conn.cursor() as cur:
+                                cur.execute("""
+                                    SELECT AVG(p.current_price) AS avg_price
+                                    FROM products p
+                                    JOIN categories c ON c.id = p.category_id
+                                    WHERE p.is_active = TRUE AND c.name = %s
+                                      AND p.currency = %s AND p.current_price IS NOT NULL
+                                """, ("accesorios", product.get("currency") or "COP"))
+                                average = cur.fetchone()["avg_price"]
+                            product["_score"] = score_product(conn, product_id, float(average or 0))
+                            conn.commit()
+                            existing.add(key)
+                            meli_seen_titles.add(title_key)
+                            if product_url:
+                                meli_seen_urls.add(product_url)
+                            meli_imported.append({
+                                "id": product_id,
+                                "item_id": external_id,
+                                "title": product["title"],
+                            })
+                        except Exception as exc:
+                            conn.rollback()
+                            errors.append(f"Mercado Libre {external_id}: {exc}")
                 except Exception as exc:
                     conn.rollback()
                     errors.append(f"Mercado Libre '{query}': {exc}")
