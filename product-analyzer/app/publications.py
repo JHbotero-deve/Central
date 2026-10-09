@@ -42,6 +42,7 @@ class PublicationPayload(BaseModel):
 @router.get("/publications")
 def list_publications(
     limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0, le=100000),
     include_unpublished: bool = False,
     x_admin_key: Optional[str] = Header(default=None),
 ):
@@ -69,10 +70,10 @@ def list_publications(
                 JOIN platforms pl ON pl.id = p.platform_id
                 LEFT JOIN categories c ON c.id = p.category_id
                 WHERE p.is_active = TRUE {where}
-                ORDER BY pc.sort_order ASC, pc.published_at DESC
-                LIMIT %s
+                ORDER BY pc.sort_order ASC, pc.published_at DESC, pc.id ASC
+                LIMIT %s OFFSET %s
                 """,
-                (limit,),
+                (limit, offset),
             )
             rows = cur.fetchall()
 
