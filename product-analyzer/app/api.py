@@ -1,15 +1,16 @@
-﻿"""
+"""
 Central Product Analyzer REST API.
 """
 
 import os
 import time
+import secrets
 
 import requests
 from typing import Optional
 from urllib.parse import quote, urljoin, urlparse, urlunparse
 
-from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Header
 from fastapi.responses import Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -31,10 +32,15 @@ from meli_oauth import router as meli_oauth_router, notification_router as meli_
 
 API_VERSION = "1.3.0"
 
-# Central opera sin login. Las rutas que antes dependian de require_admin
-# se mantienen para conservar compatibilidad con el codigo existente.
-def require_admin() -> dict:
-    return {}
+def require_admin(x_admin_key: Optional[str] = Header(default=None)) -> dict:
+    """Protege operaciones administrativas con ADMIN_API_KEY; nunca falla abierto."""
+    expected = os.getenv("ADMIN_API_KEY", "").strip()
+    if not expected:
+        raise HTTPException(status_code=503, detail="ADMIN_API_KEY no está configurada")
+    supplied = (x_admin_key or "").strip()
+    if not supplied or not secrets.compare_digest(supplied, expected):
+        raise HTTPException(status_code=401, detail="Se requiere una clave administrativa válida")
+    return {"admin": True}
 
 app = FastAPI(
     title="Central Product Analyzer API",
@@ -749,6 +755,50 @@ def search_mercadolibre_products(
     return {"query": q.strip(), "count": len(results), "items": results}
 
 
+class MercadoLibreCardImport(BaseModel):
+    external_id: str = Field(min_length=2, max_length=200)
+    title: str = Field(min_length=2, max_length=500)
+    image_url: str = Field(min_length=8, max_length=2_000_000)
+    product_url: str = Field(min_length=10, max_length=2000)
+    price: float = Field(gt=0)
+    currency: str = Field(default="COP", min_length=3, max_length=10)
+    category: str = Field(default="otros", min_length=2, max_length=100)
+
+
+@core_router.post("/products/mercadolibre")
+def import_mercadolibre_card(payload: MercadoLibreCardImport, _: dict = Depends(require_admin)):
+    """Guarda el producto seleccionado como fuente externa, nunca como producto propio/Wompi."""
+    from urllib.parse import urlparse
+    parsed = urlparse(payload.product_url)
+    host = (parsed.hostname or "").lower()
+    if parsed.scheme != "https" or not (host == "mercadolibre.com" or host.endswith(".mercadolibre.com") or host == "mercadolibre.com.co" or host.endswith(".mercadolibre.com.co")):
+        raise HTTPException(status_code=422, detail="El enlace debe pertenecer a Mercado Libre y usar HTTPS")
+    product = {
+        "external_id": payload.external_id.strip(), "title": payload.title.strip(),
+        "image_url": payload.image_url.strip(), "product_url": payload.product_url.strip(),
+        "price": payload.price, "currency": payload.currency.upper(), "rating": None,
+        "reviews_count": 0, "source_metadata": {"origin": "tarjetas-search", "source": "mercadolibre"},
+    }
+    conn = get_connection()
+    try:
+        product_id = upsert_product(conn, "mercadolibre", payload.category.lower().strip(), product)
+        with conn.cursor() as cur:
+            cur.execute("""SELECT p.id,p.title,pl.name AS platform,c.name AS category,p.current_price,
+                p.currency,p.image_url,p.image_gallery,p.product_url,p.affiliate_url,p.updated_at
+                FROM products p JOIN platforms pl ON pl.id=p.platform_id
+                LEFT JOIN categories c ON c.id=p.category_id WHERE p.id=%s""", (product_id,))
+            saved = cur.fetchone()
+        return {"product": saved}
+    except ValueError as exc:
+        conn.rollback()
+        raise HTTPException(status_code=422, detail=str(exc))
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
 class ProductImport(BaseModel):
     url: str = Field(min_length=10, max_length=2000)
     category: str = Field(default="accesorios", min_length=2, max_length=100)
@@ -952,6 +1002,55 @@ def active_catalog(_: dict = Depends(require_admin)):
                 ORDER BY p.updated_at DESC
                 LIMIT 200            """)
             return cur.fetchall()
+    finally:
+        conn.close()
+
+
+class ProductUpdate(BaseModel):
+    title: str = Field(min_length=2, max_length=500)
+    description: Optional[str] = Field(default=None, max_length=5000)
+    price: float = Field(gt=0)
+    previous_price: Optional[float] = Field(default=None, gt=0)
+    currency: str = Field(default="COP", min_length=3, max_length=10)
+    category: str = Field(default="otros", min_length=2, max_length=100)
+    image_url: str = Field(min_length=8, max_length=2_000_000)
+    image_gallery: list[str] = Field(default_factory=list, max_length=5)
+    product_url: Optional[str] = Field(default=None, max_length=2000)
+
+
+@core_router.patch("/products/{product_id}")
+def update_personal_product(product_id: int, payload: ProductUpdate, _: dict = Depends(require_admin)):
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id FROM platforms WHERE name='personal'")
+            platform = cur.fetchone()
+            if not platform:
+                raise HTTPException(status_code=500, detail="Fuente personal no configurada")
+            category_name = payload.category.lower().strip()
+            cur.execute("SELECT id FROM categories WHERE name=%s", (category_name,))
+            category = cur.fetchone()
+            if not category:
+                cur.execute("INSERT INTO categories(name) VALUES(%s) RETURNING id", (category_name,))
+                category = cur.fetchone()
+            cur.execute("""UPDATE products SET category_id=%s,title=%s,description=%s,current_price=%s,
+                previous_price=%s,currency=%s,image_url=%s,image_gallery=%s,product_url=%s,updated_at=NOW()
+                WHERE id=%s AND platform_id=%s AND is_active=TRUE
+                RETURNING id,title,description,current_price AS price,previous_price,currency,image_url,image_gallery,product_url""",
+                (category["id"],payload.title.strip(),payload.description,payload.price,payload.previous_price,
+                 payload.currency.upper(),payload.image_url,Json(payload.image_gallery or []),payload.product_url,
+                 product_id,platform["id"]))
+            saved = cur.fetchone()
+            if not saved:
+                raise HTTPException(status_code=404, detail="Producto propio no encontrado")
+        conn.commit()
+        return {"product": saved}
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         conn.close()
 
