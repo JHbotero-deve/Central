@@ -26,13 +26,17 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           import re
-          html = Path("product-analyzer/frontend/index.html").read_text(encoding="utf-8")
-          matches = re.findall(r"<script(?:\s[^>]*)?>([\s\S]*?)</script>", html)
-          if not matches:
-              raise SystemExit("Frontend script not found")
-          Path("/tmp/central-frontend.js").write_text("\n".join(matches), encoding="utf-8")
+
+          for name in ("index", "tarjetas"):
+              path = Path(f"product-analyzer/frontend/{name}.html")
+              html = path.read_text(encoding="utf-8")
+              matches = re.findall(r"<script\b[^>]*>([\s\S]*?)</script\s*>", html, flags=re.IGNORECASE)
+              if not matches:
+                  raise SystemExit(f"Inline frontend script not found: {path}")
+              Path(f"/tmp/central-{name}.js").write_text("\n".join(matches), encoding="utf-8")
           PY
-          node --check /tmp/central-frontend.js
+          node --check /tmp/central-index.js
+          node --check /tmp/central-tarjetas.js
       - name: Build Figma showcase
         shell: bash
         run: |
@@ -51,8 +55,6 @@ jobs:
         run: |
           npm --prefix product-analyzer/headphones install --no-audit --no-fund
           npm --prefix product-analyzer/headphones audit --audit-level=high
-
-
 
   docker:
     name: Validate backend image

@@ -713,6 +713,42 @@ def public_sitemap():
     xml='<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'+''.join("<url><loc>"+u+"</loc></url>" for u in urls)+"</urlset>"
     return Response(xml,media_type="application/xml")
 
+@core_router.get("/mercadolibre/search")
+def search_mercadolibre_products(
+    q: str = Query(..., min_length=2, max_length=120),
+    limit: int = Query(8, ge=1, le=20),
+):
+    """Busca productos reales de Mercado Libre para precargar una tarjeta sin copiar URLs."""
+    try:
+        found = fetch_mercadolibre(q.strip(), limit=limit)
+    except Exception as exc:
+        print(f"[Mercado Libre] búsqueda de tarjetas falló: {type(exc).__name__}: {exc}")
+        raise HTTPException(
+            status_code=502,
+            detail="Mercado Libre no respondió. Revisa la conexión OAuth y vuelve a intentar.",
+        )
+    results = []
+    for product in found[:limit]:
+        title = str(product.get("title") or "").strip()
+        image_url = str(product.get("image_url") or "").strip()
+        product_url = str(product.get("product_url") or "").strip()
+        try:
+            price = float(product.get("price") or 0)
+        except (TypeError, ValueError):
+            price = 0
+        if not title or price <= 0 or not product_url:
+            continue
+        results.append({
+            "id": str(product.get("external_id") or ""),
+            "title": title[:200],
+            "image_url": image_url,
+            "product_url": product_url,
+            "price": price,
+            "currency": str(product.get("currency") or "COP").upper(),
+        })
+    return {"query": q.strip(), "count": len(results), "items": results}
+
+
 class ProductImport(BaseModel):
     url: str = Field(min_length=10, max_length=2000)
     category: str = Field(default="accesorios", min_length=2, max_length=100)
