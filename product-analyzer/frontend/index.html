@@ -50,6 +50,12 @@
 (()=>{"use strict";
 const API="/api/v1", $=id=>document.getElementById(id);
 const authHeaders=(extra={})=>extra;
+let adminKey="";
+const adminHeaders=(extra={})=>{
+  if(!adminKey)adminKey=window.prompt("Clave administrativa de Central (ADMIN_API_KEY):")||"";
+  if(!adminKey)throw new Error("Operación cancelada: falta la clave administrativa.");
+  return {...extra,"X-Admin-Key":adminKey};
+};
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const money=(v,c)=>{if(v==null||Number.isNaN(Number(v)))return"—";const n=Number(v);const cur=String(c||"COP").toUpperCase();if(cur==="USD"||cur==="US$"||cur==="$"){const cop=n*3329.61;return new Intl.NumberFormat("es-CO",{style:"currency",currency:"COP",maximumFractionDigits:0}).format(cop)+" COP";}try{return new Intl.NumberFormat("es-CO",{style:"currency",currency:"COP",maximumFractionDigits:0}).format(n)+" COP"}catch{return n.toLocaleString("es-CO")+" COP"}};
 const date=v=>v?new Date(v).toLocaleString("es-CO"):"—";
@@ -202,7 +208,7 @@ async function submitManual(e){
     };
     const r=await fetch(API+"/products/personal",{
       method:"POST",
-      headers:authHeaders({"Content-Type":"application/json",Accept:"application/json"}),
+      headers:adminHeaders({"Content-Type":"application/json",Accept:"application/json"}),
       body:JSON.stringify(body)
     });
     const data=await r.json().catch(()=>({}));
@@ -230,7 +236,7 @@ async function submitImport(e){
     const r=await fetch(API+"/products/import-url",{
       method:"POST",
       credentials:"include",
-      headers:authHeaders({"Content-Type":"application/json"}),
+      headers:adminHeaders({"Content-Type":"application/json"}),
       body:JSON.stringify({url:$("url").value,category:$("category").value})
     });
     const data=await r.json();
