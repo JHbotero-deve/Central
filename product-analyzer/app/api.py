@@ -1043,6 +1043,13 @@ def update_personal_product(product_id: int, payload: ProductUpdate, _: dict = D
             saved = cur.fetchone()
             if not saved:
                 raise HTTPException(status_code=404, detail="Producto propio no encontrado")
+            cur.execute("""UPDATE published_cards
+                SET title=%s,subtitle=%s,price_display=%s,image_url=%s,product_url=%s,
+                    sale_price=%s,updated_at=NOW()
+                WHERE product_id=%s""",
+                (payload.title.strip(),payload.description,
+                 f"{payload.price:,.0f} {payload.currency.upper()}",payload.image_url,
+                 payload.product_url,payload.price,product_id))
         conn.commit()
         return {"product": saved}
     except HTTPException:
