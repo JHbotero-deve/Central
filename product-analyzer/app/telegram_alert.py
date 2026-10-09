@@ -170,7 +170,7 @@ def _top_products(limit=5):
         conn.close()
 
 
-def _catalog_products(limit=20):
+def _catalog_products(limit=20, offset=0):
     conn = get_connection()
     try:
         with conn.cursor() as cur:
@@ -189,11 +189,11 @@ def _catalog_products(limit=20):
                 LEFT JOIN product_scores s ON s.product_id = p.id
                 WHERE p.is_active = TRUE
                   AND p.is_blocked = FALSE
-                  AND pl.name = 'personal'
+                  AND pl.name IN ('personal', 'mercadolibre', 'amazon')
                 ORDER BY p.id ASC
-                LIMIT %s
+                LIMIT %s OFFSET %s
                 """,
-                (limit,),
+                (limit, offset),
             )
             return cur.fetchall()
     finally:
@@ -449,11 +449,16 @@ def _handle(token, chat_id, text):
         ))
 
     if command in ("/productos", "/catalogo"):
-        products = _catalog_products(20)
+        try:
+            page = max(1, min(int(argument.strip() or "1"), 500))
+        except ValueError:
+            return _send(token, chat_id, "Uso: /productos 1 (cada página muestra 20 productos).")
+        page_size = 20
+        products = _catalog_products(page_size, (page - 1) * page_size)
         if not products:
-            return _send(token, chat_id, "No hay productos activos en el catálogo.")
-        _send(token, chat_id, "<b>Catálogo Central · 20 productos</b>")
-        for i, product in enumerate(products, 1):
+            return _send(token, chat_id, f"No hay productos en la página {page}. Prueba /productos 1.")
+        _send(token, chat_id, f"<b>Catálogo Central · página {page}</b>\\nProductos mostrados: {len(products)}\\nSiguiente página: /productos {page + 1}")
+        for i, product in enumerate(products, (page - 1) * page_size + 1):
             product["title"] = f"{i}. {product['title']}"
             _send_product(token, chat_id, product)
         return True
