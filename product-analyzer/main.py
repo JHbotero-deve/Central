@@ -10,10 +10,9 @@ async def background_sync_worker():
     while True:
         try:
             purge_expired_products()
-            # Aquí se ejecutaría la ingesta masiva cada 2 horas para Amazon, MercadoLibre y AliExpress
         except Exception:
             pass
-        await asyncio.sleep(7200) # Cada 2 horas
+        await asyncio.sleep(7200)
 
 @app.on_event("startup")
 async def startup_event():
