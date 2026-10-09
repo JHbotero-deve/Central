@@ -275,7 +275,16 @@ async function load(){
       if(!Array.isArray(list))throw Error("Respuesta de catálogo inválida");
       for(const p of list){
         const id=String(p.product_id??p.id??"").trim();
-        const key=id?("product:"+id):String(p.external_id||p.product_url||p.affiliate_url||p.title||"").trim().toLowerCase();
+        const platform=String(p.platform||"").trim().toLowerCase();
+        const sku=String(p.sku||"").trim().toLowerCase();
+        const title=String(p.title||"").normalize("NFKC").replace(/\s+/g," ").trim().toLowerCase();
+        const externalId=String(p.external_id||"").trim().toLowerCase();
+        const sourceUrl=String(p.product_url||p.affiliate_url||"").trim().toLowerCase();
+        const key=platform==="personal"
+          ? (sku ? "personal:sku:"+sku : title ? "personal:title:"+title : "product:"+id)
+          : externalId ? platform+":external:"+externalId
+          : sourceUrl ? platform+":url:"+sourceUrl
+          : "product:"+id;
         if(key&&!seen.has(key)){seen.add(key);all.push(p)}
       }
       if(list.length<pageSize)break;

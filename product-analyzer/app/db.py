@@ -1,4 +1,7 @@
+import hashlib
 import os
+import re
+import unicodedata
 from urllib.parse import quote
 
 import psycopg2
@@ -23,6 +26,16 @@ def _affiliate_url(product: dict) -> str | None:
     if tracking: result+="&ascsubtag="+quote(tracking,safe="")
     return result
 
+def _stable_external_id(platform_name: str, product: dict, category_name: str) -> str:
+    """Genera una clave estable cuando la fuente no entrega un ID externo."""
+    source_url = (product.get("product_url") or product.get("affiliate_url") or "").strip().lower()
+    title = unicodedata.normalize("NFKC", str(product.get("title") or "")).strip().lower()
+    normalized_title = re.sub(r"\s+", " ", title)
+    identity = str(product.get("sku") or "").strip().lower() or source_url or (category_name.strip().lower() + ":" + normalized_title)
+    digest = hashlib.sha256((platform_name.strip().lower() + ":" + identity).encode("utf-8")).hexdigest()[:32]
+    return "central-" + digest
+
+
 def upsert_product(conn, platform_name: str, category_name: str, product: dict):
     with conn.cursor() as cur:
         cur.execute("SELECT id FROM platforms WHERE name = %s", (platform_name,))
@@ -32,6 +45,29 @@ def upsert_product(conn, platform_name: str, category_name: str, product: dict):
 
         cur.execute("SELECT id FROM categories WHERE name = %s", (category_name,))
         category = cur.fetchone()
+
+        # Reutiliza productos propios por SKU o por título+categoría si el creador
+        # de tarjetas no entrega un ID de origen estable.
+        external_id = str(product.get("external_id") or "").strip()
+        title = str(product.get("title") or "").strip()
+        if platform_name.strip().lower() == "personal" and title:
+            sku = str(product.get("sku") or "").strip()
+            if sku:
+                cur.execute(
+                    "SELECT p.external_id FROM products p WHERE p.platform_id = %s AND p.is_active = TRUE AND BTRIM(COALESCE(p.sku, '')) = %s ORDER BY p.id ASC LIMIT 1",
+                    (platform["id"], sku),
+                )
+            else:
+                cur.execute(
+                    "SELECT p.external_id FROM products p WHERE p.platform_id = %s AND p.is_active = TRUE AND LOWER(BTRIM(p.title)) = LOWER(BTRIM(%s)) AND p.category_id IS NOT DISTINCT FROM %s ORDER BY p.id ASC LIMIT 1",
+                    (platform["id"], title, category["id"] if category else None),
+                )
+            existing_personal = cur.fetchone()
+            if existing_personal and existing_personal.get("external_id"):
+                external_id = str(existing_personal["external_id"])
+
+        if not external_id:
+            external_id = _stable_external_id(platform_name, product, category_name)
 
         seller_data = product.get("seller") or {}
         seller_id = None
@@ -57,7 +93,7 @@ def upsert_product(conn, platform_name: str, category_name: str, product: dict):
         source_metadata = dict(product.get("source_metadata") or {})
         if product.get("image_url") and not source_metadata.get("mongo_image_id"):
             try:
-                mongo_id = store_product_image(product["image_url"], platform=platform_name, external_id=product.get("external_id"))
+                mongo_id = store_product_image(product["image_url"], platform=platform_name, external_id=external_id)
                 if mongo_id:
                     source_metadata["mongo_image_id"] = mongo_id
                     print(f"[mongo] imagen guardada {platform_name}/{product.get('external_id')}")
@@ -107,7 +143,7 @@ def upsert_product(conn, platform_name: str, category_name: str, product: dict):
                 platform["id"],
                 category["id"] if category else None,
                 seller_id,
-                product["external_id"],
+                external_id,
                 product["title"],
                 product.get("image_url"),
                 Json(product.get("gallery_urls") or ([product.get("image_url")] if product.get("image_url") else [])),
