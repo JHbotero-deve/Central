@@ -67,9 +67,9 @@
 .card:hover{transform:translateY(-5px)!important;border-color:rgba(255,138,0,.45)!important;box-shadow:0 30px 70px rgba(0,0,0,.24)!important}
 .card-media{aspect-ratio:1/1.08!important;height:auto!important;margin:0!important;border-radius:0!important;border:0!important;background:radial-gradient(circle at 50% 35%,rgba(255,138,0,.18),transparent 36%),linear-gradient(145deg,#1a1f27,#080a0e)!important;box-shadow:none!important;transform:none!important;position:relative!important}
 .card-media:before{border-color:rgba(255,138,0,.22)!important}
-.card-media img{padding:0!important;width:100%!important;height:100%!important;object-fit:cover!important;mix-blend-mode:normal!important;display:block!important}
-.card-image-actions{position:absolute;left:14px;right:14px;bottom:14px;z-index:8;display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.card-action{min-height:42px;padding:10px 12px;border-radius:13px;border:1px solid rgba(255,255,255,.16);font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;text-align:center;cursor:pointer;backdrop-filter:blur(12px);text-decoration:none}
+.card-media img{padding:18px!important;width:100%!important;height:100%!important;object-fit:contain!important;mix-blend-mode:normal!important;display:block!important;transition:transform .3s ease!important}
+.card-image-actions{position:absolute;left:10px;right:10px;bottom:10px;z-index:8;display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.card-action{min-height:32px;padding:7px 9px;border-radius:10px;border:1px solid rgba(255,255,255,.16);font-size:9px;font-weight:800;display:flex;align-items:center;justify-content:center;text-align:center;cursor:pointer;backdrop-filter:blur(12px);text-decoration:none}
 .card-action-secondary{background:rgba(8,10,14,.72);color:#fff}
 .card-action-primary{background:#ff8a00;border-color:#ff8a00;color:#080a0e}
 .card-action:hover{transform:translateY(-1px)}
@@ -263,19 +263,32 @@ async function loadTelegram(){
   }
 }
 async function load(){
-  const endpoints=[API+"/publications?limit=100"];
-  for(const endpoint of endpoints)try{
-    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),7000);
-    const r=await fetch(endpoint,{cache:"no-store",signal:controller.signal});clearTimeout(timer);
-    if(!r.ok)throw Error("HTTP "+r.status);
-    const d=await r.json();const list=Array.isArray(d)?d:(d.items||d.publications||d.data||[]);
-    if(!Array.isArray(list)||!list.length)throw Error("sin publicaciones");
-    const seen=new Set();
-    const unique=list.filter(p=>{const k=String(p.product_id||p.id||p.external_id||p.product_url||p.affiliate_url||p.title||"").trim().toLowerCase();if(!k||seen.has(k))return false;seen.add(k);return true;});
-    products=unique;localStorage.setItem("central_products_cache",JSON.stringify(products));setCategories();applyFilter();return;
-  }catch(e){console.error("Error cargando catalogo:",endpoint,e)}
-  if(products.length){setCategories();applyFilter();return}
-  $("grid").innerHTML='<div class="empty"><b>Catálogo vacío</b>Vuelve pronto: estamos preparando nuestros productos.</div>';renderFeature();
+  try{
+    const pageSize=100, all=[], seen=new Set();
+    for(let offset=0;offset<5000;offset+=pageSize){
+      const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),12000);
+      let r;
+      try{r=await fetch(API+"/publications?limit="+pageSize+"&offset="+offset,{cache:"no-store",signal:controller.signal})}
+      finally{clearTimeout(timer)}
+      if(!r.ok)throw Error("HTTP "+r.status+" al cargar catálogo");
+      const d=await r.json(),list=Array.isArray(d)?d:(d.items||d.publications||d.data||[]);
+      if(!Array.isArray(list))throw Error("Respuesta de catálogo inválida");
+      for(const p of list){
+        const id=String(p.product_id??p.id??"").trim();
+        const key=id?("product:"+id):String(p.external_id||p.product_url||p.affiliate_url||p.title||"").trim().toLowerCase();
+        if(key&&!seen.has(key)){seen.add(key);all.push(p)}
+      }
+      if(list.length<pageSize)break;
+    }
+    if(!all.length)throw Error("No hay publicaciones visibles con imagen");
+    products=all;
+    try{localStorage.setItem("central_products_cache",JSON.stringify(products))}catch(e){console.warn("Catálogo no guardado en caché local",e)}
+    setCategories();applyFilter();
+  }catch(e){
+    console.error("Error cargando catálogo:",e);
+    if(products.length){setCategories();applyFilter();return}
+    $("grid").innerHTML='<div class="empty"><b>No se pudo cargar el catálogo</b>Intenta actualizar la página en unos segundos.</div>';renderFeature();
+  }
 }
 function imgFail(im){
   const fb=im.dataset.fb;
