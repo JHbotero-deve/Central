@@ -17,6 +17,16 @@
 .admin-card-price{font:800 16px var(--display);color:var(--brand)}
 .admin-card-meta{display:flex;align-items:center;justify-content:space-between;gap:8px;color:var(--muted);font-size:11px}
 .admin-card-status{display:inline-flex;width:max-content;padding:2px 6px;border:1px solid color-mix(in srgb,var(--ok) 45%,var(--line));border-radius:999px;color:var(--ok);font-weight:700}
+.meli-search{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;margin:8px 0}
+.meli-search .ed-in{min-width:0}
+.meli-results{display:flex;flex-direction:column;gap:8px;margin:8px 0 16px}
+.meli-result{display:grid;grid-template-columns:56px minmax(0,1fr);gap:10px;align-items:center;width:100%;padding:8px;border:1px solid var(--line);border-radius:12px;background:var(--panel);color:inherit;text-align:left;cursor:pointer;font:inherit}
+.meli-result:hover,.meli-result:focus-visible{border-color:var(--brand);outline-color:var(--brand)}
+.meli-result img{width:56px;height:56px;object-fit:contain;border-radius:8px;background:#fff}
+.meli-result b{display:block;font-size:12px;line-height:1.3}
+.meli-result small{display:block;color:var(--muted);font-size:11px;margin-top:4px}
+.meli-search-note{font-size:11px;color:var(--muted);margin:4px 0 8px}
+
 </style></head>
 <body><div class="sh-wrap">
 <header class="sh-top"><a class="sh-logo" href="/vitrina">CENTRAL</a><div style="display:flex;gap:8px"><a class="sh-pill" href="/vitrina">Ver vitrina</a></div></header>
@@ -29,6 +39,11 @@
 
   <div class="ed-body" id="tab-add">
    <div class="ed-l">NUEVO PRODUCTO</div>
+   <div class="ed-l">BUSCAR PRODUCTO EN MERCADO LIBRE</div>
+   <div class="meli-search"><input class="ed-in" id="meliQuery" maxlength="120" placeholder="Ej: Raspberry Pi Pico original"><button class="ed-btn" id="meliSearch" type="button">Buscar</button></div>
+   <div class="meli-search-note">Elige un resultado para cargar título, precio, imagen y enlace automáticamente.</div>
+   <div id="meliMsg" class="ed-msg" hidden></div><div id="meliResults" class="meli-results"></div>
+   <div class="ed-l">O completa los datos manualmente</div>
    <label class="ed-l">Nombre del producto *<input class="ed-in" id="title" maxlength="200" placeholder="Ej: Air Street Pro X"></label>
    <div class="ed-2">
     <label class="ed-l">Marca<input class="ed-in" id="brand" maxlength="60" placeholder="Ej: Nike"></label>
@@ -101,7 +116,40 @@ $("addVar").addEventListener("click",()=>{if(V.length<4){V.push({name:"",glow:Ma
 $("tab-add").addEventListener("input",preview);$("plate").addEventListener("change",preview);
 document.querySelectorAll("[data-tab]").forEach(b=>b.addEventListener("click",()=>tab(b.dataset.tab)));
 
-function adminCardHtml(m){
+let meliItems=[];
+ async function searchMeli(){
+   const q=$("meliQuery").value.trim(),btn=$("meliSearch"),box=$("meliResults"),msg=$("meliMsg");
+   msg.hidden=true;box.innerHTML="";
+   if(q.length<2)return show(msg,"err","Escribe al menos 2 caracteres para buscar.");
+   btn.disabled=true;btn.textContent="Buscando…";
+   try{
+     const data=await S.api("/mercadolibre/search?q="+encodeURIComponent(q)+"&limit=8");
+     meliItems=Array.isArray(data.items)?data.items:[];
+     if(!meliItems.length){show(msg,"err","No encontramos productos con precio disponible. Prueba otra búsqueda.");return}
+     box.innerHTML=meliItems.map((p,i)=>{
+       const src=S.imgOk(p.image_url);
+       return '<button type="button" class="meli-result" data-meli-index="'+i+'">'+
+         (src?'<img src="'+S.esc(src)+'" alt="" loading="lazy" referrerpolicy="no-referrer">':'<span class="admin-card-noimg">Sin imagen</span>')+
+         '<span><b>'+S.esc(p.title)+'</b><small>'+S.money(p.price,p.currency)+' · Mercado Libre</small></span></button>';
+     }).join("");
+   }catch(e){show(msg,"err",e.message||"No fue posible buscar en Mercado Libre.")}
+   finally{btn.disabled=false;btn.textContent="Buscar"}
+ }
+ $("meliSearch").addEventListener("click",searchMeli);
+ $("meliQuery").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();searchMeli()}});
+ $("meliResults").addEventListener("click",e=>{
+   const b=e.target.closest("[data-meli-index]");if(!b)return;
+   const p=meliItems[Number(b.dataset.meliIndex)];if(!p)return;
+   $("title").value=p.title;
+   $("price").value=String(p.price);
+   $("currency").value=["COP","USD"].includes(p.currency)?p.currency:"COP";
+   $("l_meli").value=p.product_url;
+   V[0]={...V[0],name:V[0].name||"Principal",img:p.image_url||V[0].img};
+   renderVars();preview();
+   show($("msg"),"ok","Producto cargado. Revisa los datos y pulsa «Crear tarjeta».");
+   $("msg").scrollIntoView({behavior:"smooth",block:"nearest"});
+ });
+ function adminCardHtml(m){
   const v=m.variants[0]||{},src=S.imgOk(v.img);
   const img=src?'<img src="'+S.esc(src)+'" alt="'+S.esc(m.title)+'" loading="lazy" referrerpolicy="no-referrer">':'<span class="admin-card-noimg">Sin imagen</span>';
   return '<button type="button" class="admin-card" data-id="'+S.esc(m.id)+'" aria-label="Abrir '+S.esc(m.title)+'"><div class="admin-card-media '+(m.plate?"plate":"")+'">'+img+'</div><div class="admin-card-body"><span class="admin-card-brand">'+S.esc(m.brand||m.cat)+'</span><span class="admin-card-title">'+S.esc(m.title)+'</span><span class="admin-card-price">'+S.money(m.price,m.currency)+'</span><div class="admin-card-meta"><span>'+S.esc(m.cat)+'</span><span class="admin-card-status">Activo</span></div></div></button>'
