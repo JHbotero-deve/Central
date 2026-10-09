@@ -14,7 +14,7 @@ from url_import import import_url
 
 POLL_INTERVAL = int(os.getenv("TELEGRAM_POLL_INTERVAL", "3"))
 API_BASE = "https://api.telegram.org"
-ALLOWED_PLATFORMS = {"mercadolibre", "amazon", "personal"}
+ALLOWED_PLATFORMS = {"mercadolibre", "amazon", "aliexpress", "personal"}
 ALLOWED_CATEGORIES = {"ropa", "calzado", "accesorios", "electronica", "hogar", "fitness", "otros"}
 
 
@@ -189,7 +189,7 @@ def _catalog_products(limit=20, offset=0):
                 LEFT JOIN product_scores s ON s.product_id = p.id
                 WHERE p.is_active = TRUE
                   AND p.is_blocked = FALSE
-                  AND pl.name IN ('personal', 'mercadolibre', 'amazon')
+                  AND pl.name IN ('personal', 'mercadolibre', 'amazon', 'aliexpress')
                 ORDER BY p.id ASC
                 LIMIT %s OFFSET %s
                 """,
@@ -301,7 +301,7 @@ def _ingest_telegram_url(url, context=""):
     category = _category_from_text(context)
     try:
         product = import_url(url, category)
-        if product["platform"] not in {"amazon", "mercadolibre", "tiktok"}:
+        if product["platform"] not in {"amazon", "mercadolibre", "tiktok", "aliexpress"}:
             return None, "Fuente no habilitada."
         conn = get_connection()
         try:
@@ -400,7 +400,7 @@ def _model_product(argument):
             "external_id": parts[2],
             "title": parts[3],
             "price": float(parts[4]),
-            "currency": "COP" if platform == "mercadolibre" else "USD",
+            "currency": "COP" if platform in {"mercadolibre", "aliexpress"} else "USD",
             "product_url": parts[5],
             "rating": float(parts[6]) if parts[6] else None,
             "reviews_count": int(parts[7] or 0),
@@ -441,7 +441,7 @@ def _handle(token, chat_id, text):
             "/top — oportunidades con mayor score\n"
             "/buscar producto — buscar en los datos modelados\n"
             "/modelar — registrar y puntuar un producto\n"
-            "/agregar — importar un producto desde Amazon o Mercado Libre por URL\n"
+            "/agregar — importar un producto desde Amazon, Mercado Libre o AliExpress por URL\n"
             "/publicar ID — publicar un producto validado\n"
             "También puedes enviar una URL sola: Central la captura y la deja lista para publicar.\n"
             "/estado — estado del catálogo\n"
