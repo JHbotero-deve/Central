@@ -28,10 +28,10 @@ jobs:
           import re
           for name in ("index", "tarjetas"):
               html = Path(f"product-analyzer/frontend/{name}.html").read_text(encoding="utf-8")
-              matches = re.findall(r"<script(?:\\s[^>]*)?>([\\s\\S]*?)</script>", html)
+              matches = re.findall(r"<script(?:\s[^>]*)?>([\s\S]*?)</script>", html)
               if not matches:
                   raise SystemExit(f"Frontend script not found: {name}.html")
-              Path(f"/tmp/central-{name}.js").write_text("\\n".join(matches), encoding="utf-8")
+              Path(f"/tmp/central-{name}.js").write_text("\n".join(matches), encoding="utf-8")
           node --check /tmp/central-index.js
           node --check /tmp/central-tarjetas.js
       - name: Build Figma showcase
