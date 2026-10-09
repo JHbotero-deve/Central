@@ -91,7 +91,8 @@ def upsert_product(conn, platform_name: str, category_name: str, product: dict):
             seller_id = cur.fetchone()["id"]
 
         source_metadata = dict(product.get("source_metadata") or {})
-        if product.get("image_url") and not source_metadata.get("mongo_image_id"):
+        if product.get("model_3d_url = Column(String, nullable=True)
+    image_url") and not source_metadata.get("mongo_image_id"):
             try:
                 mongo_id = store_product_image(product["image_url"], platform=platform_name, external_id=external_id)
                 if mongo_id:
