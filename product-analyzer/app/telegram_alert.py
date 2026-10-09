@@ -6,7 +6,7 @@ import time
 from urllib.parse import urlparse
 
 import requests
-from PIL import Image, UnidentifiedImageError
+from PIL import Image, ImageOps, UnidentifiedImageError
 
 from analysis import score_product
 from db import get_connection, upsert_product
@@ -108,10 +108,21 @@ def _send_product(token, chat_id, product):
                 with Image.open(io.BytesIO(data)) as source:
                     source.seek(0)
                     source.load()
-                    image = source.convert("RGB")
-                    image.thumbnail((1280, 1280), Image.Resampling.LANCZOS)
+                    # Telegram puede rechazar fotos extremas aunque estén en JPEG.
+                    # Respetar orientación EXIF y encajar el producto en un lienzo cuadrado.
+                    image = ImageOps.exif_transpose(source)
+                    if image.mode in ("RGBA", "LA") or "transparency" in image.info:
+                        rgba = image.convert("RGBA")
+                        background = Image.new("RGBA", rgba.size, (255, 255, 255, 255))
+                        background.alpha_composite(rgba)
+                        image = background.convert("RGB")
+                    else:
+                        image = image.convert("RGB")
+                    image.thumbnail((1000, 1000), Image.Resampling.LANCZOS)
+                    canvas = Image.new("RGB", (1024, 1024), "white")
+                    canvas.paste(image, ((1024 - image.width) // 2, (1024 - image.height) // 2))
                     output = io.BytesIO()
-                    image.save(output, format="JPEG", quality=88, optimize=True)
+                    canvas.save(output, format="JPEG", quality=88, optimize=True)
                     normalized = output.getvalue()
                 r = requests.post(
                     f"{API_BASE}/bot{token}/sendPhoto",
