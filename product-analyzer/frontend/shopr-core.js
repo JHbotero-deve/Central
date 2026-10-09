@@ -17,7 +17,7 @@ const applyTheme=()=>document.documentElement.style.setProperty("--bg",theme()[1
 let adminKey="";
 async function api(path,opt={}){
   const method=String(opt.method||"GET").toUpperCase();
-  const protectedWrite=method!=="GET"&&(/^\/(products|catalog)(\/|\?|$)/.test(path)||/^\/publications(\/|\?|$)/.test(path));
+  const protectedWrite=(method!=="GET"&&(/^\/(products|catalog)(\/|\?|$)/.test(path)||/^\/publications(\/|\?|$)/.test(path)))||/^\/catalog(\/|\?|$)/.test(path)||(/^\/publications(\/|\?|$)/.test(path)&&/[?&]include_unpublished=true/.test(path));
   const h={Accept:"application/json",...(opt.headers||{})};
   if(protectedWrite){
     if(!adminKey)adminKey=window.prompt("Clave administrativa de Central (ADMIN_API_KEY):")||"";
