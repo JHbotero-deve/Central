@@ -27,7 +27,7 @@ jobs:
           from pathlib import Path
           import re
 
-          for name in ("index", "tarjetas"):
+          for name in ("index", "tarjetas", "producto"):
               path = Path(f"product-analyzer/frontend/{name}.html")
               html = path.read_text(encoding="utf-8")
               matches = re.findall(r"<script\b[^>]*>([\s\S]*?)</script\s*>", html, flags=re.IGNORECASE)
@@ -37,6 +37,8 @@ jobs:
           PY
           node --check /tmp/central-index.js
           node --check /tmp/central-tarjetas.js
+          node --check /tmp/central-producto.js
+          node --check product-analyzer/frontend/shopr-core.js
       - name: Build Figma showcase
         shell: bash
         run: |

@@ -310,37 +310,49 @@ const unpackDescription=v=>{
 };
 
 try{
-    const response=await fetch(
-        API+"/products/"+encodeURIComponent(id),
-        {
-            cache:"no-store",
-            headers:{
-                "Accept":"application/json"
+
+    // Una URL pública debe resolverse primero contra su publicación.
+    // /products/{id} omite productos cuyo ciclo de catálogo de 48 horas venció.
+    const endpoints=[
+        API+"/publications/product/"+encodeURIComponent(id),
+        API+"/products/"+encodeURIComponent(id)
+    ];
+    let response=null;
+    const statuses=[];
+    for(const endpoint of endpoints){
+        try{
+            const candidate=await fetch(endpoint,{
+                cache:"no-store",
+                headers:{"Accept":"application/json"}
+            });
+            if(candidate.ok){
+                response=candidate;
+                break;
             }
+            statuses.push(candidate.status);
+        }catch(fetchError){
+            statuses.push(0);
+            console.warn("No se pudo consultar la ficha en",endpoint,fetchError);
         }
-    );
+    }
 
-    if(!response.ok){
-
-        if(response.status===404){
-            document.getElementById("app").innerHTML=
-                "<p>Producto no encontrado.</p>";
-        }else{
-            document.getElementById("app").innerHTML=
-                "<p>No fue posible cargar el producto.</p>";
-        }
-
+    if(!response){
+        const notFound=statuses.length===endpoints.length&&statuses.every(x=>x===404);
+        document.getElementById("app").innerHTML=notFound
+            ?"<p>Producto no encontrado o retirado de la tienda.</p>"
+            :"<p>No fue posible cargar los datos del producto. Intenta de nuevo.</p>";
         return;
     }
 
     const data=await response.json();
     const p=data.product||data;
 
+    // El endpoint público devuelve product_id; normalizamos la clave que usa la ficha.
+    if(p&&!p.id&&p.product_id) p.id=p.product_id;
+
     if(!p||!p.id){
-
         document.getElementById("app").innerHTML=
-            "<p>Producto no disponible.</p>";
-
+            "<p>La ficha no contiene un identificador de producto válido.</p>";
         return;
     }
 
@@ -414,20 +426,15 @@ try{
         gallery.unshift(p.image_url);
     }
 
-    if(!gallery.length){
-
-        document.getElementById("app").innerHTML=
-            "<p>Producto disponible, pero la fuente no proporcionó una imagen.</p>";
-
-        return;
-    }
-
     const platform=
         String(p.platform||"").toLowerCase();
 
     const own=
         String(p.checkout_mode||"").toUpperCase()==="CENTRAL"
         ||platform==="personal";
+
+    const sourceStale=p.source_active===false
+        ||(p.catalog_expires_at&&Date.parse(p.catalog_expires_at)<Date.now());
 
     document.title=
         (p.title||"Producto")+" | Central";
@@ -520,6 +527,8 @@ try{
         ||platform==="meli"
     ){
         buttonText="Ver oferta en Mercado Libre";
+    }else if(platform==="aliexpress"){
+        buttonText="Comprar en AliExpress";
     }
 
     document.getElementById("app").innerHTML=`
@@ -528,11 +537,16 @@ try{
 <section>
 
     <div class="media">
-        <img
-            id="mainImg"
-            src="${esc(mediaSrc(gallery[0]))}"
-            alt="${esc(p.title)}"
-        >
+        ${gallery.length ? `
+            <img
+                id="mainImg"
+                src="${esc(mediaSrc(gallery[0]))}"
+                alt="${esc(p.title)}"
+            >
+            <p id="imageMissing" style="color:var(--muted);text-align:center;font-size:12px" hidden>La imagen de origen no está disponible ahora.</p>
+        ` : `
+            <p style="color:var(--muted);text-align:center;font-size:12px">La fuente no proporcionó una imagen. El resto de la ficha sigue disponible.</p>
+        `}
     </div>
 
     <div class="gallery">
@@ -542,6 +556,7 @@ try{
                 data-original="${esc(x)}"
                 alt="${esc(p.title)}"
                 loading="lazy"
+                onerror="this.hidden=true"
             >
         `).join("")}
     </div>
@@ -553,6 +568,7 @@ try{
     <div class="kicker">
         ${esc(p.platform||"Central")}
     </div>
+    ${sourceStale?'<p class="status" role="status">Esta ficha conserva los últimos datos guardados, pero la fuente está pendiente de actualización. Verifica el precio y la disponibilidad en el proveedor antes de comprar.</p>':""}
 
     <h1>${esc(p.title)}</h1>
 
@@ -566,7 +582,7 @@ try{
     <div class="price">
         ${esc(
             money(
-                p.current_price,
+                p.current_price ?? p.sale_price,
                 p.currency
             )
         )}
@@ -688,15 +704,34 @@ try{
 </div>
 `;
 
-    document
-        .querySelectorAll(".gallery img")
-        .forEach(x=>{
-            x.onclick=()=>{
-                document.getElementById(
-                    "mainImg"
-                ).src=x.src;
-            };
+    const mainImage=document.getElementById("mainImg");
+    let mainImageIndex=0;
+    if(mainImage){
+        mainImage.addEventListener("error",()=>{
+            mainImageIndex+=1;
+            if(mainImageIndex<gallery.length){
+                mainImage.src=mediaSrc(gallery[mainImageIndex]);
+                return;
+            }
+            mainImage.hidden=true;
+            const placeholder=document.getElementById("imageMissing");
+            if(placeholder) placeholder.hidden=false;
         });
+    }
+
+    document.querySelectorAll(".gallery img").forEach(x=>{
+        x.onclick=()=>{
+            const main=document.getElementById("mainImg");
+            if(!main)return;
+            const placeholder=document.getElementById("imageMissing");
+            if(placeholder) placeholder.hidden=true;
+            main.hidden=false;
+            const selected=x.dataset.original||gallery[0];
+            const selectedIndex=gallery.indexOf(selected);
+            mainImageIndex=selectedIndex>=0?selectedIndex:0;
+            main.src=mediaSrc(selected);
+        };
+    });
 
     document.getElementById("buy").onclick=async()=>{
 
@@ -808,8 +843,8 @@ try{
             }
         }
 
-        if(p.product_url){
-            location.href=p.product_url;
+        if(p.affiliate_url||p.product_url){
+            location.href=p.affiliate_url||p.product_url;
             return;
         }
 
@@ -831,7 +866,7 @@ try{
             "@type":"Offer",
             "url":canonicalUrl,
             "price":Number(
-                p.current_price||0
+                p.current_price ?? p.sale_price ?? 0
             ),
             "priceCurrency":
                 p.currency||"COP",
