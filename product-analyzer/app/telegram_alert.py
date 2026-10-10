@@ -409,6 +409,7 @@ def _ingest_telegram_url(url, context="", image_url=None):
             price=price,
             currency=currency,
             image_url=image_url,
+            require_image=False,
         )
         if product["platform"] not in {"amazon", "mercadolibre", "tiktok", "aliexpress"}:
             return None, "Fuente no habilitada."
@@ -418,13 +419,20 @@ def _ingest_telegram_url(url, context="", image_url=None):
             score = score_product(conn, product_id, float(product.get("price") or 0))
         finally:
             conn.close()
+        if product.get("image_url"):
+            next_step = f"<b>Listo para publicar:</b> /publicar {product_id}"
+        else:
+            next_step = (
+                "<b>Guardado en el catálogo, no publicado.</b> Falta una imagen real. "
+                "Añádela en Central antes de publicar esta tarjeta."
+            )
         message = (
             f"<b>Producto capturado</b> · ID {product_id}\n"
             f"{html.escape(product['title'])}\n"
             f"Fuente: {html.escape(product['platform'])}\n"
             f"Precio: {product['price']:,.0f} {html.escape(product['currency'])}\n"
             f"Score: {float(score):.1f}/100\n"
-            f"<b>Listo para publicar:</b> /publicar {product_id}"
+            f"{next_step}"
         )
         return product_id, message
     except Exception as exc:
