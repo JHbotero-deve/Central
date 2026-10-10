@@ -95,14 +95,55 @@ def upsert_product(conn, platform_name: str, category_name: str, product: dict):
             seller_id = cur.fetchone()["id"]
 
         source_metadata = dict(product.get("source_metadata") or {})
-        if product.get("image_url") and not source_metadata.get("mongo_image_id"):
+        stored_image_url = product.get("image_url")
+        stored_gallery = list(product.get("gallery_urls") or product.get("image_gallery") or [])
+
+        if stored_image_url and str(stored_image_url).startswith("mongo://"):
+            source_metadata["mongo_image_id"] = str(stored_image_url)[8:]
+        elif stored_image_url and str(stored_image_url).startswith("data:"):
+            # Las imágenes subidas por Telegram/editor deben salir de PostgreSQL como
+            # referencias mongo://, nunca como enormes data URI en las tarjetas.
             try:
-                mongo_id = store_product_image(product["image_url"], platform=platform_name, external_id=external_id)
+                mongo_id = store_product_image(stored_image_url, platform=platform_name, external_id=external_id)
+                if not mongo_id:
+                    raise RuntimeError("MONGO_URL no está configurada para guardar la imagen subida")
+                stored_image_url = "mongo://" + mongo_id
+                source_metadata["mongo_image_id"] = mongo_id
+            except Exception as exc:
+                raise ValueError(f"No se pudo guardar la imagen subida: {exc}") from exc
+        elif stored_image_url and not source_metadata.get("mongo_image_id"):
+            try:
+                mongo_id = store_product_image(stored_image_url, platform=platform_name, external_id=external_id)
                 if mongo_id:
                     source_metadata["mongo_image_id"] = mongo_id
                     print(f"[mongo] imagen guardada {platform_name}/{product.get('external_id')}")
             except Exception as exc:
                 print(f"[mongo] imagen no guardada: {exc}")
+
+        normalized_gallery = []
+        for gallery_image in stored_gallery:
+            value = str(gallery_image or "").strip()
+            if not value:
+                continue
+            if value.startswith("mongo://"):
+                normalized_gallery.append(value)
+            elif value.startswith("data:"):
+                try:
+                    mongo_id = store_product_image(value, platform=platform_name, external_id=external_id)
+                    if not mongo_id:
+                        raise RuntimeError("MONGO_URL no está configurada para guardar imágenes subidas")
+                    normalized_gallery.append("mongo://" + mongo_id)
+                    if stored_image_url and value == product.get("image_url"):
+                        source_metadata["mongo_image_id"] = mongo_id
+                except Exception as exc:
+                    raise ValueError(f"No se pudo guardar una imagen de la galería: {exc}") from exc
+            else:
+                normalized_gallery.append(value)
+        if not normalized_gallery and stored_image_url:
+            normalized_gallery = [stored_image_url]
+        stored_gallery = normalized_gallery
+        if "gallery_urls" in source_metadata:
+            source_metadata["gallery_urls"] = stored_gallery
 
         cur.execute(
             """
@@ -149,8 +190,8 @@ def upsert_product(conn, platform_name: str, category_name: str, product: dict):
                 seller_id,
                 external_id,
                 product["title"],
-                product.get("image_url"),
-                Json(product.get("gallery_urls") or ([product.get("image_url")] if product.get("image_url") else [])),
+                stored_image_url,
+                Json(stored_gallery or ([stored_image_url] if stored_image_url else [])),
                 product.get("product_url"),
                 _affiliate_url(product),
                 product.get("price"),
