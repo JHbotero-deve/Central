@@ -41,6 +41,8 @@ jobs:
           node --check product-analyzer/frontend/shopr-core.js
       - name: Audit storefront card markup and CSS
         run: python scripts/audit_storefront_cards.py
+      - name: Audit dashboard and card-creation flow
+        run: python scripts/audit_admin_flow.py
       - name: Build Figma showcase
         shell: bash
         run: |
