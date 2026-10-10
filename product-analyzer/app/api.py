@@ -223,6 +223,8 @@ def _sync_store_catalog():
     conn = get_connection()
     amazon_imported = []
     meli_imported = []
+    meli_refreshed = []
+    meli_refreshed_keys = set()
     errors = []
     try:
         with conn.cursor() as cur:
@@ -307,13 +309,25 @@ def _sync_store_catalog():
                         key = ("mercadolibre", external_id.upper())
                         title_key = " ".join(str(product.get("title") or "").lower().split())
                         product_url = str(product.get("product_url") or "").split("?")[0].rstrip("/").lower()
-                        if (
-                            not external_id
-                            or not title_key
-                            or key in existing
-                            or title_key in meli_seen_titles
-                            or (product_url and product_url in meli_seen_urls)
-                        ):
+                        if not external_id or not title_key:
+                            continue
+                        if key in existing:
+                            if key in meli_refreshed_keys:
+                                continue
+                            try:
+                                product_id = upsert_product(conn, "mercadolibre", "accesorios", product)
+                                conn.commit()
+                                meli_refreshed_keys.add(key)
+                                meli_refreshed.append({
+                                    "id": product_id,
+                                    "item_id": external_id,
+                                    "title": product["title"],
+                                })
+                            except Exception as exc:
+                                conn.rollback()
+                                errors.append(f"Mercado Libre {external_id}: {exc}")
+                            continue
+                        if title_key in meli_seen_titles or (product_url and product_url in meli_seen_urls):
                             continue
                         try:
                             product_id = upsert_product(conn, "mercadolibre", "accesorios", product)
@@ -355,7 +369,13 @@ def _sync_store_catalog():
             })
         return {
             "amazon": {"imported": len(amazon_imported), "published": 0, "products": amazon_imported},
-            "mercadolibre": {"imported": len(meli_imported), "published": 0, "products": meli_imported},
+            "mercadolibre": {
+                "imported": len(meli_imported),
+                "refreshed": len(meli_refreshed),
+                "published": 0,
+                "products": meli_imported,
+                "refreshed_products": meli_refreshed,
+            },
             "total_published": 0,
             "errors": errors[:10],
         }
