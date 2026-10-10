@@ -433,6 +433,9 @@ try{
         String(p.checkout_mode||"").toUpperCase()==="CENTRAL"
         ||platform==="personal";
 
+    const sourceStale=p.source_active===false
+        ||(p.catalog_expires_at&&Date.parse(p.catalog_expires_at)<Date.now());
+
     document.title=
         (p.title||"Producto")+" | Central";
 
@@ -566,6 +569,7 @@ try{
     <div class="kicker">
         ${esc(p.platform||"Central")}
     </div>
+    ${sourceStale?'<p class="status" role="status">Esta ficha conserva los últimos datos guardados, pero la fuente está pendiente de actualización. Verifica el precio y la disponibilidad en el proveedor antes de comprar.</p>':""}
 
     <h1>${esc(p.title)}</h1>
 
