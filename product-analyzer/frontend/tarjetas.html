@@ -41,11 +41,11 @@ body:not(.auth-ready) .sh-wrap{display:none!important}#panel{display:none}.centr
 <button class="central-auth-submit" id="auth-submit" type="submit">Entrar</button><p class="central-auth-message" id="auth-message" role="status" aria-live="polite"></p>
 </form><p class="central-auth-note" id="auth-note">Sesión segura en este dispositivo.</p>
 </section></main><div class="sh-wrap">
-<header class="sh-top"><a class="sh-logo" href="/vitrina">CENTRAL</a><div class="admin-session-actions"><a class="sh-pill" href="/vitrina">Ver vitrina</a><button class="sh-pill" id="logout" type="button">Cerrar sesión</button></div></header>
+<header class="sh-top"><a class="sh-logo" href="/">CENTRAL</a><div class="admin-session-actions"><a class="sh-pill" href="/tienda">Ver tienda</a><button class="sh-pill" id="logout" type="button">Cerrar sesión</button></div></header>
 
 <section id="panel"><div class="ed-grid">
  <aside class="ed-side">
-  <div class="ed-tabs"><button type="button" data-tab="mine">Productos</button><button type="button" data-tab="add" class="on">Agregar</button><button type="button" data-tab="theme">Tema</button></div>
+  <div class="ed-tabs"><button type="button" data-tab="mine">Productos</button><button type="button" data-tab="add" class="on">Agregar</button></div>
 
   <div class="ed-body" id="tab-mine" hidden><div class="ed-l">Productos</div><div class="sh-grid admin-cards" id="mine"></div></div>
 
@@ -83,29 +83,39 @@ body:not(.auth-ready) .sh-wrap{display:none!important}#panel{display:none}.centr
    <button class="ed-btn" id="save" type="button">Crear tarjeta</button><button class="ed-x" id="cancelEdit" type="button" hidden>Cancelar edición</button><div id="msg" class="ed-msg" hidden></div>
   </div>
 
-  <div class="ed-body" id="tab-theme" hidden><div class="ed-l">Fondo de la vitrina (se guarda en este navegador)</div><div class="ed-themes" id="themes"></div></div>
+  
  </aside>
  <main><div class="ed-l" style="margin-bottom:10px">VISTA PREVIA EN VIVO</div><div id="preview"></div></main>
 </div></section>
 </div>
 
 <script>
-(()=>{"use strict";const S=Shopr,$=id=>document.getElementById(id);S.applyTheme();
+(()=>{"use strict";const S=Shopr,$=id=>document.getElementById(id);
 const f=id=>$(id).value.trim();
 const num=v=>{v=String(v).trim().replace(",",".");return v===""||isNaN(Number(v))?null:Number(v)};
 let V=[{name:"",glow:0,img:""}];
 
 function show(el,k,t){el.hidden=false;el.className="ed-msg "+k;el.textContent=t}
-function gate(){renderVars();preview();loadMine();renderThemes()}
-function tab(n){["mine","add","theme"].forEach(x=>{$("tab-"+x).hidden=x!==n});document.querySelectorAll("[data-tab]").forEach(b=>b.classList.toggle("on",b.dataset.tab===n))}
+function gate(){renderVars();preview();loadMine()}
+function tab(n){["mine","add"].forEach(x=>{$("tab-"+x).hidden=x!==n});document.querySelectorAll("[data-tab]").forEach(b=>b.classList.toggle("on",b.dataset.tab===n))}
 
 function renderVars(){
-  $("vars").innerHTML=V.map((v,i)=>{const up=v.img.startsWith("data:")||v.img.startsWith("mongo://");return `<div class="ed-var" data-i="${i}">
-   <div class="ed-varh"><b>Variante ${i+1}</b>${V.length>1?`<button type="button" class="ed-x" data-del="${i}">Quitar</button>`:""}</div>
-   <input class="ed-in" data-f="name" placeholder="Nombre del color (Ej: Rojo Fuego)" value="${S.esc(v.name)}">
-   <div class="ed-row"><input class="ed-in" data-f="img" placeholder="URL pública de imagen o subir archivo" value="${up?"":S.esc(v.img)}"><label class="ed-up" title="Subir imagen">⬆<input type="file" accept="image/*" data-file hidden></label></div>
-   ${up?'<div class="ed-note">'+(v.img.startsWith("mongo://")?"Imagen guardada en Central ✓":"Imagen cargada ✓")+'</div>':""}
-   <div class="ed-glows">${S.GLOWS.map((g,gi)=>`<button type="button" class="ed-g ${gi===v.glow?"on":""}" data-g="${gi}" title="${g[0]}" style="background:${g[1]}"></button>`).join("")}</div></div>`}).join("");
+  $("vars").innerHTML=V.map((v,i)=>{
+    const stored=v.img.startsWith("data:")||v.img.startsWith("mongo://");
+    const imagePreview=v.img
+      ? '<div class="ed-image-ready"><img src="'+S.esc(S.imageSrc(v.img))+'" alt="Vista previa de la imagen" loading="lazy"><span>'+(v.img.startsWith("mongo://")?"Imagen guardada en Central":"Imagen preparada para guardar")+'</span></div>'
+      : '<div class="ed-image-empty">Primero sube una imagen real del producto.</div>';
+    return `<div class="ed-var" data-i="${i}">
+      <div class="ed-varh"><b>Variante ${i+1}</b>${V.length>1?`<button type="button" class="ed-x" data-del="${i}">Quitar</button>`:""}</div>
+      <input class="ed-in" data-f="name" placeholder="Nombre de la variante (opcional)" value="${S.esc(v.name)}">
+      <label class="ed-upload-primary">${v.img?"Reemplazar imagen":"Subir imagen del producto"}<input type="file" accept="image/*" data-file hidden></label>
+      ${imagePreview}
+      <details class="ed-image-url"><summary>Usar una URL de imagen existente (opcional)</summary>
+        <input class="ed-in" data-f="img" type="url" placeholder="https://…" value="${S.esc(stored?"":v.img)}">
+      </details>
+      <div class="ed-glows">${S.GLOWS.map((g,gi)=>`<button type="button" class="ed-g ${gi===v.glow?"on":""}" data-g="${gi}" title="${g[0]}" style="background:${g[1]}"></button>`).join("")}</div>
+    </div>`;
+  }).join("");
   $("addVar").hidden=V.length>=4;
 }
 function model(){return{id:"preview",title:f("title")||"Nombre del producto",brand:f("brand"),tag:f("tag"),cat:f("category"),desc:f("description"),
@@ -198,10 +208,6 @@ async function loadMine(){
   try{const d=await S.api("/products?limit=100");const l=Array.isArray(d)?d:(d.items||d.products||[]);mineModels=l.map(p=>S.fromApi(p));$("mine").innerHTML=mineModels.length?mineModels.map(adminCardHtml).join(""):'<div class="ed-note" style="color:var(--muted)">Aún no tienes productos.</div>';bindAdminCards()}
   catch(e){$("mine").innerHTML='<div class="ed-msg err">'+S.esc(e.message)+'</div>'}
 }
-function renderThemes(){const cur=S.theme()[0];
-  $("themes").innerHTML=S.THEMES.map((t,i)=>`<button type="button" class="ed-t ${t[0]===cur?"on":""}" data-t="${i}" style="background:${t[1]}">${t[0]}</button>`).join("");
-  $("themes").querySelectorAll("[data-t]").forEach(b=>b.addEventListener("click",()=>{S.setTheme(S.THEMES[+b.dataset.t]);renderThemes()}))}
- 
 $("save").addEventListener("click",async()=>{
   const m=model(),msg=$("msg");msg.hidden=true;
   if(f("title").length<2)return show(msg,"err","El nombre necesita al menos 2 caracteres");
