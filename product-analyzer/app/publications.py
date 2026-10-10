@@ -111,7 +111,7 @@ def publish_card(payload: PublicationPayload, _: None = Depends(require_publicat
             cur.execute(
                 """
                 SELECT p.id, p.image_url, p.product_url, p.current_price, p.currency,
-                       p.title, p.description, p.image_gallery, p.affiliate_url,
+                       p.title, p.description, p.image_gallery, p.affiliate_url, p.source_metadata,
                        pl.name AS platform, s.opportunity_score
                 FROM products p
                 JOIN platforms pl ON pl.id = p.platform_id
@@ -124,7 +124,9 @@ def publish_card(payload: PublicationPayload, _: None = Depends(require_publicat
             if not product:
                 raise HTTPException(status_code=404, detail="Producto activo no encontrado")
 
-            canonical_image = product["image_url"] or ((product["image_gallery"] or [None])[0])
+            source_metadata = product.get("source_metadata") or {}
+            mongo_image_id = source_metadata.get("mongo_image_id") if isinstance(source_metadata, dict) else None
+            canonical_image = product["image_url"] or ((product["image_gallery"] or [None])[0]) or (f"mongo://{mongo_image_id}" if mongo_image_id else None)
             if not canonical_image:
                 raise HTTPException(status_code=422, detail="No se puede publicar un producto sin imagen real")
 
@@ -199,7 +201,7 @@ def update_publication(publication_id: int, payload: PublicationPayload, _: None
             cur.execute(
                 """
                 SELECT pc.product_id, p.title, p.image_url, p.image_gallery, p.product_url,
-                       p.affiliate_url, p.current_price, p.currency, pl.name AS platform,
+                       p.affiliate_url, p.current_price, p.currency, p.source_metadata, pl.name AS platform,
                        s.opportunity_score
                 FROM published_cards pc
                 JOIN products p ON p.id = pc.product_id
@@ -213,7 +215,9 @@ def update_publication(publication_id: int, payload: PublicationPayload, _: None
             if not current:
                 raise HTTPException(status_code=404, detail="Publicación no encontrada")
 
-            canonical_image = current["image_url"] or ((current["image_gallery"] or [None])[0])
+            source_metadata = current.get("source_metadata") or {}
+            mongo_image_id = source_metadata.get("mongo_image_id") if isinstance(source_metadata, dict) else None
+            canonical_image = current["image_url"] or ((current["image_gallery"] or [None])[0]) or (f"mongo://{mongo_image_id}" if mongo_image_id else None)
             if not canonical_image:
                 raise HTTPException(status_code=422, detail="No se puede actualizar una publicación sin imagen real")
 
