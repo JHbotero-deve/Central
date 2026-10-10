@@ -281,8 +281,13 @@ def _add_url(argument):
         finally:
             conn.close()
     except Exception as exc:
-        print(f"[telegram-bot] url import error: {exc}")
-        return None, "No fue posible agregar el producto desde la URL.", None
+        detail = str(exc).strip()
+        print(f"[telegram-bot] url import error: {type(exc).__name__}: {detail[:220]}")
+        return None, (
+            "No fue posible agregar el producto. "
+            + html.escape(detail[:220])
+            + " Uso: /agregar categoría|URL|PRECIO|TÍTULO|IMAGEN_URL|MONEDA."
+        ), None
 
 
 def _extract_urls(text):
