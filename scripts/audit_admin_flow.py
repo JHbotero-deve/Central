@@ -15,7 +15,7 @@ def check(condition: bool, message: str) -> None:
 
 
 page = (FRONT / "index.html").read_text(encoding="utf-8-sig")
-markup = page.split("<script", 1)[0]
+markup = re.sub(r"<script\\b[^>]*>[\\s\\S]*?</script\\s*>", "", page, flags=re.IGNORECASE)
 ids = re.findall(r'\bid=["\']([^"\']+)["\']', markup)
 duplicates = sorted({item for item in ids if ids.count(item) > 1})
 check(not duplicates, "dashboard has no duplicate static HTML IDs")
