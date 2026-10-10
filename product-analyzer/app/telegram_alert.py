@@ -1,20 +1,22 @@
+import base64
 import html
 import io
 import os
 import re
 import time
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 
 import requests
 from PIL import Image, ImageOps, UnidentifiedImageError
 
 from analysis import score_product
 from db import get_connection, upsert_product
-from url_import import import_url
+from url_import import detect_platform, import_url
 
 POLL_INTERVAL = int(os.getenv("TELEGRAM_POLL_INTERVAL", "3"))
 API_BASE = "https://api.telegram.org"
-ALLOWED_PLATFORMS = {"mercadolibre", "amazon", "aliexpress", "personal"}
+CENTRAL_API_BASE = (os.getenv("CENTRAL_API_BASE") or "https://gracious-renewal-production-aadd.up.railway.app").rstrip("/")
+ALLOWED_PLATFORMS = {"mercadolibre", "amazon", "tiktok", "aliexpress", "personal"}
 ALLOWED_CATEGORIES = {"ropa", "calzado", "accesorios", "electronica", "hogar", "fitness", "otros"}
 
 
@@ -65,7 +67,7 @@ def _format_product(p):
     price_score = p.get("price_score")
     demand_score = p.get("demand_score")
     trend_score = p.get("trend_score")
-    url = str(p.get("product_url") or "").strip()
+    url = str(p.get("affiliate_url") or p.get("product_url") or "").strip()
 
     lines = [
         f"<b>{title}</b>",
@@ -91,6 +93,8 @@ def _format_product(p):
 def _send_product(token, chat_id, product):
     image_url = str(product.get("image_url") or "").strip()
     text = _format_product(product)
+    if image_url.startswith("mongo://"):
+        image_url = CENTRAL_API_BASE + "/api/v1/media/image?url=" + quote(image_url, safe="")
     if image_url.startswith(("http://", "https://")):
         try:
             image_response = requests.get(
@@ -147,7 +151,7 @@ def _top_products(limit=5):
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT p.title, p.current_price, p.currency, p.product_url, p.image_url,
+                SELECT p.title, p.current_price, p.currency, p.product_url, p.affiliate_url, p.image_url,
                        p.rating, p.reviews_count, p.sales_estimate,
                        pl.name AS platform, c.name AS category,
                        COALESCE(s.price_score, 0) AS price_score,
@@ -176,7 +180,7 @@ def _catalog_products(limit=20, offset=0):
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT p.title, p.current_price, p.currency, p.product_url, p.image_url,
+                SELECT p.title, p.current_price, p.currency, p.product_url, p.affiliate_url, p.image_url,
                        p.rating, p.reviews_count, p.sales_estimate,
                        pl.name AS platform, c.name AS category,
                        COALESCE(s.price_score, 0) AS price_score,
@@ -206,7 +210,7 @@ def _search_products(term, limit=8):
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT p.title, p.current_price, p.currency, p.product_url, p.image_url,
+                SELECT p.title, p.current_price, p.currency, p.product_url, p.affiliate_url, p.image_url,
                        p.rating, p.reviews_count, p.sales_estimate,
                        pl.name AS platform, c.name AS category,
                        COALESCE(s.price_score, 0) AS price_score,
@@ -233,7 +237,7 @@ def _search_products(term, limit=8):
 def _add_url(argument):
     parts = [part.strip() for part in argument.split("|")]
     if len(parts) < 2:
-        return None, "Uso: /agregar categoría|url|precio|título|imagen", None
+        return None, "Uso: /agregar categoría|URL|PRECIO|TÍTULO|IMAGEN_URL|MONEDA", None
 
     category, url = parts[0].lower(), parts[1]
     if category not in ALLOWED_CATEGORIES:
@@ -241,11 +245,15 @@ def _add_url(argument):
 
     try:
         price = float(parts[2]) if len(parts) > 2 and parts[2] else None
+        platform = detect_platform(url)
+        default_currency = "COP" if platform in {"mercadolibre", "aliexpress"} else "USD"
+        currency = parts[5].upper() if len(parts) > 5 and parts[5] else default_currency
         product = import_url(
             url,
             category,
             title=parts[3] if len(parts) > 3 and parts[3] else None,
             price=price,
+            currency=currency,
             image_url=parts[4] if len(parts) > 4 and parts[4] else None,
         )
         if product["platform"] not in ALLOWED_PLATFORMS:
@@ -273,8 +281,13 @@ def _add_url(argument):
         finally:
             conn.close()
     except Exception as exc:
-        print(f"[telegram-bot] url import error: {exc}")
-        return None, "No fue posible agregar el producto desde la URL.", None
+        detail = str(exc).strip()
+        print(f"[telegram-bot] url import error: {type(exc).__name__}: {detail[:220]}")
+        return None, (
+            "No fue posible agregar el producto. "
+            + html.escape(detail[:220])
+            + " Uso: /agregar categoría|URL|PRECIO|TÍTULO|IMAGEN_URL|MONEDA."
+        ), None
 
 
 def _extract_urls(text):
@@ -297,10 +310,109 @@ def _category_from_text(text):
     return "otros"
 
 
-def _ingest_telegram_url(url, context=""):
-    category = _category_from_text(context)
+def _context_title(context):
+    """Extrae una línea candidata de título sin inventar datos desde la URL."""
+    skipped = (
+        "mejores recomendaciones", "productos en oferta", "ahora precio",
+        "precio:", "precio actual", "haz clic", "clic y compra", "compra:",
+        "enlace:", "link:", "oferta del día", "oferta del dia",
+    )
+    for line in (context or "").splitlines():
+        value = re.sub(r"https?://[^\s<>]+", "", line.strip(" \t•-"), flags=re.I).strip(" \t•-:|")
+        if len(value) < 5 or len(value) > 500:
+            continue
+        lowered = value.lower()
+        if any(term in lowered for term in skipped):
+            continue
+        if not re.search(r"[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]", value):
+            continue
+        return value
+    return None
+
+
+def _price_from_context(context):
+    text = context or ""
+    match = re.search(
+        r"\b(COP|COL\$|USD|US\$|EUR|CNY|RMB)\s*[:：]?\s*\$?\s*([0-9][0-9.,]*)",
+        text,
+        re.I,
+    )
+    if match:
+        currency, raw = match.group(1).upper(), match.group(2)
+    else:
+        match = re.search(r"\$\s*([0-9][0-9.,]*)\s*(COP|USD|EUR|CNY)\b", text, re.I)
+        if not match:
+            return None, None
+        raw, currency = match.group(1), match.group(2).upper()
+    currency = {"COL$": "COP", "US$": "USD", "RMB": "CNY"}.get(currency, currency)
+    if "." in raw and "," in raw:
+        raw = raw.replace(".", "").replace(",", ".") if raw.rfind(",") > raw.rfind(".") else raw.replace(",", "")
+    elif "," in raw:
+        raw = raw.replace(",", ".") if len(raw.rsplit(",", 1)[-1]) <= 2 else raw.replace(",", "")
+    elif "." in raw and len(raw.rsplit(".", 1)[-1]) == 3:
+        raw = raw.replace(".", "")
     try:
-        product = import_url(url, category)
+        amount = float(raw)
+    except ValueError:
+        return None, None
+    return (amount, currency) if amount > 0 else (None, None)
+
+
+def _telegram_photo_data_url(token, message):
+    """Recupera la foto adjunta a un mensaje para guardarla con su producto."""
+    photos = message.get("photo") or []
+    if not photos:
+        return None
+    try:
+        photo = max(photos, key=lambda item: (int(item.get("width") or 0) * int(item.get("height") or 0), int(item.get("file_size") or 0)))
+        info = requests.get(
+            f"{API_BASE}/bot{token}/getFile",
+            params={"file_id": photo["file_id"]},
+            timeout=10,
+        )
+        info.raise_for_status()
+        payload = info.json()
+        if not payload.get("ok"):
+            return None
+        file_path = payload.get("result", {}).get("file_path")
+        if not file_path:
+            return None
+        response = requests.get(f"{API_BASE}/file/bot{token}/{file_path}", timeout=20)
+        response.raise_for_status()
+        data = response.content
+        content_type = (response.headers.get("Content-Type") or "").split(";", 1)[0].lower()
+        if content_type not in {"image/jpeg", "image/png", "image/webp", "image/gif", "image/avif"}:
+            extension = str(file_path).lower().rsplit(".", 1)[-1] if "." in str(file_path) else ""
+            content_type = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png",
+                            "webp": "image/webp", "gif": "image/gif", "avif": "image/avif"}.get(extension, "")
+        if not data or len(data) > 8 * 1024 * 1024 or content_type not in {
+            "image/jpeg", "image/png", "image/webp", "image/gif", "image/avif",
+        }:
+            print("[telegram-bot] foto adjunta omitida: formato no permitido o supera 8 MB")
+            return None
+        return f"data:{content_type};base64," + base64.b64encode(data).decode("ascii")
+    except (KeyError, requests.RequestException, ValueError) as exc:
+        print(f"[telegram-bot] no se pudo leer la foto adjunta: {type(exc).__name__}")
+        return None
+
+
+def _ingest_telegram_url(url, context="", image_url=None):
+    category = _category_from_text(context)
+    title = _context_title(context)
+    price, currency = _price_from_context(context)
+    try:
+        platform = detect_platform(url)
+        if currency is None:
+            currency = "COP" if platform in {"mercadolibre", "aliexpress"} else "USD"
+        product = import_url(
+            url,
+            category,
+            title=title,
+            price=price,
+            currency=currency,
+            image_url=image_url,
+            require_image=False,
+        )
         if product["platform"] not in {"amazon", "mercadolibre", "tiktok", "aliexpress"}:
             return None, "Fuente no habilitada."
         conn = get_connection()
@@ -309,18 +421,31 @@ def _ingest_telegram_url(url, context=""):
             score = score_product(conn, product_id, float(product.get("price") or 0))
         finally:
             conn.close()
+        if product.get("image_url"):
+            next_step = f"<b>Listo para publicar:</b> /publicar {product_id}"
+        else:
+            next_step = (
+                "<b>Guardado en el catálogo, no publicado.</b> Falta una imagen real. "
+                "Añádela en Central antes de publicar esta tarjeta."
+            )
         message = (
             f"<b>Producto capturado</b> · ID {product_id}\n"
             f"{html.escape(product['title'])}\n"
             f"Fuente: {html.escape(product['platform'])}\n"
             f"Precio: {product['price']:,.0f} {html.escape(product['currency'])}\n"
             f"Score: {float(score):.1f}/100\n"
-            f"<b>Listo para publicar:</b> /publicar {product_id}"
+            f"{next_step}"
         )
         return product_id, message
     except Exception as exc:
-        print(f"[telegram-bot] captura URL fallida: {type(exc).__name__}")
-        return None, "No se pudo importar esa URL."
+        detail = str(exc).strip()
+        print(f"[telegram-bot] captura URL fallida: {type(exc).__name__}: {detail[:220]}")
+        return None, (
+            "No se pudo importar el producto automáticamente. "
+            + html.escape(detail[:220])
+            + " Si falta información, envía la URL junto al nombre, precio con moneda y una foto del producto, "
+              "o usa /agregar categoría|URL|PRECIO|TÍTULO|IMAGEN_URL|MONEDA."
+        )
 
 
 def _publish_product(product_id):
@@ -493,7 +618,7 @@ def _handle(token, chat_id, text):
         message = (
             f"<b>Producto agregado</b>\n{html.escape(payload['title'])}\n"
             f"Plataforma: {html.escape(payload['platform'])}\n{score_text}\n"
-            f'<a href="{html.escape(payload["product_url"], quote=True)}">Abrir producto original</a>'
+            f'<a href="{html.escape(payload.get("affiliate_url") or payload["product_url"], quote=True)}">Abrir enlace de compra</a>'
         )
         if payload.get("image_url"):
             message += f'\nImagen: <a href="{html.escape(payload["image_url"], quote=True)}">ver imagen</a>'
@@ -578,14 +703,15 @@ def run_bot():
         print("[telegram-bot] Bot deshabilitado: falta TELEGRAM_CHAT_ID.")
         return
 
-    try:
-        lock_conn = _acquire_polling_lock()
-    except Exception as exc:
-        print(f"[telegram-bot] no se pudo adquirir el bloqueo de polling: {type(exc).__name__}")
-        return
-    if lock_conn is None:
-        print("[telegram-bot] otra instancia mantiene el bloqueo de polling; esta instancia termina.")
-        return
+    lock_conn = None
+    while lock_conn is None:
+        try:
+            lock_conn = _acquire_polling_lock()
+        except Exception as exc:
+            print(f"[telegram-bot] no se pudo adquirir el bloqueo de polling: {type(exc).__name__}")
+        if lock_conn is None:
+            print("[telegram-bot] polling ocupado; se reintentará sin apagar el servicio.")
+            time.sleep(max(POLL_INTERVAL, 5))
 
     try:
         _clear_webhook(token)
@@ -612,10 +738,13 @@ def run_bot():
                     if text.startswith("/"):
                         _handle(token, chat_id, text)
                         continue
-                    for url in _extract_urls(text)[:3]:
-                        clean_url = url.rstrip(".,);]}")
-                        _, result = _ingest_telegram_url(clean_url, text)
-                        _send(token, chat_id, result)
+                    urls = _extract_urls(text)[:3]
+                    if urls:
+                        photo_data_url = _telegram_photo_data_url(token, message)
+                        for url in urls:
+                            clean_url = url.rstrip(".,);]}")
+                            _, result = _ingest_telegram_url(clean_url, text, photo_data_url)
+                            _send(token, chat_id, result)
             except requests.HTTPError as exc:
                 response = getattr(exc, "response", None)
                 status = response.status_code if response is not None else "?"

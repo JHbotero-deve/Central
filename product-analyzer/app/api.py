@@ -15,6 +15,7 @@ from fastapi.responses import Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from psycopg2.extras import Json
+from mongo_store import store_product_image
 
 from analysis import score_product
 from amazon_api import fetch_amazon_products
@@ -567,15 +568,50 @@ def public_product(product_id: int):
     conn=get_connection()
     try:
         with conn.cursor() as cur:
-            cur.execute("""SELECT pc.id AS publication_id,pc.product_id,pc.title,pc.subtitle,pc.price_display,
-                pc.sale_price,pc.opportunity_score,pc.footer,p.description,p.current_price,p.previous_price,p.currency,
-                COALESCE(NULLIF(pc.image_url, ''), NULLIF(p.image_url, '')) AS image_url,p.image_gallery,
+            cur.execute("""SELECT
+                p.id AS id,
+                pc.id AS publication_id,
+                pc.product_id,
+                COALESCE(NULLIF(pc.title, ''), p.title) AS title,
+                pc.subtitle,
+                pc.price_display,
+                pc.sale_price,
+                pc.opportunity_score,
+                pc.footer,
+                p.description,
+                p.current_price,
+                p.previous_price,
+                p.currency,
+                CASE
+                    WHEN COALESCE(p.source_metadata->>'mongo_image_id', '') <> ''
+                    THEN 'mongo://' || (p.source_metadata->>'mongo_image_id')
+                    ELSE COALESCE(NULLIF(pc.image_url, ''), NULLIF(p.image_url, ''))
+                END AS image_url,
+                p.image_gallery,
                 COALESCE(NULLIF(pc.product_url, ''), NULLIF(p.product_url, '')) AS product_url,
-                p.affiliate_url,p.sku,p.external_id,p.stock,
-                pl.name AS platform,c.name AS category,p.rating,p.reviews_count,p.updated_at
-                FROM published_cards pc JOIN products p ON p.id=pc.product_id JOIN platforms pl ON pl.id=p.platform_id
+                p.affiliate_url,
+                p.sku,
+                p.external_id,
+                p.stock,
+                p.sales_estimate,
+                p.source_metadata,
+                p.model_url,
+                p.model_shape,
+                p.catalog_expires_at,
+                p.is_active AS source_active,
+                s.name AS seller_name,
+                s.reputation AS seller_reputation,
+                pl.name AS platform,
+                c.name AS category,
+                p.rating,
+                p.reviews_count,
+                p.updated_at
+                FROM published_cards pc
+                JOIN products p ON p.id=pc.product_id
+                JOIN platforms pl ON pl.id=p.platform_id
                 LEFT JOIN categories c ON c.id=p.category_id
-                WHERE pc.product_id=%s AND pc.is_published=TRUE AND p.is_active=TRUE""",(product_id,))
+                LEFT JOIN sellers s ON s.id=p.seller_id
+                WHERE pc.product_id=%s AND pc.is_published=TRUE AND p.is_blocked=FALSE""",(product_id,))
             row=cur.fetchone()
     finally: conn.close()
     if not row: raise HTTPException(404,"Producto publicado no encontrado")
@@ -933,6 +969,46 @@ def import_product_from_url(payload: ProductImport, _: dict = Depends(require_ad
         conn.close()
 
 
+def _persist_product_image_reference(value: str | None, *, platform: str, external_id: str, index: int = 0):
+    """Guarda imágenes subidas como mongo:// y mantiene URL pública si el proveedor remoto falla."""
+    value = str(value or "").strip()
+    if not value:
+        return None, None
+    if value.startswith("mongo://"):
+        return value, value[8:]
+
+    is_data_uri = value.startswith("data:")
+    if not is_data_uri:
+        try:
+            _public_url(value)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    try:
+        mongo_id = store_product_image(
+            value,
+            platform=platform,
+            external_id=external_id,
+            image_index=index,
+        )
+        if mongo_id:
+            return "mongo://" + mongo_id, mongo_id
+    except Exception as exc:
+        if is_data_uri:
+            raise HTTPException(
+                status_code=422,
+                detail="No se pudo guardar la imagen subida. Comprueba que MongoDB esté conectado y vuelve a intentar.",
+            ) from exc
+        print(f"[media] imagen externa no cacheada ({platform}): {type(exc).__name__}")
+
+    if is_data_uri:
+        raise HTTPException(
+            status_code=503,
+            detail="El almacenamiento de imágenes no está disponible; la tarjeta no se guardó para evitar perder la imagen.",
+        )
+    return value, None
+
+
 class PersonalProduct(BaseModel):
     title: str = Field(min_length=2, max_length=500)
     description: Optional[str] = Field(default=None, max_length=5000)
@@ -963,26 +1039,39 @@ def create_personal_product(payload: PersonalProduct, _: dict = Depends(require_
                 cur.execute("INSERT INTO categories(name) VALUES(%s) RETURNING id", (category_name,))
                 category = cur.fetchone()
             sku = (payload.sku or "").strip() or f"PERSONAL-{int(time.time()*1000)}"
+            primary_image, primary_mongo_id = _persist_product_image_reference(
+                payload.image_url, platform="personal", external_id=sku, index=0
+            )
+            saved_gallery = []
+            for image_index, image_value in enumerate(payload.image_gallery or [], start=1):
+                stored_ref, _ = _persist_product_image_reference(
+                    image_value, platform="personal", external_id=sku, index=image_index
+                )
+                if stored_ref:
+                    saved_gallery.append(stored_ref)
+            source_metadata = {"mongo_image_id": primary_mongo_id} if primary_mongo_id else {}
             cur.execute("""
                 INSERT INTO products (
                     platform_id,category_id,external_id,sku,title,description,image_url,image_gallery,
-                    product_url,current_price,previous_price,currency,stock,is_active,
+                    product_url,current_price,previous_price,currency,stock,source_metadata,is_active,
                     catalog_expires_at,updated_at
-                ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,TRUE,NULL,NOW())
+                ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,TRUE,NULL,NOW())
                 ON CONFLICT(platform_id,external_id) DO UPDATE SET
                     category_id=EXCLUDED.category_id,sku=EXCLUDED.sku,title=EXCLUDED.title,
                     description=EXCLUDED.description,image_url=EXCLUDED.image_url,
-                    product_url=EXCLUDED.product_url,current_price=EXCLUDED.current_price,
-                    previous_price=EXCLUDED.previous_price,currency=EXCLUDED.currency,
-                    stock=EXCLUDED.stock,is_active=TRUE,catalog_expires_at=NULL,updated_at=NOW()
+                    image_gallery=EXCLUDED.image_gallery,product_url=EXCLUDED.product_url,
+                    current_price=EXCLUDED.current_price,previous_price=EXCLUDED.previous_price,
+                    currency=EXCLUDED.currency,stock=EXCLUDED.stock,source_metadata=EXCLUDED.source_metadata,
+                    is_active=TRUE,catalog_expires_at=NULL,updated_at=NOW()
                 RETURNING id
             """,(platform["id"],category["id"],sku,sku,payload.title.strip(),payload.description,
-                 payload.image_url,Json(payload.image_gallery or []),payload.product_url,payload.price,payload.previous_price,
-                 payload.currency.upper(),payload.stock))
+                 primary_image,Json(saved_gallery or ([primary_image] if primary_image else [])),payload.product_url,
+                 payload.price,payload.previous_price,payload.currency.upper(),payload.stock,Json(source_metadata)))
             product_id=cur.fetchone()["id"]
             cur.execute("INSERT INTO price_history(product_id,price) VALUES(%s,%s)",(product_id,payload.price))
             cur.execute("""SELECT p.id,p.title,pl.name AS platform,c.name AS category,p.current_price,
-                p.previous_price,p.currency,p.image_url,p.image_gallery,p.product_url,p.stock,p.sku,p.description,p.updated_at
+                p.previous_price,p.currency,p.image_url,p.image_gallery,p.product_url,p.affiliate_url,p.stock,p.sku,
+                p.description,p.source_metadata,p.updated_at
                 FROM products p JOIN platforms pl ON pl.id=p.platform_id LEFT JOIN categories c ON c.id=p.category_id
                 WHERE p.id=%s""",(product_id,))
             saved=cur.fetchone()
@@ -1008,14 +1097,40 @@ def update_product_images(product_id: int, payload: ProductImages, _: dict = Dep
     conn=get_connection()
     try:
         with conn.cursor() as cur:
-            cur.execute("""UPDATE products SET image_gallery=%s,image_url=%s,updated_at=NOW()
-                           WHERE id=%s RETURNING id,image_url,image_gallery,updated_at""",(Json(clean),clean[0] if clean else None,product_id))
+            cur.execute("SELECT pl.name AS platform,p.external_id FROM products p JOIN platforms pl ON pl.id=p.platform_id WHERE p.id=%s",(product_id,))
+            current=cur.fetchone()
+            if not current:
+                raise HTTPException(status_code=404,detail="Producto no encontrado")
+            saved=[]
+            first_mongo_id=None
+            for index,image in enumerate(clean):
+                stored_ref,mongo_id=_persist_product_image_reference(
+                    image,platform=str(current["platform"]),external_id=str(current["external_id"]),index=index
+                )
+                if stored_ref:
+                    saved.append(stored_ref)
+                    if index==0:
+                        first_mongo_id=mongo_id
+            metadata={"mongo_image_id":first_mongo_id} if first_mongo_id else {}
+            cur.execute("""UPDATE products SET image_gallery=%s,image_url=%s,
+                           source_metadata=(COALESCE(source_metadata,'{}'::jsonb)-'mongo_image_id') || %s,
+                           updated_at=NOW()
+                           WHERE id=%s RETURNING id,image_url,image_gallery,source_metadata,updated_at""",
+                        (Json(saved),saved[0] if saved else None,Json(metadata),product_id))
             result=cur.fetchone()
-            if not result: raise HTTPException(status_code=404,detail="Producto no encontrado")
-        conn.commit(); return result
+            cur.execute("UPDATE published_cards SET image_url=%s,updated_at=NOW() WHERE product_id=%s",
+                        (saved[0] if saved else None,product_id))
+        conn.commit()
+        return result
     except HTTPException:
-        conn.rollback(); raise
-    finally: conn.close()
+        conn.rollback()
+        raise
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
 
 
 class ModelUpdate(BaseModel):
@@ -1102,13 +1217,25 @@ def update_personal_product(product_id: int, payload: ProductUpdate, _: dict = D
             if not category:
                 cur.execute("INSERT INTO categories(name) VALUES(%s) RETURNING id", (category_name,))
                 category = cur.fetchone()
+            primary_image, primary_mongo_id = _persist_product_image_reference(
+                payload.image_url, platform="personal", external_id=str(product_id), index=0
+            )
+            saved_gallery = []
+            for image_index, image_value in enumerate(payload.image_gallery or [], start=1):
+                stored_ref, _ = _persist_product_image_reference(
+                    image_value, platform="personal", external_id=str(product_id), index=image_index
+                )
+                if stored_ref:
+                    saved_gallery.append(stored_ref)
+            image_metadata = {"mongo_image_id": primary_mongo_id} if primary_mongo_id else {}
             cur.execute("""UPDATE products SET category_id=%s,title=%s,description=%s,current_price=%s,
-                previous_price=%s,currency=%s,image_url=%s,image_gallery=%s,product_url=%s,updated_at=NOW()
+                previous_price=%s,currency=%s,image_url=%s,image_gallery=%s,product_url=%s,
+                source_metadata=(COALESCE(source_metadata,'{}'::jsonb)-'mongo_image_id') || %s,updated_at=NOW()
                 WHERE id=%s AND platform_id=%s AND is_active=TRUE
                 RETURNING id,title,description,current_price AS price,previous_price,currency,image_url,image_gallery,product_url""",
                 (category["id"],payload.title.strip(),payload.description,payload.price,payload.previous_price,
-                 payload.currency.upper(),payload.image_url,Json(payload.image_gallery or []),payload.product_url,
-                 product_id,platform["id"]))
+                 payload.currency.upper(),primary_image,Json(saved_gallery or ([primary_image] if primary_image else [])),
+                 payload.product_url,Json(image_metadata),product_id,platform["id"]))
             saved = cur.fetchone()
             if not saved:
                 raise HTTPException(status_code=404, detail="Producto propio no encontrado")
@@ -1117,7 +1244,7 @@ def update_personal_product(product_id: int, payload: ProductUpdate, _: dict = D
                     sale_price=%s,updated_at=NOW()
                 WHERE product_id=%s""",
                 (payload.title.strip(),payload.description,
-                 f"{payload.price:,.0f} {payload.currency.upper()}",payload.image_url,
+                 f"{payload.price:,.0f} {payload.currency.upper()}",primary_image,
                  payload.product_url,payload.price,product_id))
         conn.commit()
         return {"product": saved}
