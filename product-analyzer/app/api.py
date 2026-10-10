@@ -567,14 +567,48 @@ def public_product(product_id: int):
     conn=get_connection()
     try:
         with conn.cursor() as cur:
-            cur.execute("""SELECT pc.id AS publication_id,pc.product_id,pc.title,pc.subtitle,pc.price_display,
-                pc.sale_price,pc.opportunity_score,pc.footer,p.description,p.current_price,p.previous_price,p.currency,
-                COALESCE(NULLIF(pc.image_url, ''), NULLIF(p.image_url, '')) AS image_url,p.image_gallery,
+            cur.execute("""SELECT
+                p.id AS id,
+                pc.id AS publication_id,
+                pc.product_id,
+                COALESCE(NULLIF(pc.title, ''), p.title) AS title,
+                pc.subtitle,
+                pc.price_display,
+                pc.sale_price,
+                pc.opportunity_score,
+                pc.footer,
+                p.description,
+                p.current_price,
+                p.previous_price,
+                p.currency,
+                CASE
+                    WHEN COALESCE(p.source_metadata->>'mongo_image_id', '') <> ''
+                    THEN 'mongo://' || (p.source_metadata->>'mongo_image_id')
+                    ELSE COALESCE(NULLIF(pc.image_url, ''), NULLIF(p.image_url, ''))
+                END AS image_url,
+                p.image_gallery,
                 COALESCE(NULLIF(pc.product_url, ''), NULLIF(p.product_url, '')) AS product_url,
-                p.affiliate_url,p.sku,p.external_id,p.stock,
-                pl.name AS platform,c.name AS category,p.rating,p.reviews_count,p.updated_at
-                FROM published_cards pc JOIN products p ON p.id=pc.product_id JOIN platforms pl ON pl.id=p.platform_id
+                p.affiliate_url,
+                p.sku,
+                p.external_id,
+                p.stock,
+                p.sales_estimate,
+                p.source_metadata,
+                p.model_url,
+                p.model_shape,
+                p.catalog_expires_at,
+                s.name AS seller_name,
+                s.reputation AS seller_reputation,
+                pl.name AS platform,
+                c.name AS category,
+                p.rating,
+                p.reviews_count,
+                p.updated_at
+                FROM published_cards pc
+                JOIN products p ON p.id=pc.product_id
+                JOIN platforms pl ON pl.id=p.platform_id
                 LEFT JOIN categories c ON c.id=p.category_id
+                LEFT JOIN sellers s ON s.id=p.seller_id
                 WHERE pc.product_id=%s AND pc.is_published=TRUE AND p.is_active=TRUE""",(product_id,))
             row=cur.fetchone()
     finally: conn.close()
