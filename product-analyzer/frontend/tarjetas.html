@@ -100,11 +100,11 @@ function gate(){renderVars();preview();loadMine();renderThemes()}
 function tab(n){["mine","add","theme"].forEach(x=>{$("tab-"+x).hidden=x!==n});document.querySelectorAll("[data-tab]").forEach(b=>b.classList.toggle("on",b.dataset.tab===n))}
 
 function renderVars(){
-  $("vars").innerHTML=V.map((v,i)=>{const up=v.img.startsWith("data:");return `<div class="ed-var" data-i="${i}">
+  $("vars").innerHTML=V.map((v,i)=>{const up=v.img.startsWith("data:")||v.img.startsWith("mongo://");return `<div class="ed-var" data-i="${i}">
    <div class="ed-varh"><b>Variante ${i+1}</b>${V.length>1?`<button type="button" class="ed-x" data-del="${i}">Quitar</button>`:""}</div>
    <input class="ed-in" data-f="name" placeholder="Nombre del color (Ej: Rojo Fuego)" value="${S.esc(v.name)}">
-   <div class="ed-row"><input class="ed-in" data-f="img" placeholder="URL de imagen (Amazon / Mercado Libre)" value="${up?"":S.esc(v.img)}"><label class="ed-up" title="Subir imagen">⬆<input type="file" accept="image/*" data-file hidden></label></div>
-   ${up?'<div class="ed-note">Imagen subida ✓</div>':""}
+   <div class="ed-row"><input class="ed-in" data-f="img" placeholder="URL pública de imagen o subir archivo" value="${up?"":S.esc(v.img)}"><label class="ed-up" title="Subir imagen">⬆<input type="file" accept="image/*" data-file hidden></label></div>
+   ${up?'<div class="ed-note">'+(v.img.startsWith("mongo://")?"Imagen guardada en Central ✓":"Imagen cargada ✓")+'</div>':""}
    <div class="ed-glows">${S.GLOWS.map((g,gi)=>`<button type="button" class="ed-g ${gi===v.glow?"on":""}" data-g="${gi}" title="${g[0]}" style="background:${g[1]}"></button>`).join("")}</div></div>`}).join("");
   $("addVar").hidden=V.length>=4;
 }
@@ -164,7 +164,7 @@ let meliItems=[];
    $("msg").scrollIntoView({behavior:"smooth",block:"nearest"});
  });
  function adminCardHtml(m){
-  const v=m.variants[0]||{},src=S.imgOk(v.img),own=m.platform==="personal";
+  const v=m.variants[0]||{},src=S.imageSrc(v.img),own=m.platform==="personal";
   const img=src?'<img src="'+S.esc(src)+'" alt="'+S.esc(m.title)+'" loading="lazy" referrerpolicy="no-referrer">':'<span class="admin-card-noimg">Sin imagen</span>';
   return '<div class="admin-card-wrap"><button type="button" class="admin-card" data-open="'+S.esc(m.id)+'" aria-label="Ver '+S.esc(m.title)+'"><div class="admin-card-media '+(m.plate?"plate":"")+'">'+img+'</div><div class="admin-card-body"><span class="admin-card-brand">'+S.esc(m.brand||m.cat)+'</span><span class="admin-card-title">'+S.esc(m.title)+'</span><span class="admin-card-price">'+S.money(m.price,m.currency)+'</span><div class="admin-card-meta"><span>'+S.esc(m.platform||m.cat)+'</span><span class="admin-card-status">Activo</span></div></div></button><div class="admin-card-actions">'+(own?'<button type="button" data-edit="'+S.esc(m.id)+'">Editar</button>':'')+'<button type="button" data-publish="'+S.esc(m.id)+'">Publicar</button><button type="button" data-delete="'+S.esc(m.id)+'">Eliminar</button></div></div>'
 }
