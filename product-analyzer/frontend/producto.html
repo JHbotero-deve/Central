@@ -542,7 +542,6 @@ try{
                 id="mainImg"
                 src="${esc(mediaSrc(gallery[0]))}"
                 alt="${esc(p.title)}"
-                onerror="this.hidden=true;document.getElementById('imageMissing').hidden=false"
             >
             <p id="imageMissing" style="color:var(--muted);text-align:center;font-size:12px" hidden>La imagen de origen no está disponible ahora.</p>
         ` : `
@@ -705,15 +704,34 @@ try{
 </div>
 `;
 
-    document
-        .querySelectorAll(".gallery img")
-        .forEach(x=>{
-            x.onclick=()=>{
-                document.getElementById(
-                    "mainImg"
-                ).src=x.src;
-            };
+    const mainImage=document.getElementById("mainImg");
+    if(mainImage){
+        let mainImageIndex=0;
+        mainImage.addEventListener("error",()=>{
+            mainImageIndex+=1;
+            if(mainImageIndex<gallery.length){
+                mainImage.src=mediaSrc(gallery[mainImageIndex]);
+                return;
+            }
+            mainImage.hidden=true;
+            const placeholder=document.getElementById("imageMissing");
+            if(placeholder) placeholder.hidden=false;
         });
+    }
+
+    document.querySelectorAll(".gallery img").forEach(x=>{
+        x.onclick=()=>{
+            const main=document.getElementById("mainImg");
+            if(!main)return;
+            const placeholder=document.getElementById("imageMissing");
+            if(placeholder) placeholder.hidden=true;
+            main.hidden=false;
+            const selected=x.dataset.original||gallery[0];
+            const selectedIndex=gallery.indexOf(selected);
+            mainImageIndex=selectedIndex>=0?selectedIndex:0;
+            main.src=mediaSrc(selected);
+        };
+    });
 
     document.getElementById("buy").onclick=async()=>{
 
