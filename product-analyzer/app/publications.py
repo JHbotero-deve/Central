@@ -77,7 +77,7 @@ def list_publications(
                 JOIN products p ON p.id = pc.product_id
                 JOIN platforms pl ON pl.id = p.platform_id
                 LEFT JOIN categories c ON c.id = p.category_id
-                WHERE p.is_active = TRUE {where}
+                WHERE p.is_active = TRUE AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW()) {where}
                 ORDER BY pc.sort_order ASC, pc.published_at DESC, pc.id ASC
                 LIMIT %s OFFSET %s
                 """,
@@ -116,7 +116,7 @@ def publish_card(payload: PublicationPayload, _: None = Depends(require_publicat
                 FROM products p
                 JOIN platforms pl ON pl.id = p.platform_id
                 LEFT JOIN product_scores s ON s.product_id = p.id
-                WHERE p.id = %s AND p.is_active = TRUE
+                WHERE p.id = %s AND p.is_active = TRUE AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW())
                 """,
                 (payload.product_id,),
             )
@@ -205,7 +205,7 @@ def update_publication(publication_id: int, payload: PublicationPayload, _: None
                 JOIN products p ON p.id = pc.product_id
                 JOIN platforms pl ON pl.id = p.platform_id
                 LEFT JOIN product_scores s ON s.product_id = p.id
-                WHERE pc.id = %s AND p.is_active = TRUE
+                WHERE pc.id = %s AND p.is_active = TRUE AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW())
                 """,
                 (publication_id,),
             )

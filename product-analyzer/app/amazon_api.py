@@ -15,6 +15,7 @@ CREDENTIAL_VERSION = os.getenv("AMAZON_CREDENTIAL_VERSION", "3.1").strip()
 _TOKEN: str | None = None
 _TOKEN_EXPIRES_AT = 0.0
 _TOKEN_VERSION = ""
+_AUTH_FAILURE = False
 
 
 def _access_token() -> str:
@@ -355,6 +356,9 @@ def _fallback_images(url: str) -> dict[str, Any]:
 
 
 def search_products(keywords: str, limit: int = 10) -> list[dict[str, Any]]:
+    global _AUTH_FAILURE
+    if _AUTH_FAILURE:
+        return []
     try:
         data = _request(
             "searchItems",
@@ -376,7 +380,12 @@ def search_products(keywords: str, limit: int = 10) -> list[dict[str, Any]]:
         if items:
             return items
     except Exception as exc:
-        print(f"[amazon] Creators API no disponible para '{keywords}': {exc}")
+        message = str(exc)
+        print(f"[amazon] Creators API no disponible para '{keywords}': {message}")
+        if "Amazon OAuth rechazó las credenciales" in message or "invalid_client" in message:
+            _AUTH_FAILURE = True
+            print("[amazon] partner no autorizado; se omiten nuevas solicitudes hasta corregir credenciales.", flush=True)
+            return []
 
     html_results = _search_amazon_html(keywords, limit)
     if html_results:

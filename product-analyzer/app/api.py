@@ -1047,6 +1047,7 @@ def active_catalog(_: dict = Depends(require_admin)):
                 LEFT JOIN categories c ON c.id = p.category_id
                 LEFT JOIN published_cards pc ON pc.product_id = p.id
                 WHERE p.is_active = TRUE AND p.is_blocked = FALSE
+                  AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW())
                 ORDER BY p.updated_at DESC
                 LIMIT 200            """)
             return cur.fetchall()
