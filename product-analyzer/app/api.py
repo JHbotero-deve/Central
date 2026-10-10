@@ -598,6 +598,7 @@ def public_product(product_id: int):
                 p.model_url,
                 p.model_shape,
                 p.catalog_expires_at,
+                p.is_active AS source_active,
                 s.name AS seller_name,
                 s.reputation AS seller_reputation,
                 pl.name AS platform,
@@ -610,7 +611,7 @@ def public_product(product_id: int):
                 JOIN platforms pl ON pl.id=p.platform_id
                 LEFT JOIN categories c ON c.id=p.category_id
                 LEFT JOIN sellers s ON s.id=p.seller_id
-                WHERE pc.product_id=%s AND pc.is_published=TRUE AND p.is_active=TRUE""",(product_id,))
+                WHERE pc.product_id=%s AND pc.is_published=TRUE AND p.is_blocked=FALSE""",(product_id,))
             row=cur.fetchone()
     finally: conn.close()
     if not row: raise HTTPException(404,"Producto publicado no encontrado")
