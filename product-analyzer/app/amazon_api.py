@@ -544,7 +544,7 @@ def fetch_amazon_products(
     ]
 
     results: list[tuple[str, dict[str, Any]]] = []
-    seen = set(existing_ids)
+    seen = set()
 
     for category, keywords in searches:
         try:
