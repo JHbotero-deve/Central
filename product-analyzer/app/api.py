@@ -362,7 +362,7 @@ def _sync_store_catalog():
             conn.rollback()
             errors.append(f"Mercado Libre: {exc}")
 
-        if not amazon_imported and not meli_imported:
+        if not amazon_imported and not meli_imported and not meli_refreshed:
             raise HTTPException(status_code=502, detail={
                 "message": "No se pudo importar ningún producto real.",
                 "errors": errors[:10],
