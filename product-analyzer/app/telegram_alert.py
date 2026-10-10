@@ -15,7 +15,7 @@ from url_import import detect_platform, import_url
 
 POLL_INTERVAL = int(os.getenv("TELEGRAM_POLL_INTERVAL", "3"))
 API_BASE = "https://api.telegram.org"
-ALLOWED_PLATFORMS = {"mercadolibre", "amazon", "aliexpress", "personal"}
+ALLOWED_PLATFORMS = {"mercadolibre", "amazon", "tiktok", "aliexpress", "personal"}
 ALLOWED_CATEGORIES = {"ropa", "calzado", "accesorios", "electronica", "hogar", "fitness", "otros"}
 
 
@@ -66,7 +66,7 @@ def _format_product(p):
     price_score = p.get("price_score")
     demand_score = p.get("demand_score")
     trend_score = p.get("trend_score")
-    url = str(p.get("product_url") or "").strip()
+    url = str(p.get("affiliate_url") or p.get("product_url") or "").strip()
 
     lines = [
         f"<b>{title}</b>",
@@ -148,7 +148,7 @@ def _top_products(limit=5):
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT p.title, p.current_price, p.currency, p.product_url, p.image_url,
+                SELECT p.title, p.current_price, p.currency, p.product_url, p.affiliate_url, p.image_url,
                        p.rating, p.reviews_count, p.sales_estimate,
                        pl.name AS platform, c.name AS category,
                        COALESCE(s.price_score, 0) AS price_score,
@@ -177,7 +177,7 @@ def _catalog_products(limit=20, offset=0):
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT p.title, p.current_price, p.currency, p.product_url, p.image_url,
+                SELECT p.title, p.current_price, p.currency, p.product_url, p.affiliate_url, p.image_url,
                        p.rating, p.reviews_count, p.sales_estimate,
                        pl.name AS platform, c.name AS category,
                        COALESCE(s.price_score, 0) AS price_score,
@@ -207,7 +207,7 @@ def _search_products(term, limit=8):
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT p.title, p.current_price, p.currency, p.product_url, p.image_url,
+                SELECT p.title, p.current_price, p.currency, p.product_url, p.affiliate_url, p.image_url,
                        p.rating, p.reviews_count, p.sales_estimate,
                        pl.name AS platform, c.name AS category,
                        COALESCE(s.price_score, 0) AS price_score,
@@ -600,7 +600,7 @@ def _handle(token, chat_id, text):
         message = (
             f"<b>Producto agregado</b>\n{html.escape(payload['title'])}\n"
             f"Plataforma: {html.escape(payload['platform'])}\n{score_text}\n"
-            f'<a href="{html.escape(payload["product_url"], quote=True)}">Abrir producto original</a>'
+            f'<a href="{html.escape(payload.get("affiliate_url") or payload["product_url"], quote=True)}">Abrir enlace de compra</a>'
         )
         if payload.get("image_url"):
             message += f'\nImagen: <a href="{html.escape(payload["image_url"], quote=True)}">ver imagen</a>'
