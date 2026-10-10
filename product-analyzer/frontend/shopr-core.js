@@ -4,7 +4,8 @@ const GLOWS=[["Rojo Fuego","#ff3b1f"],["Naranja","#ff7a1a"],["Ámbar","#ffb300"]
 const THEMES=[["Crema","#f6f1e8"],["Marfil","#fffdf8"],["Verde suave","#edf2e6"]];
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const url=u=>/^https?:\/\//i.test(u||"")?String(u):"";
-const imgOk=u=>/^(https?:\/\/|data:image\/)/i.test(u||"")?String(u):"";
+const imgOk=u=>/^(https?:\/\/|data:image\/|mongo:\/\/)/i.test(u||"")?String(u):"";
+const imageSrc=u=>{const src=imgOk(u);return src.startsWith("mongo://")?API+"/media/image?url="+encodeURIComponent(src):src};
 const nn=x=>(x==null||x===""||isNaN(Number(x)))?null:Number(x);
 const money=(v,c)=>{if(nn(v)==null)return"—";const cur=String(c||"COP").toUpperCase();try{return new Intl.NumberFormat(cur==="COP"?"es-CO":"en-US",{style:"currency",currency:cur,maximumFractionDigits:cur==="COP"?0:2}).format(Number(v))}catch{return v+" "+cur}};
 const enc=s=>{let o="";new TextEncoder().encode(s).forEach(x=>o+=String.fromCharCode(x));return btoa(o)};
@@ -50,7 +51,7 @@ function detailHtml(m,vi){
   if(url(L.wompi))b.push(a("sh-wmp",L.wompi,"Pagar con <b>Wompi</b>"));
   if(!b.length&&url(m.fallback))b.push(a("sh-amz",m.fallback,"Ver <b>producto</b>"));
   if(!b.length&&m.platform==="personal")b.push('<a class="sh-btn sh-wmp" href="/tienda">Comprar en <b>Central</b></a>');
-  const im=imgOk(v.img)?`<img src="${esc(imgOk(v.img))}" alt="${esc(m.title)}" referrerpolicy="no-referrer">`:'<span class="sh-noimg">Sin imagen</span>';
+  const im=imageSrc(v.img)?`<img src="${esc(imageSrc(v.img))}" alt="${esc(m.title)}" referrerpolicy="no-referrer" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span class="sh-noimg" hidden>Imagen no disponible</span>`:'<span class="sh-noimg">Sin imagen</span>';
   const facts=[];if(m.sku)facts.push(["SKU",m.sku]);if(m.stock!=null)facts.push(["Disponibilidad",m.stock>0?String(m.stock)+" unidades":"Agotado"]);if(m.sellerName)facts.push(["Vendedor",m.sellerName]);if(m.sellerReputation)facts.push(["Reputación",typeof m.sellerReputation==="string"?m.sellerReputation:JSON.stringify(m.sellerReputation)]);if(m.salesEstimate!=null)facts.push(["Ventas estimadas",String(m.salesEstimate)]);if(m.reviews>0)facts.push(["Reseñas",String(m.reviews)]);if(m.updatedAt)facts.push(["Actualizado",String(m.updatedAt).slice(0,10)]);if(m.platform)facts.push(["Origen",m.platform==="mercadolibre"?"Mercado Libre":m.platform==="amazon"?"Amazon":m.platform]);
   const sw=m.variants.length>1?`<div class="sh-color">COLOR: <b>${esc(v.name||gl[0])}</b></div><div class="sh-sw">${m.variants.map((x,i)=>`<button type="button" data-vi="${i}" class="${i===vi?"on":""}" title="${esc(x.name||"")}" style="background:${(GLOWS[x.glow]||GLOWS[0])[1]}"></button>`).join("")}</div>`:"";
   return `<section class="sh-detail"><div class="sh-stage ${m.plate?"plate":""}">${im}</div><div class="sh-info">
@@ -69,8 +70,8 @@ function mountDetail(root,m,vi=0){
   root.querySelectorAll("[data-vi]").forEach(b=>b.addEventListener("click",()=>mountDetail(root,m,+b.dataset.vi)))}
 function cardHtml(m){
   const v=m.variants[0]||{};
-  const im=imgOk(v.img)?`<img src="${esc(imgOk(v.img))}" alt="${esc(m.title)}" loading="lazy" referrerpolicy="no-referrer">`:'<span class="sh-noimg">Sin imagen</span>';
+  const src=imageSrc(v.img),im=src?`<img src="${esc(src)}" alt="${esc(m.title)}" loading="lazy" referrerpolicy="no-referrer" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span class="sh-noimg" hidden>Imagen no disponible</span>`:'<span class="sh-noimg">Sin imagen</span>';
   return `<button type="button" class="sh-card" data-id="${esc(m.id)}"><div class="sh-cim ${m.plate?"plate":""}">${im}</div><div class="sh-cb"><span class="sh-cbrand">${esc(m.brand||m.cat)}</span><span class="sh-ctitle">${esc(m.title)}</span><span class="sh-cprice">${money(m.price,m.currency)}</span></div></button>`}
 
-return{API,GLOWS,THEMES,esc,url,imgOk,nn,money,pack,unpack,fromApi,detailHtml,mountDetail,cardHtml,api,theme,setTheme,applyTheme}
+return{API,GLOWS,THEMES,esc,url,imgOk,imageSrc,nn,money,pack,unpack,fromApi,detailHtml,mountDetail,cardHtml,api,theme,setTheme,applyTheme}
 })();
