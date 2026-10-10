@@ -979,7 +979,10 @@ def _persist_product_image_reference(value: str | None, *, platform: str, extern
 
     is_data_uri = value.startswith("data:")
     if not is_data_uri:
-        _public_url(value)
+        try:
+            _public_url(value)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     try:
         mongo_id = store_product_image(
@@ -1094,14 +1097,40 @@ def update_product_images(product_id: int, payload: ProductImages, _: dict = Dep
     conn=get_connection()
     try:
         with conn.cursor() as cur:
-            cur.execute("""UPDATE products SET image_gallery=%s,image_url=%s,updated_at=NOW()
-                           WHERE id=%s RETURNING id,image_url,image_gallery,updated_at""",(Json(clean),clean[0] if clean else None,product_id))
+            cur.execute("SELECT pl.name AS platform,p.external_id FROM products p JOIN platforms pl ON pl.id=p.platform_id WHERE p.id=%s",(product_id,))
+            current=cur.fetchone()
+            if not current:
+                raise HTTPException(status_code=404,detail="Producto no encontrado")
+            saved=[]
+            first_mongo_id=None
+            for index,image in enumerate(clean):
+                stored_ref,mongo_id=_persist_product_image_reference(
+                    image,platform=str(current["platform"]),external_id=str(current["external_id"]),index=index
+                )
+                if stored_ref:
+                    saved.append(stored_ref)
+                    if index==0:
+                        first_mongo_id=mongo_id
+            metadata={"mongo_image_id":first_mongo_id} if first_mongo_id else {}
+            cur.execute("""UPDATE products SET image_gallery=%s,image_url=%s,
+                           source_metadata=(COALESCE(source_metadata,'{}'::jsonb)-'mongo_image_id') || %s,
+                           updated_at=NOW()
+                           WHERE id=%s RETURNING id,image_url,image_gallery,source_metadata,updated_at""",
+                        (Json(saved),saved[0] if saved else None,Json(metadata),product_id))
             result=cur.fetchone()
-            if not result: raise HTTPException(status_code=404,detail="Producto no encontrado")
-        conn.commit(); return result
+            cur.execute("UPDATE published_cards SET image_url=%s,updated_at=NOW() WHERE product_id=%s",
+                        (saved[0] if saved else None,product_id))
+        conn.commit()
+        return result
     except HTTPException:
-        conn.rollback(); raise
-    finally: conn.close()
+        conn.rollback()
+        raise
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
 
 
 class ModelUpdate(BaseModel):
@@ -1215,7 +1244,7 @@ def update_personal_product(product_id: int, payload: ProductUpdate, _: dict = D
                     sale_price=%s,updated_at=NOW()
                 WHERE product_id=%s""",
                 (payload.title.strip(),payload.description,
-                 f"{payload.price:,.0f} {payload.currency.upper()}",payload.image_url,
+                 f"{payload.price:,.0f} {payload.currency.upper()}",primary_image,
                  payload.product_url,payload.price,product_id))
         conn.commit()
         return {"product": saved}
