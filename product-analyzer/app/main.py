@@ -1,23 +1,27 @@
 import asyncio
+import os
+import uvicorn
 from fastapi import FastAPI
-from app.admin import router as admin_router
-from app.ingest import purge_expired_products
+from api import _sync_store_catalog
 
-app = FastAPI(title="Product Analyzer Multiplatform Central", version="2.0.0")
-app.include_router(admin_router)
+app = FastAPI(title="Central Catalog Worker", docs_url=None, redoc_url=None)
 
-async def background_sync_worker():
+async def sync_catalog_loop():
     while True:
         try:
-            purge_expired_products()
-        except Exception:
-            pass
+            result = await asyncio.to_thread(_sync_store_catalog)
+            print({"event": "catalog_sync", "result": result}, flush=True)
+        except Exception as exc:
+            print({"event": "catalog_sync_failed", "error": str(exc)}, flush=True)
         await asyncio.sleep(7200)
 
 @app.on_event("startup")
 async def startup_event():
-    asyncio.create_task(background_sync_worker())
+    asyncio.create_task(sync_catalog_loop())
 
-@app.get("/")
-def root():
-    return {"status": "online", "platforms": ["amazon", "mercadolibre", "aliexpress"], "discount_filter": ">=50%"}
+@app.get("/health")
+def health():
+    return {"status": "ok", "service": "central-worker"}
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", "8000")))

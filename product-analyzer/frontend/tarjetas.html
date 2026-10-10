@@ -28,10 +28,20 @@
 .meli-result small{display:block;color:var(--muted);font-size:11px;margin-top:4px}
 .meli-search-note{font-size:11px;color:var(--muted);margin:4px 0 8px}
 
-</style><script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+body:not(.auth-ready) .sh-wrap{display:none!important}#panel{display:none}.central-auth{min-height:100vh;display:grid;place-items:center;padding:24px;background:var(--bg);color:var(--ink);font-family:var(--font)}.central-auth-card{width:min(100%,440px);padding:clamp(22px,5vw,34px);background:var(--panel);border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow)}.central-auth-brand{display:flex;align-items:center;gap:12px;margin-bottom:28px}.central-auth-brand img{width:48px;height:48px}.central-auth-brand strong{display:block;font:800 17px var(--display)}.central-auth-brand span,.central-auth-copy,.central-auth-note{color:var(--muted);font-size:13px}.central-auth-kicker{font-size:11px;font-weight:800;letter-spacing:.14em;color:var(--brand);margin:0}.central-auth-card h1{font:700 clamp(28px,7vw,36px)/1.1 var(--display);margin:10px 0}.central-auth-form{display:grid;gap:14px;margin-top:22px}.central-auth-form label{display:grid;gap:7px;font-size:12px;font-weight:700;color:var(--muted)}.central-auth-form input{width:100%;min-width:0;border:1px solid var(--line);border-radius:10px;padding:13px;background:var(--panel2);color:var(--ink);font:14px var(--font)}.central-auth-form input:focus-visible{outline:2px solid var(--brand);outline-offset:2px}.central-auth-submit{min-height:48px;border:0;border-radius:10px;background:var(--brand);color:white;font:700 14px var(--font);cursor:pointer}.central-auth-submit:disabled{opacity:.6;cursor:wait}.central-auth-message{font-size:13px;color:var(--danger);min-height:18px;margin:0}.central-auth-note{margin:18px 0 0}.admin-session-actions{display:flex;gap:8px;align-items:center}</style><script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
 </head>
-<body><div class="sh-wrap">
-<header class="sh-top"><a class="sh-logo" href="/vitrina">CENTRAL</a><div style="display:flex;gap:8px"><a class="sh-pill" href="/vitrina">Ver vitrina</a></div></header>
+<body><main id="auth-screen" class="central-auth"><section class="central-auth-card">
+<div class="central-auth-brand"><img src="/central-icon.svg" alt=""><div><strong>CENTRAL</strong><span>Administración segura</span></div></div>
+<p class="central-auth-kicker">ACCESO PRIVADO</p><h1 id="auth-title">Iniciar sesión</h1><p class="central-auth-copy" id="auth-copy">Accede al panel administrativo de Central.</p>
+<form id="auth-form" class="central-auth-form">
+<label>Correo administrativo<input id="auth-email" type="email" autocomplete="username" required value="jorgebotero190@gmail.com"></label>
+<label id="setup-code-wrap" hidden>Código de configuración inicial<input id="auth-setup-code" type="password" autocomplete="one-time-code" minlength="24"></label>
+<label>Contraseña<input id="auth-password" type="password" autocomplete="current-password" minlength="12" required></label>
+<label id="confirm-wrap" hidden>Confirmar contraseña<input id="auth-confirm" type="password" autocomplete="new-password" minlength="12"></label>
+<button class="central-auth-submit" id="auth-submit" type="submit">Entrar</button><p class="central-auth-message" id="auth-message" role="status" aria-live="polite"></p>
+</form><p class="central-auth-note" id="auth-note">Sesión segura en este dispositivo.</p>
+</section></main><div class="sh-wrap">
+<header class="sh-top"><a class="sh-logo" href="/vitrina">CENTRAL</a><div class="admin-session-actions"><a class="sh-pill" href="/vitrina">Ver vitrina</a><button class="sh-pill" id="logout" type="button">Cerrar sesión</button></div></header>
 
 <section id="panel"><div class="ed-grid">
  <aside class="ed-side">
@@ -223,5 +233,14 @@ $("save").addEventListener("click",async()=>{
     }
   }catch(e){show(msg,"err",e.message)}finally{b.disabled=false}});
 $("cancelEdit").addEventListener("click",resetEditor);
-gate();})();
+async function initAuth(){
+ const screen=$("auth-screen"),form=$("auth-form"),msg=$("auth-message"),btn=$("auth-submit"),email=$("auth-email"),password=$("auth-password"),code=$("auth-setup-code"),confirmPassword=$("auth-confirm");
+ let setupRequired=false;
+ const say=(text,ok=false)=>{msg.textContent=text;msg.style.color=ok?"var(--brand)":"var(--danger)"};
+ const mode=setup=>{setupRequired=setup;$("auth-title").textContent=setup?"Configurar cuenta administrativa":"Iniciar sesión";$("auth-copy").textContent=setup?"Crea una contraseña privada. Este paso solo se permite una vez.":"Accede al panel administrativo de Central.";$("setup-code-wrap").hidden=!setup;$("confirm-wrap").hidden=!setup;code.required=setup;confirmPassword.required=setup;password.autocomplete=setup?"new-password":"current-password";btn.textContent=setup?"Crear cuenta y entrar":"Entrar";$("auth-note").textContent=setup?"Contraseña única de al menos 12 caracteres.":"Sesión de siete días en este dispositivo."};
+ const showPanel=()=>{document.body.classList.add("auth-ready");screen.hidden=true;$("panel").style.display="block";$("logout").addEventListener("click",async()=>{try{await S.api("/auth/logout",{method:"POST"})}finally{location.reload()}});gate()};
+ try{const status=await S.api("/auth/status");if(status.authenticated){showPanel();return}mode(!!status.setupRequired)}catch{mode(false);say("No se pudo conectar con el servicio de autenticación.");btn.disabled=true;return}
+ form.addEventListener("submit",async e=>{e.preventDefault();say("");btn.disabled=true;try{if(setupRequired){if(password.value.length<12)throw Error("Usa al menos 12 caracteres.");if(password.value!==confirmPassword.value)throw Error("Las contraseñas no coinciden.");await S.api("/auth/setup",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:email.value.trim(),setup_token:code.value,password:password.value})})}else{await S.api("/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:email.value.trim(),password:password.value})})}password.value="";confirmPassword.value="";code.value="";showPanel()}catch(err){say(err.message||"No fue posible autenticarte.")}finally{btn.disabled=false}});
+}
+initAuth();})();
 </script></body></html>

@@ -3,10 +3,11 @@ from typing import Optional
 import os
 import secrets
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Header
+from fastapi import APIRouter, Depends, HTTPException, Query, Header, Request
 from pydantic import BaseModel, Field
 
 from db import get_connection
+from auth import is_authenticated
 from notifications import send_telegram_publication
 
 router = APIRouter(tags=["publications"])
@@ -14,19 +15,19 @@ router = APIRouter(tags=["publications"])
 CAMPOS_PRIVADOS = ("cost_price", "profit_amount", "profit_margin_pct", "opportunity_score")
 
 
-def es_admin(x_admin_key: Optional[str]) -> bool:
+def es_admin(x_admin_key: Optional[str], request: Optional[Request] = None) -> bool:
     """True si la cabecera X-Admin-Key coincide con ADMIN_API_KEY."""
+    if request is not None and is_authenticated(request):
+        return True
     clave = os.getenv("ADMIN_API_KEY", "").strip()
     if not clave or not x_admin_key:
         return False
     return secrets.compare_digest(x_admin_key.strip().encode(), clave.encode())
 
 
-def require_publication_admin(x_admin_key: Optional[str] = Header(default=None)):
-    if not os.getenv("ADMIN_API_KEY", "").strip():
-        raise HTTPException(status_code=503, detail="ADMIN_API_KEY no está configurada")
-    if not es_admin(x_admin_key):
-        raise HTTPException(status_code=401, detail="Se requiere una clave administrativa válida")
+def require_publication_admin(request: Request, x_admin_key: Optional[str] = Header(default=None)):
+    if not es_admin(x_admin_key, request):
+        raise HTTPException(status_code=401, detail="Inicia sesión para administrar Central")
 
 
 
@@ -47,12 +48,13 @@ class PublicationPayload(BaseModel):
 
 @router.get("/publications")
 def list_publications(
+    request: Request,
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0, le=100000),
     include_unpublished: bool = False,
     x_admin_key: Optional[str] = Header(default=None),
 ):
-    admin = es_admin(x_admin_key)
+    admin = es_admin(x_admin_key, request)
     # Los borradores solo los puede ver el administrador
     if include_unpublished and not admin:
         raise HTTPException(status_code=401, detail="No autorizado")

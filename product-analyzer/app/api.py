@@ -24,6 +24,7 @@ from monetization import router as monetization_router
 from publications import router as publication_router
 from store_orders import router as store_orders_router
 from commerce import router as commerce_router
+from auth import router as auth_router, require_admin
 from tiktok_api import router as tiktok_creator_router
 from url_import import import_url, _public_url
 from wompi import router as wompi_router
@@ -32,15 +33,6 @@ from meli_oauth import router as meli_oauth_router, notification_router as meli_
 
 API_VERSION = "1.3.0"
 
-def require_admin(x_admin_key: Optional[str] = Header(default=None)) -> dict:
-    """Protege operaciones administrativas con ADMIN_API_KEY; nunca falla abierto."""
-    expected = os.getenv("ADMIN_API_KEY", "").strip()
-    if not expected:
-        raise HTTPException(status_code=503, detail="ADMIN_API_KEY no está configurada")
-    supplied = (x_admin_key or "").strip()
-    if not supplied or not secrets.compare_digest(supplied, expected):
-        raise HTTPException(status_code=401, detail="Se requiere una clave administrativa válida")
-    return {"admin": True}
 
 app = FastAPI(
     title="Central Product Analyzer API",
@@ -48,6 +40,7 @@ app = FastAPI(
     version=API_VERSION,
 )
 
+app.include_router(auth_router, prefix="/api/v1")
 app.include_router(monetization_router, prefix="/api/v1")
 app.include_router(wompi_router, prefix="/api/v1")
 app.include_router(meli_oauth_router, prefix="/api/v1")
