@@ -326,7 +326,7 @@ def aliexpress_oauth_callback(
         settings["app_secret"],
     )
     try:
-        response = requests.post(TOKEN_API_URL, params=params, timeout=20)
+        response = requests.post(TOKEN_API_URL, data=params, timeout=20)
         try:
             response_body = response.json()
         except ValueError:
