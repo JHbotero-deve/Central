@@ -8,7 +8,7 @@
 .admin-card:hover{transform:translateY(-3px);border-color:var(--brand)}
 .admin-card:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
 .admin-card-media{aspect-ratio:4/3;display:grid;place-items:center;overflow:hidden;background:linear-gradient(160deg,#25171a,#0f0f12)}
-.admin-card-media img{width:100%;height:100%;object-fit:contain}
+.admin-card-media img{display:block;width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;object-position:center}
 .admin-card-media.plate img{background:#fff}
 .admin-card-noimg{font-size:12px;color:var(--muted)}
 .admin-card-body{padding:12px 14px;display:flex;flex-direction:column;gap:3px}
