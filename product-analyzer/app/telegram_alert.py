@@ -318,12 +318,10 @@ def _context_title(context):
         "enlace:", "link:", "oferta del día", "oferta del dia",
     )
     for line in (context or "").splitlines():
-        value = line.strip(" \t•-")
+        value = re.sub(r"https?://[^\s<>]+", "", line.strip(" \t•-"), flags=re.I).strip(" \t•-:|")
         if len(value) < 5 or len(value) > 500:
             continue
         lowered = value.lower()
-        if lowered.startswith(("http://", "https://")) or "http://" in lowered or "https://" in lowered:
-            continue
         if any(term in lowered for term in skipped):
             continue
         if not re.search(r"[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]", value):
@@ -366,7 +364,7 @@ def _telegram_photo_data_url(token, message):
     if not photos:
         return None
     try:
-        photo = max(photos, key=lambda item: int(item.get("file_size") or 0))
+        photo = max(photos, key=lambda item: (int(item.get("width") or 0) * int(item.get("height") or 0), int(item.get("file_size") or 0)))
         info = requests.get(
             f"{API_BASE}/bot{token}/getFile",
             params={"file_id": photo["file_id"]},
@@ -382,7 +380,11 @@ def _telegram_photo_data_url(token, message):
         response = requests.get(f"{API_BASE}/file/bot{token}/{file_path}", timeout=20)
         response.raise_for_status()
         data = response.content
-        content_type = (response.headers.get("Content-Type") or "image/jpeg").split(";", 1)[0].lower()
+        content_type = (response.headers.get("Content-Type") or "").split(";", 1)[0].lower()
+        if content_type not in {"image/jpeg", "image/png", "image/webp", "image/gif", "image/avif"}:
+            extension = str(file_path).lower().rsplit(".", 1)[-1] if "." in str(file_path) else ""
+            content_type = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png",
+                            "webp": "image/webp", "gif": "image/gif", "avif": "image/avif"}.get(extension, "")
         if not data or len(data) > 8 * 1024 * 1024 or content_type not in {
             "image/jpeg", "image/png", "image/webp", "image/gif", "image/avif",
         }:
