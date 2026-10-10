@@ -38,6 +38,7 @@ jobs:
           node --check /tmp/central-index.js
           node --check /tmp/central-tarjetas.js
           node --check /tmp/central-producto.js
+          node --check product-analyzer/frontend/shopr-core.js
       - name: Build Figma showcase
         shell: bash
         run: |
