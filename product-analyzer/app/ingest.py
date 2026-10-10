@@ -14,6 +14,12 @@ MELI_PRODUCTS_SEARCH = "https://api.mercadolibre.com/products/search"
 MELI_PRODUCT = "https://api.mercadolibre.com/products/{id}"
 
 
+class MercadoLibreAccessDenied(RuntimeError):
+    """Error no recuperable durante el ciclo actual: Mercado Libre responde 403."""
+
+    fatal = True
+
+
 def _headers(include_auth=True):
     headers = {
         "User-Agent": "CentralProductAnalyzer/2.2",
@@ -79,7 +85,12 @@ def _get(url, params=None, include_auth=True, retry_auth=True):
         except ValueError:
             reason = response.text[:180].strip()
         suffix = f": {reason}" if reason else ""
-        raise RuntimeError(f"Mercado Libre rechazó la consulta (403){suffix}")
+        resource = url.split("api.mercadolibre.com", 1)[-1].split("?", 1)[0]
+        request_id = response.headers.get("x-request-id") or response.headers.get("x-trace-id")
+        trace = f"; request_id={request_id}" if request_id else ""
+        raise MercadoLibreAccessDenied(
+            f"Mercado Libre bloqueó el recurso {resource} (403){suffix}{trace}"
+        )
     response.raise_for_status()
     return response.json()
 
@@ -204,6 +215,8 @@ def _catalog_search(query, limit=20):
         data = _get(MELI_PRODUCTS_SEARCH, {
             "status": "active", "site_id": "MCO", "q": query, "limit": min(limit, 20)
         }, include_auth=True)
+    except MercadoLibreAccessDenied:
+        raise
     except (RuntimeError, requests.RequestException) as exc:
         print(f"[Mercado Libre] catalog search '{query}' no disponible: {exc}")
         return []
@@ -241,34 +254,41 @@ def _catalog_search(query, limit=20):
 
 
 def fetch_mercadolibre(query, limit=20):
-    # Primero intentamos la API autenticada. La búsqueda pública puede devolver
-    # 403 desde Railway aunque el endpoint siga funcionando con OAuth.
+    # Si la búsqueda de publicaciones devuelve 403, validamos el token una vez.
+    # No repetimos consultas anónimas ni seguimos disparando búsquedas si el
+    # recurso o la aplicación están bloqueados.
     try:
         data = _get(MELI_SEARCH, {"q": query, "limit": min(limit, 50)}, include_auth=True)
         print(f"[Mercado Libre] API autenticada OK '{query}': {len(data.get('results') or [])} resultados")
-    except (RuntimeError, requests.RequestException) as exc:
-        if isinstance(exc, RuntimeError) and "403" not in str(exc):
-            raise
-        print(f"[Mercado Libre] API autenticada bloqueada para '{query}': {exc}")
-        catalog_products = []
+    except MercadoLibreAccessDenied as search_exc:
+        print(f"[Mercado Libre] búsqueda principal bloqueada '{query}': {search_exc}")
         try:
-            data = _get(
-                MELI_SEARCH,
-                {"q": query, "limit": min(limit, 50)},
-                include_auth=False,
-                retry_auth=False,
-            )
-            print(f"[Mercado Libre] API pública OK '{query}': {len(data.get('results') or [])} resultados")
-        except (RuntimeError, requests.RequestException) as public_exc:
-            print(f"[Mercado Libre] API pública no disponible '{query}': {public_exc}")
+            _get("https://api.mercadolibre.com/users/me", include_auth=True)
+        except MercadoLibreAccessDenied as identity_exc:
+            raise MercadoLibreAccessDenied(
+                "Mercado Libre también devuelve 403 en /users/me. La integración no puede consultar la API; "
+                "verifica el estado de la aplicación en DevCenter y sus restricciones. "
+                f"Diagnóstico: {identity_exc}"
+            ) from identity_exc
+        except (RuntimeError, requests.RequestException) as identity_exc:
+            raise RuntimeError(
+                f"No se pudo validar la autorización de Mercado Libre mediante /users/me: {identity_exc}"
+            ) from identity_exc
+
+        try:
             catalog_products = _catalog_search(query, limit)
+        except MercadoLibreAccessDenied as catalog_exc:
+            raise MercadoLibreAccessDenied(
+                "El token identifica al usuario, pero Mercado Libre también bloquea la búsqueda de catálogo. "
+                "Revisa el estado/permisos de la aplicación y la disponibilidad del recurso en DevCenter. "
+                f"Diagnóstico: {catalog_exc}"
+            ) from catalog_exc
         if catalog_products:
             print(f"[Mercado Libre] usando catálogo autenticado '{query}': {len(catalog_products)} productos")
             return catalog_products
-        print(f"[Mercado Libre] catálogo sin resultados; usando búsqueda web real '{query}'")
         data = _public_search(query, limit)
-    products = []
 
+    products = []
     public_web = data.get("_source") == "public_web"
     for item in data.get("results", []):
         item_id = item.get("id")

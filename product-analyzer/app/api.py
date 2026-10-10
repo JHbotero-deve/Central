@@ -19,7 +19,7 @@ from mongo_store import store_product_image
 
 from analysis import score_product
 from amazon_api import fetch_amazon_products
-from ingest import fetch_mercadolibre
+from ingest import MercadoLibreAccessDenied, fetch_mercadolibre
 from db import get_connection, upsert_product
 from monetization import router as monetization_router
 from publications import router as publication_router
@@ -360,6 +360,9 @@ def _sync_store_catalog():
                 except Exception as exc:
                     conn.rollback()
                     errors.append(f"Mercado Libre '{query}': {exc}")
+                    if isinstance(exc, MercadoLibreAccessDenied):
+                        print({"event": "mercadolibre_access_blocked", "query": query, "error": str(exc)}, flush=True)
+                        break
 
         except Exception as exc:
             conn.rollback()
