@@ -42,6 +42,9 @@ check(re.search(r'"source"\s*:\s*"/"\s*,\s*"destination"\s*:\s*"/index\.html"', 
       "root URL opens the Central dashboard")
 check(re.search(r'"source"\s*:\s*"/vitrina"\s*,\s*"destination"\s*:\s*"/tienda\.html"', routes) is not None,
       "legacy vitrina URL opens the real published store")
+legacy = (FRONT / "vitrina.html").read_text(encoding="utf-8-sig")
+check('location.replace("/tienda"+location.search+location.hash)' in legacy,
+      "direct legacy vitrina file redirects to the real published store")
 
 editor = (FRONT / "tarjetas.html").read_text(encoding="utf-8-sig")
 vars_start = editor.find("function renderVars(){")
