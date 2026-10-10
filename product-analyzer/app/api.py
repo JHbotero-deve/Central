@@ -227,6 +227,18 @@ def _sync_store_catalog():
     try:
         with conn.cursor() as cur:
             cur.execute("""
+                UPDATE products
+                SET is_active = FALSE, updated_at = NOW()
+                WHERE is_active = TRUE
+                  AND catalog_expires_at IS NOT NULL
+                  AND catalog_expires_at <= NOW()
+                  AND is_blocked = FALSE
+            """)
+            expired_count = cur.rowcount
+            conn.commit()
+            if expired_count:
+                print({"event": "catalog_expired", "count": expired_count}, flush=True)
+            cur.execute("""
                 SELECT p.external_id, p.title, p.product_url, pl.name AS platform
                 FROM products p
                 JOIN platforms pl ON pl.id = p.platform_id
@@ -404,7 +416,7 @@ def get_product(product_id: int):
                 JOIN platforms pl ON pl.id = p.platform_id
                 LEFT JOIN categories c ON c.id = p.category_id
                 LEFT JOIN sellers s ON s.id = p.seller_id
-                WHERE p.id = %s AND p.is_active = TRUE
+                WHERE p.id = %s AND p.is_active = TRUE AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW())
                 """,
                 (product_id,),
             )
@@ -437,6 +449,7 @@ def list_products(
                 LEFT JOIN categories c ON c.id = p.category_id
                 LEFT JOIN product_scores s ON s.product_id = p.id
                 WHERE p.is_active = TRUE
+                  AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW())
             """
             params = []
             if category:

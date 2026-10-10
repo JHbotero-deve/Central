@@ -567,8 +567,10 @@ def fetch_amazon_products(
             )
 
         except Exception as exc:
-            print(
-                f"[amazon] error buscando '{keywords}': {exc}"
-            )
+            message = str(exc)
+            print(f"[amazon] error buscando '{keywords}': {message}")
+            if "Amazon OAuth rechazó las credenciales" in message or "invalid_client" in message:
+                print("[amazon] sincronización detenida: credenciales del partner inválidas; continúa Mercado Libre.", flush=True)
+                break
 
     return results
