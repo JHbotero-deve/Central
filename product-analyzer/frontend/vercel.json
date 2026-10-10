@@ -1,6 +1,6 @@
 {
   "rewrites": [
-    { "source": "/vitrina", "destination": "/vitrina.html" },
+    { "source": "/vitrina", "destination": "/tienda.html" },
     { "source": "/tarjetas", "destination": "/tarjetas.html" },
     { "source": "/catalogo", "destination": "/catalogo.html" },
     {
@@ -9,7 +9,7 @@
     },
     {
       "source": "/",
-      "destination": "/tienda.html"
+      "destination": "/index.html"
     },
     {
       "source": "/admin",

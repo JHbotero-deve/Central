@@ -1,7 +1,6 @@
 window.Shopr=(()=>{"use strict";
 const API="/api/v1";
 const GLOWS=[["Rojo Fuego","#ff3b1f"],["Naranja","#ff7a1a"],["Ámbar","#ffb300"],["Verde","#2ecc71"],["Azul","#3b82f6"],["Violeta","#8b5cf6"],["Blanco","#e9e9f0"],["Negro","#1c1c20"]];
-const THEMES=[["Crema","#f6f1e8"],["Marfil","#fffdf8"],["Verde suave","#edf2e6"]];
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const url=u=>/^https?:\/\//i.test(u||"")?String(u):"";
 const imgOk=u=>/^(https?:\/\/|data:image\/|mongo:\/\/)/i.test(u||"")?String(u):"";
@@ -12,9 +11,6 @@ const enc=s=>{let o="";new TextEncoder().encode(s).forEach(x=>o+=String.fromChar
 const dec=s=>new TextDecoder().decode(Uint8Array.from(atob(s),c=>c.charCodeAt(0)));
 const pack=(t,m)=>String(t||"").trim()+"\n\n[[central:"+enc(JSON.stringify(m))+"]]";
 const unpack=d=>{d=String(d||"");const m=d.match(/\n*\[\[central:([A-Za-z0-9+\/=]+)\]\]\s*$/);if(!m)return{text:d.trim(),meta:{}};let meta={};try{meta=JSON.parse(dec(m[1]))}catch{}return{text:d.slice(0,m.index).trim(),meta}};
-const theme=()=>{try{const saved=JSON.parse(localStorage.getItem("central_theme"));return THEMES.find(t=>t[0]===saved?.[0]&&t[1]===saved?.[1])||THEMES[0]}catch{return THEMES[0]}};
-const setTheme=t=>{localStorage.setItem("central_theme",JSON.stringify(t));applyTheme()};
-const applyTheme=()=>document.documentElement.style.setProperty("--bg",theme()[1]);
 async function api(path,opt={}){
   const h={Accept:"application/json",...(opt.headers||{})};
   const r=await fetch(API+path,{cache:"no-store",credentials:"include",...opt,headers:h});let b=null;try{b=await r.json()}catch{}
@@ -73,5 +69,5 @@ function cardHtml(m){
   const src=imageSrc(v.img),im=src?`<img src="${esc(src)}" alt="${esc(m.title)}" loading="lazy" referrerpolicy="no-referrer" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span class="sh-noimg" hidden>Imagen no disponible</span>`:'<span class="sh-noimg">Sin imagen</span>';
   return `<button type="button" class="sh-card" data-id="${esc(m.id)}"><div class="sh-cim ${m.plate?"plate":""}">${im}</div><div class="sh-cb"><span class="sh-cbrand">${esc(m.brand||m.cat)}</span><span class="sh-ctitle">${esc(m.title)}</span><span class="sh-cprice">${money(m.price,m.currency)}</span></div></button>`}
 
-return{API,GLOWS,THEMES,esc,url,imgOk,imageSrc,nn,money,pack,unpack,fromApi,detailHtml,mountDetail,cardHtml,api,theme,setTheme,applyTheme}
+return{API,GLOWS,esc,url,imgOk,imageSrc,nn,money,pack,unpack,fromApi,detailHtml,mountDetail,cardHtml,api}
 })();
