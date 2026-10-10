@@ -705,8 +705,8 @@ try{
 `;
 
     const mainImage=document.getElementById("mainImg");
+    let mainImageIndex=0;
     if(mainImage){
-        let mainImageIndex=0;
         mainImage.addEventListener("error",()=>{
             mainImageIndex+=1;
             if(mainImageIndex<gallery.length){
