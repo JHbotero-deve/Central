@@ -199,13 +199,17 @@ def import_url(
     try:
         metadata = _metadata(url)
     except requests.RequestException as exc:
-        # AliExpress puede bloquear la lectura automática. Permite importación manual
-        # solo si los tres datos comerciales se aportaron explícitamente.
-        if platform != "aliexpress" or not (title and image_url and price is not None):
+        # Algunas tiendas bloquean lectura automática. Solo se admite salida manual
+        # cuando el usuario aportó título, precio e imagen real; no se inventan datos.
+        if not (title and image_url and price is not None):
             if platform == "aliexpress":
                 raise ValueError("AliExpress no entregó los metadatos. Completa nombre, precio e imagen real y vuelve a importar.") from exc
             raise
-        metadata = {"resolved_url": url, "gallery_urls": []}
+        metadata = {
+            "resolved_url": url,
+            "gallery_urls": [],
+            "metadata_source": "manual",
+        }
     resolved_url = metadata.get("resolved_url") or url
     external_id = _asin(resolved_url) if platform == "amazon" else None
     if not external_id:
@@ -243,7 +247,7 @@ def import_url(
         "seller": {"name": metadata.get("seller")} if metadata.get("seller") else {},
         "source_metadata": {
             "import_method": "product_url",
-            "metadata_source": "open_graph+jsonld",
+            "metadata_source": metadata.get("metadata_source") or "open_graph+jsonld",
             "original_url": url,
             "resolved_url": resolved_url,
             "brand": metadata.get("brand"),
