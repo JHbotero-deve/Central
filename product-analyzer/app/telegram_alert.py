@@ -4,7 +4,7 @@ import io
 import os
 import re
 import time
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 
 import requests
 from PIL import Image, ImageOps, UnidentifiedImageError
@@ -15,6 +15,7 @@ from url_import import detect_platform, import_url
 
 POLL_INTERVAL = int(os.getenv("TELEGRAM_POLL_INTERVAL", "3"))
 API_BASE = "https://api.telegram.org"
+CENTRAL_API_BASE = (os.getenv("CENTRAL_API_BASE") or "https://gracious-renewal-production-aadd.up.railway.app").rstrip("/")
 ALLOWED_PLATFORMS = {"mercadolibre", "amazon", "tiktok", "aliexpress", "personal"}
 ALLOWED_CATEGORIES = {"ropa", "calzado", "accesorios", "electronica", "hogar", "fitness", "otros"}
 
@@ -92,6 +93,8 @@ def _format_product(p):
 def _send_product(token, chat_id, product):
     image_url = str(product.get("image_url") or "").strip()
     text = _format_product(product)
+    if image_url.startswith("mongo://"):
+        image_url = CENTRAL_API_BASE + "/api/v1/media/image?url=" + quote(image_url, safe="")
     if image_url.startswith(("http://", "https://")):
         try:
             image_response = requests.get(
