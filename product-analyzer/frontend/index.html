@@ -10,10 +10,9 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <style>
 
-*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:linear-gradient(180deg,#fbf8f2 0,#f3eee5 52%,#eee7dc 100%);color:var(--text);font:15px/1.55 Inter,system-ui,sans-serif}.wrap{width:min(1160px,calc(100% - 32px));margin:auto}.mono{font-family:"JetBrains Mono",monospace}.nav{position:sticky;top:0;z-index:20;background:rgba(255,253,248,.94);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}.nav .wrap{min-height:64px;display:flex;align-items:center;justify-content:space-between;gap:18px}.brand{font-weight:700;letter-spacing:.04em}.brand b{color:var(--accent)}.navlinks{display:flex;gap:18px;flex-wrap:wrap}.navlinks a{color:var(--muted);text-decoration:none;font-size:13px}.navlinks a:hover{color:var(--text)}.status{font-size:12px;color:var(--muted)}.dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--danger);margin-right:7px}.dot.ok{background:var(--accent)}.dot.warn{background:#b88f35}header{padding:78px 0 62px;border-bottom:1px solid var(--line)}.eyebrow{font:12px "JetBrains Mono",monospace;color:var(--accent);text-transform:uppercase;letter-spacing:.08em}h1{font-size:clamp(40px,6vw,70px);line-height:1.02;max-width:900px;margin:14px 0 20px}h2{font-size:26px;margin:0 0 7px}h3{margin:0 0 8px}p{color:var(--muted)}.hero-copy{max-width:730px;font-size:17px}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:28px}.btn{display:inline-flex;align-items:center;justify-content:center;padding:11px 16px;border:1px solid var(--line);background:var(--panel);color:var(--text);text-decoration:none;border-radius:7px;font-weight:600;cursor:pointer}.btn.primary{background:var(--accent);border-color:var(--accent);color:#fffdf8}.btn.small{padding:8px 11px;font-size:12px}.btn:disabled{opacity:.55;cursor:not-allowed}section{padding:58px 0;border-bottom:1px solid var(--line)}.section-head{display:flex;align-items:end;justify-content:space-between;gap:20px;margin-bottom:24px}.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.card,.panel,.metric{background:var(--panel);border:1px solid var(--line);border-radius:10px}.card{overflow:hidden;min-width:0;display:flex;flex-direction:column}.card-media{height:170px;overflow:hidden;background:var(--panel2);display:flex;align-items:center;justify-content:center;position:relative}.card-media img{width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;display:block;padding:14px}.card-media .noimg{font:12px "JetBrains Mono";color:var(--muted)}.card-body{padding:13px;display:flex;flex-direction:column;flex:1}.badge{display:inline-block;border:1px solid #bcb4a6;color:#596057;border-radius:999px;padding:3px 8px;font:11px "JetBrains Mono"}.title{font-weight:600;margin:10px 0 7px;min-height:42px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}.price{font:700 15px "JetBrains Mono";color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.score{color:#756b9f;font:600 12px "JetBrains Mono";margin-top:5px}.card-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.card-actions a{margin:0}.empty{border:1px dashed var(--line);padding:30px;text-align:center;color:var(--muted);grid-column:1/-1}.import-main{display:grid;grid-template-columns:minmax(240px,1fr) 180px 130px;gap:10px}.import-details{display:grid;grid-template-columns:minmax(220px,2fr) 130px 110px minmax(220px,2fr);gap:10px;margin-top:10px}@media(max-width:800px){.import-main{grid-template-columns:1fr}.import-details{grid-template-columns:1fr 1fr}.import-details #importTitle,.import-details #importImageUrl{grid-column:1/-1}}.field{width:100%;padding:12px 13px;border:1px solid var(--line);background:#f7f3eb;color:var(--text);border-radius:7px;outline:none}.field:focus{border-color:#566579}.import-result{margin-top:12px;min-height:20px;color:var(--muted);font-size:13px}.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:10px}table{width:100%;border-collapse:collapse;min-width:860px;background:var(--panel)}th,td{text-align:left;padding:12px 14px;border-bottom:1px solid var(--line)}th{font:11px "JetBrains Mono";color:var(--muted);text-transform:uppercase}td{font-size:13px}.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}.metric{padding:18px}.metric strong{display:block;font:700 23px "JetBrains Mono";color:var(--accent);margin-top:5px}.metric span{color:var(--muted);font-size:12px}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:linear-gradient(180deg,#fbf8f2 0,#f3eee5 52%,#eee7dc 100%);color:var(--text);font:15px/1.55 Inter,system-ui,sans-serif}.wrap{width:min(1160px,calc(100% - 32px));margin:auto}.mono{font-family:"JetBrains Mono",monospace}.nav{position:sticky;top:0;z-index:20;background:rgba(255,253,248,.94);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}.nav .wrap{min-height:64px;display:flex;align-items:center;justify-content:space-between;gap:18px}.brand{font-weight:700;letter-spacing:.04em}.brand b{color:var(--accent)}.navlinks{display:flex;gap:18px;flex-wrap:wrap}.navlinks a{color:var(--muted);text-decoration:none;font-size:13px}.navlinks a:hover{color:var(--text)}.status{font-size:12px;color:var(--muted)}.dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--danger);margin-right:7px}.dot.ok{background:var(--accent)}.dot.warn{background:#b88f35}header{padding:78px 0 62px;border-bottom:1px solid var(--line)}.eyebrow{font:12px "JetBrains Mono",monospace;color:var(--accent);text-transform:uppercase;letter-spacing:.08em}h1{font-size:clamp(40px,6vw,70px);line-height:1.02;max-width:900px;margin:14px 0 20px}h2{font-size:26px;margin:0 0 7px}h3{margin:0 0 8px}p{color:var(--muted)}.hero-copy{max-width:730px;font-size:17px}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:28px}.btn{display:inline-flex;align-items:center;justify-content:center;padding:11px 16px;border:1px solid var(--line);background:var(--panel);color:var(--text);text-decoration:none;border-radius:7px;font-weight:600;cursor:pointer}.btn.primary{background:var(--accent);border-color:var(--accent);color:#fffdf8}.btn.small{padding:8px 11px;font-size:12px}.btn:disabled{opacity:.55;cursor:not-allowed}section{padding:58px 0;border-bottom:1px solid var(--line)}.section-head{display:flex;align-items:end;justify-content:space-between;gap:20px;margin-bottom:24px}.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.card,.panel,.metric{background:var(--panel);border:1px solid var(--line);border-radius:10px}.card{overflow:hidden;min-width:0;display:flex;flex-direction:column}.card-media{height:170px;overflow:hidden;background:var(--panel2);display:flex;align-items:center;justify-content:center;position:relative}.card-media img{width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;display:block;padding:14px}.card-media .noimg{font:12px "JetBrains Mono";color:var(--muted)}.card-body{padding:13px;display:flex;flex-direction:column;flex:1}.badge{display:inline-block;border:1px solid #bcb4a6;color:#596057;border-radius:999px;padding:3px 8px;font:11px "JetBrains Mono"}.title{font-weight:600;margin:10px 0 7px;min-height:42px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}.price{font:700 15px "JetBrains Mono";color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.score{color:#756b9f;font:600 12px "JetBrains Mono";margin-top:5px}.card-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.card-actions a{margin:0}.empty{border:1px dashed var(--line);padding:30px;text-align:center;color:var(--muted);grid-column:1/-1}.import-main{display:grid;grid-template-columns:minmax(240px,1fr) 180px 130px;gap:10px}@media(max-width:800px){.import-main{grid-template-columns:1fr}.import-category{grid-column:1/-1}.import-main .btn{width:100%}}.field{width:100%;padding:12px 13px;border:1px solid var(--line);background:#f7f3eb;color:var(--text);border-radius:7px;outline:none}.field:focus{border-color:#566579}.import-result{margin-top:12px;min-height:20px;color:var(--muted);font-size:13px}.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:10px}table{width:100%;border-collapse:collapse;min-width:860px;background:var(--panel)}th,td{text-align:left;padding:12px 14px;border-bottom:1px solid var(--line)}th{font:11px "JetBrains Mono";color:var(--muted);text-transform:uppercase}td{font-size:13px}.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}.metric{padding:18px}.metric strong{display:block;font:700 23px "JetBrains Mono";color:var(--accent);margin-top:5px}.metric span{color:var(--muted);font-size:12px}
 @media(max-width:1000px){.grid{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:850px){.grid,.metrics{grid-template-columns:1fr 1fr}.import{grid-template-columns:1fr}.navlinks{display:none}}@media(max-width:560px){.grid,.metrics{grid-template-columns:1fr}.card-media{height:155px}header{padding-top:50px}}
-.intel{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;margin-bottom:18px}.intel-card{background:linear-gradient(145deg,#fffdf8,#f3ede3);border:1px solid var(--line);border-radius:10px;padding:15px}.intel-card span{display:block;color:var(--muted);font-size:11px;text-transform:uppercase}.intel-card strong{display:block;margin-top:6px;font:700 20px "JetBrains Mono";color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.intel-card small{display:block;margin-top:5px;color:#738091}.intel-layout{display:grid;grid-template-columns:1.4fr .8fr;gap:16px}.intel-panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px}.intel-panel h3{font-size:15px;margin:0 0 12px}.signal{display:grid;grid-template-columns:minmax(0,1fr) 72px 72px 72px;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}.signal:last-child{border:0}.signal-title{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.signal-meta{color:var(--muted);font:11px "JetBrains Mono"}.signal-value{text-align:right;font:600 11px "JetBrains Mono"}.source-row{display:grid;grid-template-columns:1fr 60px 70px 70px;gap:8px;padding:10px 0;border-bottom:1px solid var(--line);font:12px "JetBrains Mono"}.source-row span:not(:first-child){text-align:right}.quickbar{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:14px 16px;margin-bottom:18px;background:#f5efe6;border:1px solid var(--line);border-radius:10px}.quickbar span{color:var(--muted);font-size:12px}@media(max-width:1050px){.intel{grid-template-columns:repeat(3,1fr)}.intel-layout{grid-template-columns:1fr}}@media(max-width:560px){.intel{grid-template-columns:1fr 1fr}.signal{grid-template-columns:minmax(0,1fr) 58px 58px}.hide-mobile{display:none}.source-row{grid-template-columns:1fr 55px 60px}}.inline-3d{display:block;height:205px;margin:0 13px 13px;border:1px solid var(--line);border-radius:8px;background:radial-gradient(circle at 50% 38%,#f8f3e9 0,#eee5d7 45%,#e4d9c9 100%);overflow:hidden;position:relative;perspective:850px}.inline-3d .hint{position:absolute;left:10px;bottom:8px;padding:4px 7px;border-radius:5px;background:rgba(255,253,248,.9);color:#62685f;font:10px "JetBrains Mono";pointer-events:none;z-index:5}.model3d-css{position:absolute;inset:0;display:grid;place-items:center;transform-style:preserve-3d;cursor:default}.model3d-css .object{position:relative;width:150px;height:105px;transform-style:preserve-3d;transform:rotateX(-12deg) rotateY(28deg);transition:transform .06s linear}.model3d-css .part{position:absolute;transform-style:preserve-3d}.model3d-css .shadow{position:absolute;left:50%;top:150px;width:110px;height:24px;transform:translateX(-50%);border-radius:50%;background:rgba(0,0,0,.45);filter:blur(7px)}.model3d-css .ball{position:absolute;left:50%;bottom:23px;width:24px;height:24px;margin-left:-12px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fffdf8,#d8d0c4 38%,#9b9183 100%);box-shadow:0 3px 12px rgba(80,65,45,.18);z-index:4;cursor:grab}.model3d-css .ball:after{content:"";position:absolute;left:50%;top:50%;width:38px;height:38px;margin:-19px;border:1px solid #aaa193;border-radius:50%}.m-mic .body{left:12px;top:28px;width:126px;height:48px;border-radius:12px;background:linear-gradient(145deg,#4b555f,#15191e);box-shadow:inset 0 2px 5px #fff,0 8px 14px rgba(70,55,35,.16)}.m-mic .screen{left:43px;top:35px;width:60px;height:23px;border-radius:4px;background:#f5f1e9;border:1px solid #68737e}.m-mic .line{left:52px;top:42px;width:42px;height:3px;background:#8d8578;box-shadow:0 7px 0 #4f5b66}.m-mic .led{left:22px;top:48px;width:8px;height:8px;border-radius:50%;background:#b6e85a;box-shadow:0 0 8px #b6e85a}.m-glasses .bridge{left:62px;top:38px;width:26px;height:14px;border-top:5px solid #1d2228}.m-glasses .lens{top:24px;width:62px;height:48px;border:7px solid #171b20;border-radius:24px 24px 18px 18px;background:rgba(160,185,205,.16);box-shadow:inset 0 0 12px rgba(180,220,255,.22)}.m-glasses .lens.l{left:4px}.m-glasses .lens.r{right:4px}.m-glasses .arm{top:31px;width:58px;height:10px;border-radius:8px;background:#d3cbc0}.m-glasses .arm.l{left:-25px;transform:rotate(-8deg)}.m-glasses .arm.r{right:-25px;transform:rotate(8deg)}.m-mouse .body{left:15px;top:18px;width:120px;height:78px;border-radius:48% 48% 35% 35%;background:linear-gradient(145deg,#eef1f4,#8d969f);box-shadow:inset 0 3px 6px #fff,0 10px 18px rgba(70,55,35,.16)}.m-mouse .stripe{left:57px;top:22px;width:6px;height:45px;border-radius:5px;background:#343b44}.m-mouse .wheel{left:54px;top:34px;width:12px;height:19px;border-radius:7px;background:#8d8578}.m-tag .body{left:30px;top:12px;width:90px;height:90px;border-radius:20px;background:linear-gradient(145deg,#f0f2f4,#9ca5ae);box-shadow:inset 0 2px 6px #fff,0 10px 18px rgba(70,55,35,.16)}.m-tag .hole{left:90px;top:22px;width:22px;height:22px;border:6px solid #222831;border-radius:50%}.m-phone .body{left:42px;top:8px;width:66px;height:98px;border-radius:10px;background:linear-gradient(145deg,#424b55,#101419);box-shadow:inset 2px 2px 5px #fff,0 10px 18px rgba(70,55,35,.16)}.m-phone .screen{left:47px;top:13px;width:56px;height:88px;border-radius:6px;background:#f0ece4;border:2px solid #56616c}.m-watch .body{left:45px;top:15px;width:60px;height:72px;border-radius:14px;background:#ddd6ca;box-shadow:0 8px 16px rgba(70,55,35,.16)}.m-watch .face{left:50px;top:21px;width:50px;height:60px;border-radius:10px;background:#f5f1e9;border:2px solid #79838d}.m-watch .strap{left:62px;top:0;width:25px;height:105px;border-radius:12px;background:#ddd6ca;z-index:-1}.m-camera .body{left:23px;top:28px;width:108px;height:58px;border-radius:10px;background:linear-gradient(145deg,#555f69,#171c21);box-shadow:inset 0 2px 4px #fff,0 10px 18px rgba(70,55,35,.16)}.m-camera .lens{left:58px;top:35px;width:42px;height:42px;border-radius:50%;background:radial-gradient(circle,#9aa6b2 0 18%,#17202a 19% 42%,#050709 43% 100%);border:3px solid #87919b}.m-headphones .band{left:25px;top:10px;width:100px;height:90px;border:14px solid #303840;border-bottom-color:transparent;border-radius:60px 60px 0 0}.m-headphones .cup{top:68px;width:30px;height:38px;border-radius:10px;background:#e8e2d8}.m-headphones .cup.l{left:17px}.m-headphones .cup.r{right:17px}.m-bottle .body{left:43px;top:15px;width:64px;height:94px;border-radius:18px 18px 14px 14px;background:linear-gradient(90deg,#697580,#d9dee2 45%,#737e88);box-shadow:0 10px 18px rgba(70,55,35,.16)}.m-bottle .cap{left:50px;top:5px;width:50px;height:18px;border-radius:7px;background:#c7bfb2}.m-default .body{left:32px;top:17px;width:86px;height:86px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff,#aeb8c2 35%,#404a54 100%);box-shadow:0 10px 18px rgba(70,55,35,.16)}@media(max-width:560px){.inline-3d{height:175px}}
-/* Tarjeta Radar final: imagen protagonista + dos acciones dentro de la imagen */
+.intel{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;margin-bottom:18px}.intel-card{background:linear-gradient(145deg,#fffdf8,#f3ede3);border:1px solid var(--line);border-radius:10px;padding:15px}.intel-card span{display:block;color:var(--muted);font-size:11px;text-transform:uppercase}.intel-card strong{display:block;margin-top:6px;font:700 20px "JetBrains Mono";color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.intel-card small{display:block;margin-top:5px;color:#738091}.intel-layout{display:grid;grid-template-columns:1.4fr .8fr;gap:16px}.intel-panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px}.intel-panel h3{font-size:15px;margin:0 0 12px}.signal{display:grid;grid-template-columns:minmax(0,1fr) 72px 72px 72px;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}.signal:last-child{border:0}.signal-title{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.signal-meta{color:var(--muted);font:11px "JetBrains Mono"}.signal-value{text-align:right;font:600 11px "JetBrains Mono"}.source-row{display:grid;grid-template-columns:1fr 60px 70px 70px;gap:8px;padding:10px 0;border-bottom:1px solid var(--line);font:12px "JetBrains Mono"}.source-row span:not(:first-child){text-align:right}.quickbar{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:14px 16px;margin-bottom:18px;background:#f5efe6;border:1px solid var(--line);border-radius:10px}.quickbar span{color:var(--muted);font-size:12px}@media(max-width:1050px){.intel{grid-template-columns:repeat(3,1fr)}.intel-layout{grid-template-columns:1fr}}@media(max-width:560px){.intel{grid-template-columns:1fr 1fr}.signal{grid-template-columns:minmax(0,1fr) 58px 58px}.hide-mobile{display:none}.source-row{grid-template-columns:1fr 55px 60px}}/* Tarjeta Radar final: imagen protagonista + dos acciones dentro de la imagen */
 .radar-card{border-radius:26px!important;overflow:hidden!important;background:#11151b!important;border:1px solid rgba(255,255,255,.10)!important;box-shadow:0 22px 55px rgba(0,0,0,.16)!important}
 .radar-card:hover{transform:translateY(-5px)!important;border-color:rgba(255,138,0,.45)!important;box-shadow:0 30px 70px rgba(0,0,0,.24)!important}
 .radar-card .card-media{height:auto!important;aspect-ratio:1/1.08!important;background:radial-gradient(circle at 50% 35%,rgba(255,138,0,.18),transparent 36%),linear-gradient(145deg,#1a1f27,#080a0e)!important;border:0!important}
@@ -37,10 +36,20 @@
 <section id="inteligencia"><div class="wrap"><div class="section-head"><div><div class="eyebrow">00 · inteligencia comercial</div><h2>Centro de control comercial</h2><p>Una sola lectura para decidir qué importar, qué publicar, qué vender y qué retirar.</p></div><div class="mono" id="intelUpdated">—</div></div><div class="quickbar"><div><strong>Gestión de productos</strong><br><span>Importa desde una plataforma o crea una tarjeta manualmente para incorporarla al catálogo.</span></div><div class="actions"><a class="btn primary small" href="/tarjetas">Crear tarjeta</a><a class="btn small" href="#importar">Importar producto</a></div></div><div class="intel"><div class="intel-card"><span>Productos activos</span><strong id="iProducts">—</strong><small id="iDemand">— con demanda</small></div><div class="intel-card"><span>Oportunidades altas</span><strong id="iHigh">—</strong><small>puntuación ≥ 70</small></div><div class="intel-card"><span>Score promedio</span><strong id="iScore">—</strong><small>señal sobre 100</small></div><div class="intel-card"><span>Ventas aprobadas</span><strong id="iPaid">—</strong><small id="iOrders">— pedidos</small></div><div class="intel-card"><span>Ingresos</span><strong id="iRevenue">—</strong><small id="iProfit">— utilidad estimada</small></div><div class="intel-card"><span>Riesgos</span><strong id="iRisk">—</strong><small>vencen en 24 h</small></div></div><div class="intel-layout"><div class="intel-panel"><h3>Productos que merecen atención</h3><div id="signals">Analizando catálogo…</div></div><div class="intel-panel"><h3>Rendimiento por fuente</h3><div id="sources">Analizando fuentes…</div><div id="pipelineMeta" class="status" style="margin-top:12px">Sincronización: —</div></div></div></div></section>
 <section id="oportunidades"><div class="wrap"><div class="section-head"><div><div class="eyebrow">02 · puntuación</div><h2>Oportunidades activas</h2><p>Productos reales ordenados por la señal calculada por Central.</p></div><div class="mono" id="updated">—</div></div><div class="grid" id="featured"><div class="empty">Cargando datos reales…</div></div></div></section>
 
-<section id="importar"><div class="wrap"><div class="section-head"><div><div class="eyebrow">04 · entrada real</div><h2>Importar desde una plataforma</h2><p>Acepta enlaces de Amazon, Mercado Libre, TikTok Shop y AliExpress. Los enlaces cortos promocionales de AliExpress se conservan para no perder la atribución de afiliado.</p></div></div><form id="importForm"><div class="import-main"><input class="field" id="url" type="url" placeholder="URL del producto o enlace promocional" required><select class="field" id="category"><option value="accesorios">Accesorios</option><option value="ropa">Ropa</option><option value="calzado">Calzado</option></select><button class="btn primary" id="importBtn" type="submit">Importar</button></div><div class="import-details"><input class="field" id="importTitle" type="text" maxlength="500" placeholder="Nombre del producto (opcional)"><input class="field" id="importPrice" type="number" min="0.01" step="any" placeholder="Precio (opcional)"><select class="field" id="importCurrency" aria-label="Moneda del precio"><option value="COP">COP</option><option value="USD">USD</option><option value="CNY">CNY</option><option value="EUR">EUR</option></select><input class="field" id="importImageUrl" type="url" placeholder="URL de imagen real (opcional)"></div></form><p style="font-size:12px;margin:10px 0 0">Si AliExpress bloquea la lectura automática, completa nombre, precio e imagen real. No se inventan imágenes ni precios.</p><div class="import-result" id="importResult"></div></div></section>
-<section id="publicaciones"><div class="wrap"><div class="section-head"><div><div class="eyebrow">03 · tienda</div><h2>Gestionar tarjetas publicadas</h2><p>Publica oportunidades, edita los textos visibles, despublica o elimina una ficha sin borrar el producto del catálogo.</p></div><a class="btn small" href="/tienda" target="_blank" rel="noopener noreferrer">Ver tienda</a></div><div id="publicationMessage" class="pub-empty">Comprobando sesión administrativa…</div><div id="publicationList" class="pub-grid"></div></div></section>
+<section id="importar"><div class="wrap">
+<div class="section-head"><div><div class="eyebrow">03 · entrada real</div><h2>Importar un producto</h2><p>Pega el enlace del producto. Central detecta la plataforma e intenta extraer el nombre, el precio y la imagen reales.</p></div></div>
+<form id="importForm"><div class="import-main">
+<input class="field" id="url" type="url" placeholder="Pega aquí el enlace del producto" autocomplete="url" required>
+<label class="import-category"><span>Categoría</span><select class="field" id="category"><option value="otros" selected>Otros</option><option value="accesorios">Accesorios</option><option value="electronicos">Electrónica</option><option value="hogar">Hogar</option><option value="belleza">Belleza</option><option value="ropa">Ropa</option><option value="calzado">Calzado</option></select></label>
+<button class="btn primary" id="importBtn" type="submit">Importar producto</button>
+</div></form>
+<p class="import-help">No pegues una URL de imagen. Si la tienda no permite leer los datos automáticamente, abre el creador para buscar en Mercado Libre o subir una imagen real.</p>
+<div class="import-fallback"><a class="btn small" href="/tarjetas">Abrir creador de tarjetas</a></div>
+<div class="import-result" id="importResult" role="status" aria-live="polite"></div>
+</div></section>
+<section id="publicaciones"><div class="wrap"><div class="section-head"><div><div class="eyebrow">04 · tienda</div><h2>Gestionar tarjetas publicadas</h2><p>Publica oportunidades, edita los textos visibles, despublica o elimina una ficha sin borrar el producto del catálogo.</p></div><a class="btn small" href="/tienda" target="_blank" rel="noopener noreferrer">Ver tienda</a></div><div id="publicationMessage" class="pub-empty">Comprobando sesión administrativa…</div><div id="publicationList" class="pub-grid"></div></div></section>
 
-<section id="importar"><div class="wrap"><div class="section-head"><div><div class="eyebrow">04 · entrada real</div><h2>Importar desde una plataforma</h2><p>Pega una URL de Amazon o Mercado Libre. Central extrae los metadatos disponibles y guarda el producto en el catálogo.</p></div></div><form class="import" id="importForm"><input class="field" id="url" type="url" placeholder="Pega la URL del producto" required><select class="field" id="category"><option value="accesorios">Accesorios</option><option value="ropa">Ropa</option><option value="calzado">Calzado</option></select><button class="btn primary" id="importBtn" type="submit">Importar</button></form><div class="import-result" id="importResult"></div></div></section>
+
 
 
 
@@ -122,21 +131,30 @@ function renderIntelligence(i){
   $("sources").innerHTML=sources||'<div class="empty">Sin fuentes activas.</div>';
 }
 async function loadTelegram(){
-  const el=$("telegram");
-  if(!el) return;
+  const statusEl=$("telegramStatus"),nameEl=$("telegramName"),detailEl=$("telegramDetail"),openEl=$("telegramOpen");
+  if(!statusEl||!nameEl||!detailEl||!openEl)return;
   try{
     const data=await get("/telegram/status");
-    el.innerHTML=data.connected
-      ? `<div class="telegram-item"><strong>Telegram conectado</strong><span>@${esc(data.username||"bot")}</span></div>`
-      : data.configured
-        ? '<div class="empty">Telegram configurado, pero no conectado.</div>'
-        : '<div class="empty">Telegram no configurado.</div>';
+    if(data.connected){
+      statusEl.textContent="Conectado";
+      nameEl.textContent=data.username?"@"+data.username:"Bot de Central";
+      detailEl.textContent="El bot está conectado y disponible.";
+      if(data.username){openEl.href="https://t.me/"+encodeURIComponent(data.username);openEl.style.display="inline-flex";}
+      else openEl.style.display="none";
+    }else{
+      statusEl.textContent=data.configured?"Atención":"No conectado";
+      nameEl.textContent="Bot de Central";
+      detailEl.textContent=data.configured?"El bot está configurado, pero todavía no confirma conexión.":"Telegram no está configurado para esta instancia.";
+      openEl.style.display="none";
+    }
   }catch(e){
     console.warn("Telegram no disponible:",e);
-    el.innerHTML='<div class="empty">Telegram sin datos disponibles.</div>';
+    statusEl.textContent="Sin datos";
+    nameEl.textContent="Bot de Central";
+    detailEl.textContent="No se pudo comprobar la conexión con Telegram.";
+    openEl.style.display="none";
   }
 }
-
 let radarProducts=[];
 function showRadarSpecs(p){
   let modal=document.getElementById("radarSpecsModal");
@@ -197,92 +215,41 @@ async function load(){
   }
   status(itemsResult.status==="fulfilled"?"ok":"error",itemsResult.status==="fulfilled"?"Central conectado":"Productos no disponibles");
 }
-async function submitManual(e){
-  e.preventDefault();
-  const btn=$("manualBtn"),out=$("manualResult");
-  btn.disabled=true;
-  btn.textContent="Creando…";
-  out.textContent="Guardando la tarjeta en el catálogo…";
-  try{
-    const body={
-      title:$("manualTitle").value.trim(),
-      price:Number($("manualPrice").value),
-      category:$("manualCategory").value,
-      currency:"COP",
-      image_url:$("manualImage").value.trim()||null,
-      product_url:$("manualUrl").value.trim()||null,
-      description:$("manualDescription").value.trim()||null,
-      stock:$("manualStock").value===""?null:Number($("manualStock").value),
-      sku:$("manualSku").value.trim()||null
-    };
-    const r=await fetch(API+"/products/personal",{
-      method:"POST",
-      headers:adminHeaders({"Content-Type":"application/json",Accept:"application/json"}),
-      body:JSON.stringify(body)
-    });
-    const data=await r.json().catch(()=>({}));
-    if(!r.ok)throw new Error(data.detail||"No fue posible crear la tarjeta");
-    out.textContent="Tarjeta creada: "+(data.product?.title||body.title);
-    $("manualForm").reset();
-    await load();
-  }catch(err){
-    out.textContent="Error: "+err.message;
-  }finally{
-    btn.disabled=false;
-    btn.textContent="Crear tarjeta";
-  }
-}
-const manualForm=$("manualForm");
-if(manualForm) manualForm.addEventListener("submit",submitManual);
-
 async function submitImport(e){
   e.preventDefault();
   const btn=$("importBtn"),out=$("importResult");
   btn.disabled=true;
   btn.textContent="Importando…";
-  out.textContent="Leyendo la URL y guardando el producto…";
+  out.textContent="Leyendo el producto y guardando sus datos reales…";
   try{
     const r=await fetch(API+"/products/import-url",{
       method:"POST",
       credentials:"include",
       headers:adminHeaders({"Content-Type":"application/json"}),
-      body:JSON.stringify({url:$("url").value,category:$("category").value,title:$("importTitle").value.trim()||null,price:$("importPrice").value?Number($("importPrice").value):null,currency:$("importCurrency").value,image_url:$("importImageUrl").value.trim()||null})
+      body:JSON.stringify({url:$("url").value.trim(),category:$("category").value})
     });
     const data=await r.json();
-    if(!r.ok)throw new Error(data.detail||"No fue posible importar");
-    out.textContent="Producto importado: "+(data.product?.title||"OK")+
-      (data.opportunity_score!=null
-        ?" · score "+Math.round(data.opportunity_score)
-        :" · score pendiente")+
-      (data.product?.affiliate_url?" · enlace promocional guardado":"");
-    $("url").value="";$("importTitle").value="";$("importPrice").value="";$("importImageUrl").value="";
+    if(!r.ok)throw new Error(data.detail||"No fue posible importar el producto.");
+    out.textContent="Producto importado: "+(data.product?.title||"Guardado")+
+      (data.opportunity_score!=null?" · puntuación "+Math.round(data.opportunity_score):" · puntuación pendiente")+
+      (data.product?.affiliate_url?" · enlace promocional conservado":"");
+    $("url").value="";
     await load();
   }catch(err){
-    out.textContent="Error: "+err.message;
+    out.textContent="No se pudo importar: "+(err.message||"Error desconocido")+". ";
+    const fallback=document.createElement("a");
+    fallback.href="/tarjetas";
+    fallback.textContent="Abrir creador y subir una imagen real";
+    fallback.className="import-error-link";
+    out.appendChild(fallback);
   }finally{
     btn.disabled=false;
-    btn.textContent="Importar";
+    btn.textContent="Importar producto";
   }
 }
 const importForm=$("importForm");
 if(importForm) importForm.addEventListener("submit",submitImport);
 
-const viewers=new Map();
-function open3dInCard(p){
- const host=$("viewer-"+p.id);if(!host||viewers.has(String(p.id)))return;
- const title=(String(p.title||"")+" "+String(p.category||"")).toLowerCase();
- let type=title.includes("ray-ban")||title.includes("rayban")||title.includes("glasses")||title.includes("gafas")?"m-glasses":title.includes("mic")||title.includes("microphone")||title.includes("microfono")||title.includes("transmisor")||title.includes("lavalier")?"m-mic":title.includes("mouse")||title.includes("raton")?"m-mouse":title.includes("smarttag")||title.includes("tracker")||title.includes("bluetooth")?"m-tag":title.includes("phone")||title.includes("celular")||title.includes("tablet")?"m-phone":title.includes("watch")||title.includes("reloj")?"m-watch":title.includes("camera")||title.includes("camara")?"m-camera":title.includes("headphone")||title.includes("audif")?"m-headphones":title.includes("bottle")||title.includes("botella")||title.includes("termo")?"m-bottle":"m-default";
- host.innerHTML='<div class="model3d-css '+type+'"><div class="object"><div class="part body"></div><div class="part screen"></div><div class="part line"></div><div class="part led"></div><div class="part bridge"></div><div class="part lens l"></div><div class="part lens r"></div><div class="part arm l"></div><div class="part arm r"></div><div class="part stripe"></div><div class="part wheel"></div><div class="part hole"></div><div class="part face"></div><div class="part strap"></div><div class="part cap"></div><div class="part band"></div><div class="part cup l"></div><div class="part cup r"></div></div><div class="shadow"></div><div class="ball" title="Arrastra para girar"></div><span class="hint">Vista 3D</span></div>';
- const stage=host.querySelector(".model3d-css"),obj=host.querySelector(".object"),ball=host.querySelector(".ball");let rx=-12,ry=28,drag=false,lx=0,ly=0,zoom=1;
- const render=()=>obj.style.transform="scale("+zoom+") rotateX("+rx+"deg) rotateY("+ry+"deg)";
- ball.addEventListener("pointerdown",e=>{drag=true;lx=e.clientX;ly=e.clientY;ball.setPointerCapture(e.pointerId);ball.style.cursor="grabbing"});
- ball.addEventListener("pointermove",e=>{if(!drag)return;ry+=(e.clientX-lx)*.8;rx+=(e.clientY-ly)*.45;rx=Math.max(-55,Math.min(35,rx));lx=e.clientX;ly=e.clientY;render()});
- const stop=e=>{drag=false;ball.style.cursor="grab";try{ball.releasePointerCapture(e.pointerId)}catch{}};
- ball.addEventListener("pointerup",stop);ball.addEventListener("pointercancel",stop);
- stage.addEventListener("wheel",e=>{e.preventDefault();zoom=Math.max(.7,Math.min(1.45,zoom-e.deltaY*.0008));render()},{passive:false});
- viewers.set(String(p.id),{host});
- render();
-}
 load();
 loadTelegram();
 loadPublications();
