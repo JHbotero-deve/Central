@@ -20,7 +20,9 @@ SQL_FILES = [
     "sql/015_product_blocks.sql",
     "sql/016_replace_catalog_20.sql",
     "sql/017_stock_reservations.sql",
-    "sql/018_pipeline_metrics.sql",]
+    "sql/018_pipeline_metrics.sql",
+    "sql/019_aliexpress.sql",
+]
 def init_database():
     db_url = os.getenv("DATABASE_URL")
     conn = psycopg2.connect(db_url) if db_url else psycopg2.connect(

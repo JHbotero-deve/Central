@@ -520,6 +520,8 @@ try{
         ||platform==="meli"
     ){
         buttonText="Ver oferta en Mercado Libre";
+    }else if(platform==="aliexpress"){
+        buttonText="Comprar en AliExpress";
     }
 
     document.getElementById("app").innerHTML=`
@@ -808,8 +810,8 @@ try{
             }
         }
 
-        if(p.product_url){
-            location.href=p.product_url;
+        if(p.affiliate_url||p.product_url){
+            location.href=p.affiliate_url||p.product_url;
             return;
         }
 

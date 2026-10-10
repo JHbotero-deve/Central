@@ -918,7 +918,7 @@ def import_product_from_url(payload: ProductImport, _: dict = Depends(require_ad
             cur.execute(
                 """
                 SELECT p.id, p.title, pl.name AS platform, c.name AS category,
-                       p.current_price, p.currency, p.image_url, p.product_url,
+                       p.current_price, p.currency, p.image_url, p.product_url, p.affiliate_url,
                        p.updated_at, p.catalog_expires_at, p.model_url, p.model_shape
                 FROM products p
                 JOIN platforms pl ON pl.id = p.platform_id
