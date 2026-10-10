@@ -22,6 +22,7 @@ SQL_FILES = [
     "sql/017_stock_reservations.sql",
     "sql/018_pipeline_metrics.sql",
     "sql/019_aliexpress.sql",
+    "sql/020_aliexpress_oauth.sql",
 ]
 def init_database():
     db_url = os.getenv("DATABASE_URL")

@@ -54,6 +54,8 @@ jobs:
         shell: bash
         run: |
           python -m compileall -q product-analyzer/app
+          python -m pip install --disable-pip-version-check --no-cache-dir -r product-analyzer/app/requirements.txt
+          python -m unittest discover -s product-analyzer/app -p 'test_aliexpress_oauth.py'
           python -m pip install --disable-pip-version-check --no-cache-dir pip-audit
           pip-audit -r product-analyzer/app/requirements.txt
       - name: Audit frontend dependencies
