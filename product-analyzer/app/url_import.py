@@ -192,6 +192,7 @@ def import_url(
     price: float | None = None,
     currency: str = "USD",
     image_url: str | None = None,
+    require_image: bool = True,
 ) -> dict:
     url = url.strip()
     _public_url(url)
@@ -201,9 +202,10 @@ def import_url(
     except requests.RequestException as exc:
         # Algunas tiendas bloquean lectura automática. Solo se admite salida manual
         # cuando el usuario aportó título, precio e imagen real; no se inventan datos.
-        if not (title and image_url and price is not None):
+        enough_manual_data = bool(title and price is not None and (image_url or not require_image))
+        if not enough_manual_data:
             if platform == "aliexpress":
-                raise ValueError("AliExpress no entregó los metadatos. Completa nombre, precio e imagen real y vuelve a importar.") from exc
+                raise ValueError("AliExpress no entregó los metadatos. Completa nombre y precio; añade una imagen real para publicar.") from exc
             raise
         metadata = {
             "resolved_url": url,
@@ -222,12 +224,12 @@ def import_url(
     final_currency = (currency if price is not None else metadata.get("currency")) or currency
     if not final_title:
         raise ValueError("No fue posible obtener el nombre real del producto.")
-    if not final_image:
-        raise ValueError("No fue posible obtener una imagen real del producto. Proporciónala manualmente para importarlo.")
+    if not final_image and require_image:
+        raise ValueError("No fue posible obtener una imagen real del producto. Proporciónala para publicar la tarjeta.")
     if final_price is None or float(final_price) <= 0:
         raise ValueError("No fue posible obtener el precio real. Proporciónalo manualmente para importarlo.")
     gallery = metadata.get("gallery_urls") or []
-    if final_image not in gallery:
+    if final_image and final_image not in gallery:
         gallery.insert(0, final_image)
     return {
         "platform": platform,
