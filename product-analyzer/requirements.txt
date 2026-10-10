@@ -1,0 +1,7 @@
+fastapi==0.110.0
+uvicorn==0.28.0
+pymongo==4.6.1
+pydantic==2.6.4
+python-telegram-bot==20.8
+requests==2.31.0
+httpx==0.26.0

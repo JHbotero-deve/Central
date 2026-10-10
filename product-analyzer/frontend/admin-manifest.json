@@ -1,0 +1,15 @@
+{
+  "id": "/tarjetas.html",
+  "name": "Central Administrativa",
+  "short_name": "Central Admin",
+  "description": "Panel administrativo de Central",
+  "lang": "es-CO",
+  "start_url": "/tarjetas.html",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#f7f4ed",
+  "theme_color": "#171a19",
+  "icons": [{"src": "/central-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any"}]
+}

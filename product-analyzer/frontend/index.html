@@ -18,7 +18,7 @@
 .radar-card:hover{transform:translateY(-5px)!important;border-color:rgba(255,138,0,.45)!important;box-shadow:0 30px 70px rgba(0,0,0,.24)!important}
 .radar-card .card-media{height:auto!important;aspect-ratio:1/1.08!important;background:radial-gradient(circle at 50% 35%,rgba(255,138,0,.18),transparent 36%),linear-gradient(145deg,#1a1f27,#080a0e)!important;border:0!important}
 .radar-card .card-media img{padding:0!important;width:100%!important;height:100%!important;object-fit:cover!important;mix-blend-mode:normal!important}
-.radar-card-actions{position:absolute;left:14px;right:14px;bottom:14px;z-index:8;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.radar-card-actions{position:absolute;left:14px;right:14px;bottom:14px;z-index:8;display:grid;grid-template-columns:1fr 1fr;gap:8px}.radar-publish{grid-column:1/-1;background:#f6f1e8;color:#202522;border-color:#f6f1e8}.pub-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}.pub-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;display:grid;gap:10px;min-width:0}.pub-card h3{margin:0;font-size:15px;overflow-wrap:anywhere}.pub-meta{font-size:12px;color:var(--muted)}.pub-form{display:grid;gap:8px}.pub-form label{display:grid;gap:4px;font-size:12px;color:var(--muted)}.pub-form input[type=text],.pub-form input[type=color]{width:100%;min-height:38px;border:1px solid var(--line);border-radius:7px;padding:8px;background:var(--panel);color:var(--text)}.pub-form .pub-check{display:flex;align-items:center;gap:8px}.pub-actions{display:flex;gap:8px;flex-wrap:wrap}.pub-actions .btn{font-size:12px}.pub-empty{padding:16px;border:1px dashed var(--line);border-radius:10px;color:var(--muted)}
 .radar-action{min-height:42px;padding:10px 12px;border-radius:13px;border:1px solid rgba(255,255,255,.16);font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;text-align:center;cursor:pointer;text-decoration:none;backdrop-filter:blur(12px)}
 .radar-specs{background:rgba(8,10,14,.72);color:#fff}
 .radar-open{background:#ff8a00;border-color:#ff8a00;color:#080a0e}
@@ -27,8 +27,9 @@
 .radar-card .category{color:#ff8a00!important}
 .radar-card h3,.radar-card .card-price{color:#fff!important}
 </style>
+<script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
 </head>
-<body><nav class="nav"><div class="wrap"><div class="brand">CENTRAL <b>·</b> RADAR</div><div class="navlinks"><a href="#oportunidades">Oportunidades</a><a href="#importar">Importar producto</a><a href="/catalogo.html">Catálogo activo</a><a href="/tienda" target="_blank" rel="noopener noreferrer">Abrir tienda</a><a href="#telegram">Telegram</a></div><div class="status" id="status"><span class="dot"></span>Central operativo</div></div></nav>
+<body><nav class="nav"><div class="wrap"><div class="brand">CENTRAL <b>·</b> RADAR</div><div class="navlinks"><a href="#oportunidades">Oportunidades</a><a href="#importar">Importar producto</a><a href="#publicaciones">Gestionar tienda</a><a href="/catalogo.html">Catálogo activo</a><a href="/tarjetas">Acceso administrativo</a><a href="/tienda" target="_blank" rel="noopener noreferrer">Abrir tienda</a><a href="#telegram">Telegram</a></div><div class="status" id="status"><span class="dot"></span>Central operativo</div></div></nav>
 
 <header><div class="wrap"><div class="eyebrow">Producto real · análisis · monetización</div><h1>Detecta oportunidades antes de que desaparezcan.</h1><p class="hero-copy">Central reúne productos reales, calcula una señal de oportunidad y mantiene un catálogo con renovación automática cada 2 horas y vigencia de 48 horas. No usa productos de demostración.</p><div class="actions"><a class="btn primary" href="#oportunidades">Ver oportunidades</a><a class="btn" href="#importar">Importar producto</a><a class="btn" href="/tienda" target="_blank" rel="noopener noreferrer">Abrir tienda</a></div></div></header>
 
@@ -37,6 +38,9 @@
 <section id="oportunidades"><div class="wrap"><div class="section-head"><div><div class="eyebrow">02 · puntuación</div><h2>Oportunidades activas</h2><p>Productos reales ordenados por la señal calculada por Central.</p></div><div class="mono" id="updated">—</div></div><div class="grid" id="featured"><div class="empty">Cargando datos reales…</div></div></div></section>
 
 <section id="importar"><div class="wrap"><div class="section-head"><div><div class="eyebrow">04 · entrada real</div><h2>Importar desde una plataforma</h2><p>Acepta enlaces de Amazon, Mercado Libre, TikTok Shop y AliExpress. Los enlaces cortos promocionales de AliExpress se conservan para no perder la atribución de afiliado.</p></div></div><form id="importForm"><div class="import-main"><input class="field" id="url" type="url" placeholder="URL del producto o enlace promocional" required><select class="field" id="category"><option value="accesorios">Accesorios</option><option value="ropa">Ropa</option><option value="calzado">Calzado</option></select><button class="btn primary" id="importBtn" type="submit">Importar</button></div><div class="import-details"><input class="field" id="importTitle" type="text" maxlength="500" placeholder="Nombre del producto (opcional)"><input class="field" id="importPrice" type="number" min="0.01" step="any" placeholder="Precio (opcional)"><select class="field" id="importCurrency" aria-label="Moneda del precio"><option value="COP">COP</option><option value="USD">USD</option><option value="CNY">CNY</option><option value="EUR">EUR</option></select><input class="field" id="importImageUrl" type="url" placeholder="URL de imagen real (opcional)"></div></form><p style="font-size:12px;margin:10px 0 0">Si AliExpress bloquea la lectura automática, completa nombre, precio e imagen real. No se inventan imágenes ni precios.</p><div class="import-result" id="importResult"></div></div></section>
+<section id="publicaciones"><div class="wrap"><div class="section-head"><div><div class="eyebrow">03 · tienda</div><h2>Gestionar tarjetas publicadas</h2><p>Publica oportunidades, edita los textos visibles, despublica o elimina una ficha sin borrar el producto del catálogo.</p></div><a class="btn small" href="/tienda" target="_blank" rel="noopener noreferrer">Ver tienda</a></div><div id="publicationMessage" class="pub-empty">Comprobando sesión administrativa…</div><div id="publicationList" class="pub-grid"></div></div></section>
+
+<section id="importar"><div class="wrap"><div class="section-head"><div><div class="eyebrow">04 · entrada real</div><h2>Importar desde una plataforma</h2><p>Pega una URL de Amazon o Mercado Libre. Central extrae los metadatos disponibles y guarda el producto en el catálogo.</p></div></div><form class="import" id="importForm"><input class="field" id="url" type="url" placeholder="Pega la URL del producto" required><select class="field" id="category"><option value="accesorios">Accesorios</option><option value="ropa">Ropa</option><option value="calzado">Calzado</option></select><button class="btn primary" id="importBtn" type="submit">Importar</button></form><div class="import-result" id="importResult"></div></div></section>
 
 
 
@@ -50,17 +54,14 @@
 (()=>{"use strict";
 const API="/api/v1", $=id=>document.getElementById(id);
 const authHeaders=(extra={})=>extra;
-let adminKey="";
-const adminHeaders=(extra={})=>{
-  if(!adminKey)adminKey=window.prompt("Clave administrativa de Central (ADMIN_API_KEY):")||"";
-  if(!adminKey)throw new Error("Operación cancelada: falta la clave administrativa.");
-  return {...extra,"X-Admin-Key":adminKey};
-};
+const adminHeaders=(extra={})=>extra;
+const requestOptions=(options={})=>({...options,credentials:"include",cache:"no-store"});
+const requireSession=error=>{if(error?.status===401){$("publicationMessage").innerHTML='Sesión administrativa requerida. <a href="/tarjetas">Inicia sesión con tu contraseña</a>; no necesitas la clave interna de Railway.';return true}return false};
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const money=(v,c)=>{if(v==null||Number.isNaN(Number(v)))return"—";const n=Number(v);const cur=String(c||"COP").toUpperCase();if(cur==="USD"||cur==="US$"||cur==="$"){const cop=n*3329.61;return new Intl.NumberFormat("es-CO",{style:"currency",currency:"COP",maximumFractionDigits:0}).format(cop)+" COP";}try{return new Intl.NumberFormat("es-CO",{style:"currency",currency:"COP",maximumFractionDigits:0}).format(n)+" COP"}catch{return n.toLocaleString("es-CO")+" COP"}};
 const date=v=>v?new Date(v).toLocaleString("es-CO"):"—";
 const productImage=p=>{const mongo=p?.source_metadata?.mongo_image_id;return mongo?"mongo://"+mongo:(p?.image_url||((p?.image_gallery||[]).find(Boolean)||""))};
-async function get(path){const protectedRead=/^\/(mongo\/health|pipeline\/(summary|metrics)|intelligence\/overview|opportunities\/top|catalog\/active|products\/compare)(\/|\?|$)/.test(path);const headers=protectedRead?adminHeaders({Accept:"application/json"}):authHeaders({Accept:"application/json"});const r=await fetch(API+path,{cache:"no-store",headers});if(!r.ok){throw new Error("HTTP "+r.status)}return r.json()}
+async function get(path){const protectedRead=/^\/(mongo\/health|pipeline\/(summary|metrics)|intelligence\/overview|opportunities\/top|catalog\/active|products\/compare)(\/|\?|$)/.test(path);const headers=protectedRead?adminHeaders({Accept:"application/json"}):authHeaders({Accept:"application/json"});const r=await fetch(API+path,requestOptions({headers}));if(!r.ok){const data=await r.json().catch(()=>({}));throw Object.assign(new Error(data.detail||"HTTP "+r.status),{status:r.status})}return r.json()}
 function status(kind,label){$("status").innerHTML='<span class="dot '+(kind==="ok"?"ok":kind==="warn"?"warn":"")+'"></span>'+esc(label)}
 function card(p){
   const id=p.id;
@@ -78,8 +79,9 @@ function card(p){
     '<div class="card-media">'+image+
       '<span class="badge">'+esc(label)+'</span>'+
       '<div class="radar-card-actions">'+
-        '<button type="button" class="radar-action radar-specs" data-id="'+esc(id)+'">Specs</button>'+
-        '<a class="radar-action radar-open" href="'+esc(destination)+'" target="_blank" rel="noopener noreferrer">'+esc(p.product_url||p.affiliate_url?"Abrir "+label:"Abrir Boopy")+'</a>'+
+        '<button type="button" class="radar-action radar-specs" data-id="'+esc(id)+'">Detalles</button>'+
+        '<a class="radar-action radar-open" href="'+esc(destination)+'" target="_blank" rel="noopener noreferrer">'+esc(p.product_url||p.affiliate_url?"Abrir "+label:"Abrir producto")+'</a>'+
+        '<button type="button" class="radar-action radar-publish" data-publish-product="'+esc(id)+'">'+(publishedProductIds.has(String(id))?"Actualizar publicación":"Publicar en tienda")+'</button>'+
       '</div>'+
     '</div>'+
     '<div class="card-body">'+
@@ -161,6 +163,13 @@ document.addEventListener("click",e=>{
   const p=radarProducts.find(x=>String(x.id)===String(b.dataset.id));
   if(p)showRadarSpecs(p);
 });
+let publishedProductIds=new Set();
+async function loadPublications(){
+ const message=$("publicationMessage"),list=$("publicationList");if(!message||!list)return;
+ try{const rows=await get("/publications?include_unpublished=true&limit=100");publishedProductIds=new Set(rows.map(row=>String(row.product_id)));message.textContent=rows.length?rows.length+" tarjetas encontradas. Guarda cambios por tarjeta; retirar elimina solo la publicación.":"No hay tarjetas publicadas ni borradores.";
+ list.innerHTML=rows.map(row=>`<article class="pub-card" data-publication-card="${row.id}"><div class="pub-meta">${esc(row.platform||"Producto")} · ${row.is_published?"Visible en tienda":"Borrador / retirada"}</div><h3>${esc(row.title)}</h3><div class="pub-meta">${esc(row.price_display||"Precio no disponible")}</div><form class="pub-form" data-publication-form="${row.id}"><label>Texto secundario<input type="text" name="subtitle" maxlength="500" value="${esc(row.subtitle||"")}"></label><label>Pie de tarjeta<input type="text" name="footer" maxlength="200" value="${esc(row.footer||"Disponible en Central")}"></label><label>Color de acento<input type="color" name="accent" value="${/^#[0-9a-f]{6}$/i.test(row.accent||"")?row.accent:"#b6f23a"}"></label><label class="pub-check"><input type="checkbox" name="is_published" ${row.is_published?"checked":""}> Visible en la tienda</label><div class="pub-actions"><button class="btn primary small" type="submit">Guardar ajustes</button><button class="btn small" type="button" data-remove-publication="${row.id}">Eliminar publicación</button></div></form></article>`).join("");
+ }catch(error){list.innerHTML="";if(!requireSession(error))message.textContent="No fue posible cargar las tarjetas: "+error.message;}
+}
 async function load(){
   const [itemsResult,topResult,intelResult,pipelineResult]=await Promise.allSettled([
     get("/products?limit=50"),get("/opportunities/top?limit=12"),get("/intelligence/overview"),get("/pipeline/metrics")
@@ -276,6 +285,48 @@ function open3dInCard(p){
 }
 load();
 loadTelegram();
+loadPublications();
+
+document.addEventListener("click",async event=>{
+ const publish=event.target.closest("[data-publish-product]");
+ if(publish){
+  publish.disabled=true;
+  try{
+   const p=radarProducts.find(item=>String(item.id)===String(publish.dataset.publishProduct));
+   if(!p)throw new Error("Producto no encontrado");
+   const response=await fetch(API+"/publications",requestOptions({method:"POST",headers:adminHeaders({"Content-Type":"application/json",Accept:"application/json"}),body:JSON.stringify({product_id:p.id,title:p.title,subtitle:p.description||null,price_display:money(p.current_price,p.currency),image_url:p.image_url||((p.image_gallery||[]).find(Boolean)||null),product_url:p.affiliate_url||p.product_url||null,sale_price:p.current_price,cost_price:p.current_price,footer:"Disponible en Central",accent:"#b6f23a",is_published:true})}));
+   const data=await response.json().catch(()=>({}));
+   if(!response.ok)throw Object.assign(new Error(data.detail||"No fue posible publicar"),{status:response.status});
+   $("publicationMessage").textContent="Publicación guardada correctamente.";await loadPublications();await load();
+  }catch(error){if(!requireSession(error))$("publicationMessage").textContent="No se publicó: "+error.message;}
+  finally{publish.disabled=false;}
+ }
+ const remove=event.target.closest("[data-remove-publication]");
+ if(remove){
+  if(!confirm("¿Eliminar esta publicación de la tienda? El producto seguirá en el catálogo."))return;
+  remove.disabled=true;
+  try{
+   const response=await fetch(API+"/publications/"+encodeURIComponent(remove.dataset.removePublication),requestOptions({method:"DELETE",headers:adminHeaders({Accept:"application/json"})}));
+   const data=await response.json().catch(()=>({}));
+   if(!response.ok)throw Object.assign(new Error(data.detail||"No fue posible eliminar la publicación"),{status:response.status});
+   await loadPublications();await load();
+  }catch(error){if(!requireSession(error))$("publicationMessage").textContent="No se pudo eliminar: "+error.message;}
+  finally{remove.disabled=false;}
+ }
+});
+document.addEventListener("submit",async event=>{
+ const form=event.target.closest("[data-publication-form]");if(!form)return;event.preventDefault();
+ const id=form.dataset.publicationForm;
+ let current;try{current=await get("/publications?include_unpublished=true&limit=100")}catch(error){if(!requireSession(error))$("publicationMessage").textContent=error.message;return}
+ const row=current.find(item=>String(item.id)===String(id));if(!row){$("publicationMessage").textContent="No se encontró la publicación para actualizar.";return}
+ const data=new FormData(form);
+ const payload={product_id:row.product_id,title:row.title,subtitle:String(data.get("subtitle")||"").trim()||null,price_display:row.price_display,image_url:row.image_url,product_url:row.product_url,sale_price:row.sale_price,cost_price:row.cost_price,opportunity_score:row.opportunity_score,footer:String(data.get("footer")||"Disponible en Central").trim(),accent:String(data.get("accent")||"#b6f23a"),is_published:data.get("is_published")==="on"};
+ const submit=form.querySelector('button[type="submit"]');submit.disabled=true;
+ try{const response=await fetch(API+"/publications/"+encodeURIComponent(id),requestOptions({method:"PATCH",headers:adminHeaders({"Content-Type":"application/json",Accept:"application/json"}),body:JSON.stringify(payload)}));const result=await response.json().catch(()=>({}));if(!response.ok)throw Object.assign(new Error(result.detail||"No fue posible guardar los ajustes"),{status:response.status});$("publicationMessage").textContent="Ajustes guardados.";await loadPublications();await load()}
+ catch(error){if(!requireSession(error))$("publicationMessage").textContent="No se guardaron los ajustes: "+error.message}
+ finally{submit.disabled=false}
+});
+
 })();
 </script>
 </body>

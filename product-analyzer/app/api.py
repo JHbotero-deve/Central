@@ -24,6 +24,7 @@ from monetization import router as monetization_router
 from publications import router as publication_router
 from store_orders import router as store_orders_router
 from commerce import router as commerce_router
+from auth import router as auth_router, require_admin
 from tiktok_api import router as tiktok_creator_router
 from url_import import import_url, _public_url
 from wompi import router as wompi_router
@@ -32,15 +33,6 @@ from meli_oauth import router as meli_oauth_router, notification_router as meli_
 
 API_VERSION = "1.3.0"
 
-def require_admin(x_admin_key: Optional[str] = Header(default=None)) -> dict:
-    """Protege operaciones administrativas con ADMIN_API_KEY; nunca falla abierto."""
-    expected = os.getenv("ADMIN_API_KEY", "").strip()
-    if not expected:
-        raise HTTPException(status_code=503, detail="ADMIN_API_KEY no está configurada")
-    supplied = (x_admin_key or "").strip()
-    if not supplied or not secrets.compare_digest(supplied, expected):
-        raise HTTPException(status_code=401, detail="Se requiere una clave administrativa válida")
-    return {"admin": True}
 
 app = FastAPI(
     title="Central Product Analyzer API",
@@ -48,6 +40,7 @@ app = FastAPI(
     version=API_VERSION,
 )
 
+app.include_router(auth_router, prefix="/api/v1")
 app.include_router(monetization_router, prefix="/api/v1")
 app.include_router(wompi_router, prefix="/api/v1")
 app.include_router(meli_oauth_router, prefix="/api/v1")
@@ -230,9 +223,23 @@ def _sync_store_catalog():
     conn = get_connection()
     amazon_imported = []
     meli_imported = []
+    meli_refreshed = []
+    meli_refreshed_keys = set()
     errors = []
     try:
         with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE products
+                SET is_active = FALSE, updated_at = NOW()
+                WHERE is_active = TRUE
+                  AND catalog_expires_at IS NOT NULL
+                  AND catalog_expires_at <= NOW()
+                  AND is_blocked = FALSE
+            """)
+            expired_count = cur.rowcount
+            conn.commit()
+            if expired_count:
+                print({"event": "catalog_expired", "count": expired_count}, flush=True)
             cur.execute("""
                 SELECT p.external_id, p.title, p.product_url, pl.name AS platform
                 FROM products p
@@ -302,13 +309,25 @@ def _sync_store_catalog():
                         key = ("mercadolibre", external_id.upper())
                         title_key = " ".join(str(product.get("title") or "").lower().split())
                         product_url = str(product.get("product_url") or "").split("?")[0].rstrip("/").lower()
-                        if (
-                            not external_id
-                            or not title_key
-                            or key in existing
-                            or title_key in meli_seen_titles
-                            or (product_url and product_url in meli_seen_urls)
-                        ):
+                        if not external_id or not title_key:
+                            continue
+                        if key in existing:
+                            if key in meli_refreshed_keys:
+                                continue
+                            try:
+                                product_id = upsert_product(conn, "mercadolibre", "accesorios", product)
+                                conn.commit()
+                                meli_refreshed_keys.add(key)
+                                meli_refreshed.append({
+                                    "id": product_id,
+                                    "item_id": external_id,
+                                    "title": product["title"],
+                                })
+                            except Exception as exc:
+                                conn.rollback()
+                                errors.append(f"Mercado Libre {external_id}: {exc}")
+                            continue
+                        if title_key in meli_seen_titles or (product_url and product_url in meli_seen_urls):
                             continue
                         try:
                             product_id = upsert_product(conn, "mercadolibre", "accesorios", product)
@@ -343,14 +362,20 @@ def _sync_store_catalog():
             conn.rollback()
             errors.append(f"Mercado Libre: {exc}")
 
-        if not amazon_imported and not meli_imported:
+        if not amazon_imported and not meli_imported and not meli_refreshed:
             raise HTTPException(status_code=502, detail={
                 "message": "No se pudo importar ningún producto real.",
                 "errors": errors[:10],
             })
         return {
             "amazon": {"imported": len(amazon_imported), "published": 0, "products": amazon_imported},
-            "mercadolibre": {"imported": len(meli_imported), "published": 0, "products": meli_imported},
+            "mercadolibre": {
+                "imported": len(meli_imported),
+                "refreshed": len(meli_refreshed),
+                "published": 0,
+                "products": meli_imported,
+                "refreshed_products": meli_refreshed,
+            },
             "total_published": 0,
             "errors": errors[:10],
         }
@@ -411,7 +436,7 @@ def get_product(product_id: int):
                 JOIN platforms pl ON pl.id = p.platform_id
                 LEFT JOIN categories c ON c.id = p.category_id
                 LEFT JOIN sellers s ON s.id = p.seller_id
-                WHERE p.id = %s AND p.is_active = TRUE
+                WHERE p.id = %s AND p.is_active = TRUE AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW())
                 """,
                 (product_id,),
             )
@@ -444,6 +469,7 @@ def list_products(
                 LEFT JOIN categories c ON c.id = p.category_id
                 LEFT JOIN product_scores s ON s.product_id = p.id
                 WHERE p.is_active = TRUE
+                  AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW())
             """
             params = []
             if category:
@@ -1041,6 +1067,7 @@ def active_catalog(_: dict = Depends(require_admin)):
                 LEFT JOIN categories c ON c.id = p.category_id
                 LEFT JOIN published_cards pc ON pc.product_id = p.id
                 WHERE p.is_active = TRUE AND p.is_blocked = FALSE
+                  AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW())
                 ORDER BY p.updated_at DESC
                 LIMIT 200            """)
             return cur.fetchall()

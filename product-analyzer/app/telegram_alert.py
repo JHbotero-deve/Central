@@ -632,3 +632,29 @@ def run_bot():
             lock_conn.close()
         except Exception:
             pass
+
+
+async def handle_telegram_product_search(update, context):
+    query = update.message.text.replace("/buscar", "").strip()
+    if not query:
+        return await update.message.reply_text("Por favor ingresa un término de búsqueda válido, ej: /buscar iPhone")
+    
+    results = fetch_mercadolibre(query, limit=5)
+    if not results:
+        return await update.message.reply_text("No se encontraron productos activos para este término.")
+    
+    saved_count = len(results)
+    await update.message.reply_text(f"¡Éxito! Se han procesado e ingresado {saved_count} productos a la tienda central.")
+
+async def handle_telegram_product_search(update, context):
+    try:
+        query = update.message.text.replace("/buscar", "").strip()
+        if not query:
+            return await update.message.reply_text("Ingresa un término válido.")
+        results = fetch_mercadolibre(query, limit=5)
+        if not results:
+            return await update.message.reply_text("No se encontraron productos.")
+        saved_count = len(results)
+        await update.message.reply_text(f"¡Éxito! Se ingresaron {saved_count} productos.")
+    except Exception:
+        await update.message.reply_text("Ocurrió un error interno.")
