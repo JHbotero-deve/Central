@@ -198,10 +198,40 @@ async def meli_notifications(request: Request):
 
 
 def get_meli_tokens() -> tuple[str | None, str | None]:
+    # La conexión OAuth guardada en PostgreSQL prevalece sobre variables
+    # de entorno que pueden conservar tokens antiguos tras una reconexión.
+    key = _env("MELI_TOKEN_ENCRYPTION_KEY")
+    if key:
+        try:
+            cipher = Fernet(key.encode())
+            conn = get_connection()
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        SELECT access_token_encrypted, refresh_token_encrypted
+                        FROM meli_oauth_tokens
+                        WHERE id=1
+                        """
+                    )
+                    row = cur.fetchone()
+            finally:
+                conn.close()
+            if row:
+                try:
+                    access_token = cipher.decrypt(row["access_token_encrypted"].encode()).decode()
+                    refresh_token = cipher.decrypt(row["refresh_token_encrypted"].encode()).decode()
+                    if access_token and refresh_token:
+                        return access_token, refresh_token
+                except Exception:
+                    pass
+        except Exception as exc:
+            print(f"[Mercado Libre] no se pudo leer la conexión OAuth guardada: {type(exc).__name__}")
+
+    # Compatibilidad para instalaciones que aún usan tokens por entorno.
     env_access = _env("MELI_ACCESS_TOKEN")
     env_refresh = _env("MELI_REFRESH_TOKEN")
     env_expires = _env("MELI_ACCESS_TOKEN_EXPIRES_AT")
-
     if env_access and env_refresh and env_expires:
         try:
             env_expires_at = datetime.fromisoformat(env_expires.replace("Z", "+00:00"))
@@ -211,40 +241,7 @@ def get_meli_tokens() -> tuple[str | None, str | None]:
                 return env_access, env_refresh
         except ValueError:
             pass
-
-    key = _env("MELI_TOKEN_ENCRYPTION_KEY")
-    if not key:
-        return None, None
-    try:
-        cipher = Fernet(key.encode())
-    except Exception:
-        return None, None
-
-    conn = get_connection()
-    try:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT access_token_encrypted, refresh_token_encrypted
-                FROM meli_oauth_tokens
-                WHERE id=1
-                """
-            )
-            row = cur.fetchone()
-    finally:
-        conn.close()
-
-    if not row:
-        return None, None
-
-    try:
-        return (
-            cipher.decrypt(row["access_token_encrypted"].encode()).decode(),
-            cipher.decrypt(row["refresh_token_encrypted"].encode()).decode(),
-        )
-    except Exception:
-        return None, None
-
+    return None, None
 
 def save_meli_tokens(access_token: str, refresh_token: str, expires_in: int = 0) -> None:
     cipher = _cipher()
