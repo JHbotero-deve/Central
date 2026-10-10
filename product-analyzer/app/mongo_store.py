@@ -3,7 +3,9 @@ PostgreSQL sigue siendo la fuente de verdad transaccional de Central.
 """
 import base64
 import hashlib
+import os
 import re
+import binascii
 from datetime import datetime, timezone
 
 import requests
@@ -74,7 +76,7 @@ def store_product_image(url: str, **metadata):
             raise ValueError("imagen subida inválida; se requiere data URI base64")
         try:
             data = base64.b64decode(re.sub(r"\s+", "", match.group(2)), validate=True)
-        except (ValueError, base64.binascii.Error) as exc:
+        except (ValueError, binascii.Error) as exc:
             raise ValueError("contenido base64 de imagen inválido") from exc
         return _store_image_bytes(data, match.group(1), "data:image-upload", **metadata)
 
@@ -138,6 +140,3 @@ def health():
     except Exception as exc:
         return {"configured": True, "connected": False, "error": str(exc)[:180]}
 
-
-# Imports used by _get_db are intentionally grouped here to keep the module easy to audit.
-import os
