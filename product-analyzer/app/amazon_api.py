@@ -373,6 +373,7 @@ def search_products(keywords: str, limit: int = 10) -> list[dict[str, Any]]:
                     "images.primary.small",
                     "itemInfo.title",
                     "offersV2.listings.price",
+                    "offersV2.listings.savingBasis",
                 ],
             },
         )
@@ -391,6 +392,28 @@ def search_products(keywords: str, limit: int = 10) -> list[dict[str, Any]]:
     if html_results:
         return html_results
     return _search_amazon_web(keywords, limit)
+
+
+def _previous_offer(item: dict[str, Any]) -> float | None:
+    """Lee precio de referencia solo si la respuesta oficial de Amazon lo proporciona."""
+    listings = ((item.get("offersV2") or {}).get("listings") or [])
+    if not listings:
+        return None
+    listing = listings[0] or {}
+    for key in ("savingBasis", "listPrice", "originalPrice"):
+        node = listing.get(key)
+        if isinstance(node, dict):
+            node = node.get("money") or node.get("price") or node
+            if isinstance(node, dict):
+                node = node.get("amount") or node.get("value")
+        try:
+            value = float(node)
+        except (TypeError, ValueError):
+            continue
+        current, _ = _offer(item)
+        if current is not None and value > current:
+            return value
+    return None
 
 
 def _map_item(
@@ -419,6 +442,7 @@ def _map_item(
         "gallery_urls": [image] if image else [],
         "product_url": str(url),
         "price": price,
+        "previous_price": _previous_offer(item),
         "currency": currency or "USD",
         "rating": None,
         "reviews_count": 0,

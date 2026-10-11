@@ -20,7 +20,8 @@ from mongo_store import store_product_image
 from analysis import score_product
 from amazon_api import fetch_amazon_products
 from ingest import MercadoLibreAccessDenied, fetch_mercadolibre
-from db import get_connection, upsert_product
+from db import get_connection, upsert_product, _affiliate_url
+from catalog_rules import discount_percentage
 from monetization import router as monetization_router
 from publications import router as publication_router
 from store_orders import router as store_orders_router
@@ -195,12 +196,40 @@ def health():
 
 
 def _publish_external_product(conn, product_id, product, platform_label):
-    price = product.get("price")
-    currency = product.get("currency") or "COP"
-    price_display = f"{price:,.2f} {currency}" if price is not None else "Consultar"
-    image_url = product.get("image_url") or None
-    product_url = product.get("product_url") or None
-    score = product.get("_score")
+    """Publica solo ofertas con descuento real >= umbral y enlace monetizable verificable."""
+    discount_pct = discount_percentage(product.get("price"), product.get("previous_price"))
+    threshold = float(os.getenv("CATALOG_MIN_DISCOUNT_PCT", "50"))
+    if discount_pct is None or discount_pct < threshold:
+        return False
+    current_price = float(product.get("price") or 0)
+    previous_price = float(product.get("previous_price") or 0)
+
+    affiliate_url = str(product.get("affiliate_url") or _affiliate_url(product) or "").strip()
+    if not affiliate_url.startswith(("https://", "http://")):
+        return False
+
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT p.title, p.current_price, p.previous_price, p.currency, p.product_url,
+                   p.image_url, p.affiliate_url, p.source_metadata
+            FROM products p WHERE p.id = %s AND p.is_active = TRUE AND p.is_blocked = FALSE
+        """, (product_id,))
+        stored = cur.fetchone()
+    if not stored:
+        return False
+
+    metadata = stored.get("source_metadata") or {}
+    mongo_image_id = metadata.get("mongo_image_id") if isinstance(metadata, dict) else None
+    image_url = ("mongo://" + str(mongo_image_id)) if mongo_image_id else (stored.get("image_url") or product.get("image_url"))
+    product_url = affiliate_url or stored.get("affiliate_url") or stored.get("product_url")
+    if not image_url or not str(image_url).strip() or not product_url:
+        return False
+
+    price = float(stored.get("current_price") or current_price)
+    previous = float(stored.get("previous_price") or previous_price)
+    currency = stored.get("currency") or product.get("currency") or "COP"
+    price_display = f"{price:,.2f} {currency}"
+    score = max(float(product.get("_score") or 0), discount_pct)
     with conn.cursor() as cur:
         cur.execute("""
             INSERT INTO published_cards (
@@ -215,34 +244,25 @@ def _publish_external_product(conn, product_id, product, platform_label):
                 cost_price=EXCLUDED.cost_price, opportunity_score=EXCLUDED.opportunity_score,
                 is_published=TRUE, published_at=NOW(), updated_at=NOW()
         """, (
-            product_id, product["title"], f"{platform_label} · producto original",
+            product_id, stored.get("title") or product["title"],
+            f"{platform_label} · descuento verificado {discount_pct:.0f}%",
             price_display, image_url, product_url,
-            price, price, score or 0, f"Oferta {platform_label}", "#b6f23a"
+            price, previous, score, f"Oferta -{discount_pct:.0f}% · {platform_label}", "#ff8a00"
         ))
-
+    return True
 
 def _sync_store_catalog():
-    """Importa productos reales al catálogo; las tarjetas se publican únicamente desde Studio."""
+    """Importa, puntúa y publica ofertas verificadas; rota caducados solo si hay reemplazos."""
     conn = get_connection()
     amazon_imported = []
     meli_imported = []
     meli_refreshed = []
     meli_refreshed_keys = set()
     errors = []
+    auto_published = []
+    expired_count = 0
     try:
         with conn.cursor() as cur:
-            cur.execute("""
-                UPDATE products
-                SET is_active = FALSE, updated_at = NOW()
-                WHERE is_active = TRUE
-                  AND catalog_expires_at IS NOT NULL
-                  AND catalog_expires_at <= NOW()
-                  AND is_blocked = FALSE
-            """)
-            expired_count = cur.rowcount
-            conn.commit()
-            if expired_count:
-                print({"event": "catalog_expired", "count": expired_count}, flush=True)
             cur.execute("""
                 SELECT p.external_id, p.title, p.product_url, pl.name AS platform
                 FROM products p
@@ -265,6 +285,8 @@ def _sync_store_catalog():
                 {external_id for platform, external_id in existing if platform == "amazon"},
                 15,
             )
+            if not amazon_products:
+                errors.append("Amazon: no se obtuvieron productos verificables en este ciclo.")
             for category, product in amazon_products[:15]:
                 try:
                     product_id = upsert_product(conn, "amazon", category, product)
@@ -278,6 +300,8 @@ def _sync_store_catalog():
                         """, (category, product.get("currency") or "USD"))
                         average = cur.fetchone()["avg_price"]
                     product["_score"] = score_product(conn, product_id, float(average or 0))
+                    if _publish_external_product(conn, product_id, product, "Amazon"):
+                        auto_published.append({"id": product_id, "title": product["title"], "discount_pct": round((float(product.get("previous_price") or 0) - float(product.get("price") or 0)) / float(product.get("previous_price") or 1) * 100, 2)})
                     conn.commit()
                     amazon_imported.append({"id": product_id, "asin": product["external_id"], "title": product["title"]})
                 except Exception as exc:
@@ -319,6 +343,8 @@ def _sync_store_catalog():
                                 continue
                             try:
                                 product_id = upsert_product(conn, "mercadolibre", "accesorios", product)
+                                if _publish_external_product(conn, product_id, product, "Mercado Libre"):
+                                    auto_published.append({"id": product_id, "title": product["title"], "discount_pct": round((float(product.get("previous_price") or 0) - float(product.get("price") or 0)) / float(product.get("previous_price") or 1) * 100, 2)})
                                 conn.commit()
                                 meli_refreshed_keys.add(key)
                                 meli_refreshed.append({
@@ -344,6 +370,8 @@ def _sync_store_catalog():
                                 """, ("accesorios", product.get("currency") or "COP"))
                                 average = cur.fetchone()["avg_price"]
                             product["_score"] = score_product(conn, product_id, float(average or 0))
+                            if _publish_external_product(conn, product_id, product, "Mercado Libre"):
+                                auto_published.append({"id": product_id, "title": product["title"], "discount_pct": round((float(product.get("previous_price") or 0) - float(product.get("price") or 0)) / float(product.get("previous_price") or 1) * 100, 2)})
                             conn.commit()
                             existing.add(key)
                             meli_seen_titles.add(title_key)
@@ -368,21 +396,57 @@ def _sync_store_catalog():
             conn.rollback()
             errors.append(f"Mercado Libre: {exc}")
 
+        # No dejar el catálogo vacío por un 403 o un ciclo sin ofertas elegibles.
+        # Solo rotar caducados después de publicar al menos un reemplazo verificado.
+        if auto_published:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    UPDATE products
+                    SET is_active = FALSE, updated_at = NOW()
+                    WHERE is_active = TRUE
+                      AND catalog_expires_at IS NOT NULL
+                      AND catalog_expires_at <= NOW()
+                      AND is_blocked = FALSE
+                """)
+                expired_count = cur.rowcount
+                cur.execute("""
+                    UPDATE published_cards pc
+                    SET is_published = FALSE, updated_at = NOW()
+                    FROM products p
+                    WHERE pc.product_id = p.id
+                      AND pc.is_published = TRUE
+                      AND p.is_active = FALSE
+                      AND p.catalog_expires_at IS NOT NULL
+                      AND p.catalog_expires_at <= NOW()
+                """)
+            conn.commit()
+            if expired_count:
+                print({"event": "catalog_expired_after_replacement", "count": expired_count}, flush=True)
+        else:
+            print({"event": "catalog_rotation_deferred", "reason": "no verified affiliate discount replacement", "threshold_pct": float(os.getenv("CATALOG_MIN_DISCOUNT_PCT", "50"))}, flush=True)
+
         if not amazon_imported and not meli_imported and not meli_refreshed:
             raise HTTPException(status_code=502, detail={
-                "message": "No se pudo importar ningún producto real.",
+                "message": "No se importaron productos nuevos ni se renovaron productos existentes.",
                 "errors": errors[:10],
+                "published": len(auto_published),
+                "expired_deactivated": expired_count,
             })
+        amazon_ids = {p["id"] for p in amazon_imported}
+        meli_ids = {p["id"] for p in meli_imported + meli_refreshed}
         return {
-            "amazon": {"imported": len(amazon_imported), "published": 0, "products": amazon_imported},
+            "amazon": {"imported": len(amazon_imported), "published": sum(1 for item in auto_published if item["id"] in amazon_ids), "products": amazon_imported},
             "mercadolibre": {
                 "imported": len(meli_imported),
                 "refreshed": len(meli_refreshed),
-                "published": 0,
+                "published": sum(1 for item in auto_published if item["id"] in meli_ids),
                 "products": meli_imported,
                 "refreshed_products": meli_refreshed,
             },
-            "total_published": 0,
+            "total_published": len(auto_published),
+            "published_products": auto_published,
+            "expired_deactivated": expired_count,
+            "discount_threshold_pct": float(os.getenv("CATALOG_MIN_DISCOUNT_PCT", "50")),
             "errors": errors[:10],
         }
     finally:
