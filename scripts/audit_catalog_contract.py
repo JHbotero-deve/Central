@@ -19,6 +19,8 @@ def check(condition, message):
         sys.exit(1)
 
 
+check("p.checkout_mode" not in API,
+      "la ruta de afiliación no consulta una columna inexistente en PostgreSQL")
 check("CATALOG_MIN_DISCOUNT_PCT" in API and "discount_percentage(" in API,
       "la publicación automática exige un descuento real configurable")
 check("affiliate_url" in API and "mongo_image_id" in API,

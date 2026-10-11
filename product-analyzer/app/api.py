@@ -725,7 +725,6 @@ def affiliate_click(payload: dict):
                     p.id,
                     p.product_url,
                     p.affiliate_url,
-                    p.checkout_mode,
                     pl.name AS platform
                 FROM products p
                 JOIN platforms pl
@@ -748,14 +747,7 @@ def affiliate_click(payload: dict):
                 row["platform"] or ""
             ).strip().lower()
 
-            checkout_mode = str(
-                row["checkout_mode"] or ""
-            ).strip().upper()
-
-            is_own = (
-                checkout_mode == "CENTRAL"
-                or platform == "personal"
-            )
+            is_own = platform == "personal"
 
             if is_own:
                 raise HTTPException(
