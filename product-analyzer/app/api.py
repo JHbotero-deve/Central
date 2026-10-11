@@ -396,34 +396,31 @@ def _sync_store_catalog():
             conn.rollback()
             errors.append(f"Mercado Libre: {exc}")
 
-        # No dejar el catálogo vacío por un 403 o un ciclo sin ofertas elegibles.
-        # Solo rotar caducados después de publicar al menos un reemplazo verificado.
-        if auto_published:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    UPDATE products
-                    SET is_active = FALSE, updated_at = NOW()
-                    WHERE is_active = TRUE
-                      AND catalog_expires_at IS NOT NULL
-                      AND catalog_expires_at <= NOW()
-                      AND is_blocked = FALSE
-                """)
-                expired_count = cur.rowcount
-                cur.execute("""
-                    UPDATE published_cards pc
-                    SET is_published = FALSE, updated_at = NOW()
-                    FROM products p
-                    WHERE pc.product_id = p.id
-                      AND pc.is_published = TRUE
-                      AND p.is_active = FALSE
-                      AND p.catalog_expires_at IS NOT NULL
-                      AND p.catalog_expires_at <= NOW()
-                """)
-            conn.commit()
-            if expired_count:
-                print({"event": "catalog_expired_after_replacement", "count": expired_count}, flush=True)
-        else:
-            print({"event": "catalog_rotation_deferred", "reason": "no verified affiliate discount replacement", "threshold_pct": float(os.getenv("CATALOG_MIN_DISCOUNT_PCT", "50"))}, flush=True)
+        # Las ofertas caducan a las 48 horas aunque el proveedor no entregue reemplazos.
+        # No se prolonga la vida de un producto vencido para ocultar un fallo de ingesta.
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE products
+                SET is_active = FALSE, updated_at = NOW()
+                WHERE is_active = TRUE
+                  AND catalog_expires_at IS NOT NULL
+                  AND catalog_expires_at <= NOW()
+            """)
+            expired_count = cur.rowcount
+            cur.execute("""
+                UPDATE published_cards pc
+                SET is_published = FALSE, updated_at = NOW()
+                FROM products p
+                WHERE pc.product_id = p.id
+                  AND pc.is_published = TRUE
+                  AND p.is_active = FALSE
+                  AND p.catalog_expires_at IS NOT NULL
+                  AND p.catalog_expires_at <= NOW()
+            """)
+        conn.commit()
+        if expired_count:
+            print({"event": "catalog_expired_after_48h", "count": expired_count}, flush=True)
+
 
         if not amazon_imported and not meli_imported and not meli_refreshed:
             raise HTTPException(status_code=502, detail={
@@ -506,7 +503,7 @@ def get_product(product_id: int):
                 JOIN platforms pl ON pl.id = p.platform_id
                 LEFT JOIN categories c ON c.id = p.category_id
                 LEFT JOIN sellers s ON s.id = p.seller_id
-                WHERE p.id = %s AND p.is_active = TRUE AND p.current_price > 0
+                WHERE p.id = %s AND p.is_active = TRUE AND p.is_blocked = FALSE AND p.current_price > 0 AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW())
                 """,
                 (product_id,),
             )
@@ -538,8 +535,9 @@ def list_products(
                 JOIN platforms pl ON pl.id = p.platform_id
                 LEFT JOIN categories c ON c.id = p.category_id
                 LEFT JOIN product_scores s ON s.product_id = p.id
-                WHERE p.is_active = TRUE
+                WHERE p.is_active = TRUE AND p.is_blocked = FALSE
                   AND p.current_price > 0
+                  AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW())
             """
             params = []
             if category:
@@ -680,7 +678,7 @@ def public_product(product_id: int):
                 JOIN platforms pl ON pl.id=p.platform_id
                 LEFT JOIN categories c ON c.id=p.category_id
                 LEFT JOIN sellers s ON s.id=p.seller_id
-                WHERE pc.product_id=%s AND pc.is_published=TRUE AND p.is_active=TRUE AND p.is_blocked=FALSE AND COALESCE(pc.sale_price,p.current_price)>0""",(product_id,))
+                WHERE pc.product_id=%s AND pc.is_published=TRUE AND p.is_active=TRUE AND p.is_blocked=FALSE AND COALESCE(pc.sale_price,p.current_price)>0 AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW())""",(product_id,))
             row=cur.fetchone()
     finally: conn.close()
     if not row: raise HTTPException(404,"Producto publicado no encontrado")
@@ -1242,7 +1240,7 @@ def active_catalog(_: dict = Depends(require_admin)):
                 JOIN platforms pl ON pl.id = p.platform_id
                 LEFT JOIN categories c ON c.id = p.category_id
                 LEFT JOIN published_cards pc ON pc.product_id = p.id
-                WHERE p.is_active = TRUE AND p.is_blocked = FALSE AND p.current_price > 0
+                WHERE p.is_active = TRUE AND p.is_blocked = FALSE AND p.current_price > 0 AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW())
                 ORDER BY p.updated_at DESC
                 LIMIT 200            """)
             return cur.fetchall()

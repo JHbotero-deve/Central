@@ -62,7 +62,7 @@ def list_publications(
     conn = get_connection()
     try:
         with conn.cursor() as cur:
-            where = "" if include_unpublished else "AND pc.is_published = TRUE AND COALESCE(pc.sale_price, p.current_price) > 0 AND COALESCE(NULLIF(pc.image_url, ''), NULLIF(p.image_url, ''), NULLIF(p.source_metadata->>'mongo_image_id', '')) IS NOT NULL AND COALESCE(NULLIF(pc.image_url, ''), NULLIF(p.image_url, ''), NULLIF(p.source_metadata->>'mongo_image_id', '')) <> ''"
+            where = "" if include_unpublished else "AND pc.is_published = TRUE AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW()) AND COALESCE(pc.sale_price, p.current_price) > 0 AND COALESCE(NULLIF(pc.image_url, ''), NULLIF(p.image_url, ''), NULLIF(p.source_metadata->>'mongo_image_id', '')) IS NOT NULL AND COALESCE(NULLIF(pc.image_url, ''), NULLIF(p.image_url, ''), NULLIF(p.source_metadata->>'mongo_image_id', '')) <> ''"
             cur.execute(
                 f"""
                 SELECT pc.id, pc.product_id, pc.title, pc.subtitle, pc.price_display,
@@ -81,7 +81,7 @@ def list_publications(
                 JOIN products p ON p.id = pc.product_id
                 JOIN platforms pl ON pl.id = p.platform_id
                 LEFT JOIN categories c ON c.id = p.category_id
-                WHERE p.is_active = TRUE {where}
+                WHERE p.is_active = TRUE AND p.is_blocked = FALSE AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW()) {where}
                 ORDER BY pc.sort_order ASC, pc.published_at DESC, pc.id ASC
                 LIMIT %s OFFSET %s
                 """,
@@ -120,7 +120,7 @@ def publish_card(payload: PublicationPayload, _: None = Depends(require_publicat
                 FROM products p
                 JOIN platforms pl ON pl.id = p.platform_id
                 LEFT JOIN product_scores s ON s.product_id = p.id
-                WHERE p.id = %s AND p.is_active = TRUE
+                WHERE p.id = %s AND p.is_active = TRUE AND p.is_blocked = FALSE AND p.current_price > 0 AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW())
                 """,
                 (payload.product_id,),
             )
@@ -211,7 +211,7 @@ def update_publication(publication_id: int, payload: PublicationPayload, _: None
                 JOIN products p ON p.id = pc.product_id
                 JOIN platforms pl ON pl.id = p.platform_id
                 LEFT JOIN product_scores s ON s.product_id = p.id
-                WHERE pc.id = %s AND p.is_active = TRUE
+                WHERE pc.id = %s AND p.is_active = TRUE AND p.is_blocked = FALSE AND p.current_price > 0 AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW())
                 """,
                 (publication_id,),
             )
