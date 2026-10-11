@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Regression checks for Central's live dashboard and card-creation flow."""
 from pathlib import Path
+import json
 import re
 import sys
 
@@ -59,5 +60,23 @@ check('data-tab="theme"' not in editor and "renderThemes" not in editor,
 core = (FRONT / "shopr-core.js").read_text(encoding="utf-8")
 check("THEMES" not in core and "setTheme" not in core,
       "unpersisted browser theme state was removed")
+
+
+auth = (ROOT / "product-analyzer" / "app" / "auth.py").read_text(encoding="utf-8")
+telegram = (ROOT / "product-analyzer" / "app" / "telegram_alert.py").read_text(encoding="utf-8")
+check("CENTRAL_ADMIN_PASSWORD" in auth and "CENTRAL_ADMIN_SETUP_TOKEN" not in auth and '@router.post("/setup")' not in auth,
+      "admin login uses one configured password and has no extra setup-code endpoint")
+check("gracious-renewal-production-76df.up.railway.app" in telegram and "gracious-renewal-production-aadd.up.railway.app" not in telegram,
+      "Telegram media and internal API fallback points to the current Railway service")
+check("def _validate_bot_token(token):" in telegram and "revalidará en cinco minutos" in telegram,
+      "Telegram validates its token and backs off on HTTP 401 instead of polling every few seconds")
+check(".radar-card{border-radius:20px!important;overflow:hidden!important;background:#fffdf8!important" in page,
+      "Central dashboard cards use the light storefront visual contract")
+check("linear-gradient(160deg,#25171a,#0f0f12)" not in editor and "background:#f8f7f3" in editor,
+      "administrative product cards use a light image surface")
+route_config = json.loads(routes)
+for asset in ("/index.html", "/tienda.html", "/tarjetas.html", "/catalogo.html", "/producto.html", "/admin-app.html", "/vitrina.html", "/shopr.css", "/shopr-core.js", "/central.css", "/central-sw.js"):
+    check(any(rule.get("source") == asset and any(header.get("key") == "Cache-Control" and "no-store" in header.get("value", "") for header in rule.get("headers", [])) for rule in route_config["headers"]),
+          f"{asset} revalidates instead of serving a stale frontend asset")
 
 print("[PASS] Central admin flow audit complete")
