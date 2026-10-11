@@ -60,6 +60,8 @@ check('data-tab="theme"' not in editor and "renderThemes" not in editor,
 core = (FRONT / "shopr-core.js").read_text(encoding="utf-8")
 check("THEMES" not in core and "setTheme" not in core,
       "unpersisted browser theme state was removed")
+check("sourceMetadata.mongo_image_id" in core and "img:imageRef" in core,
+      "admin cards resolve Mongo-stored images when image_url is empty")
 
 
 auth = (ROOT / "product-analyzer" / "app" / "auth.py").read_text(encoding="utf-8")
