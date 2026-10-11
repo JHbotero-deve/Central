@@ -9,6 +9,7 @@ API = (ROOT / "product-analyzer/app/api.py").read_text(encoding="utf-8-sig")
 DB = (ROOT / "product-analyzer/app/db.py").read_text(encoding="utf-8-sig")
 PUB = (ROOT / "product-analyzer/app/publications.py").read_text(encoding="utf-8-sig")
 WORKER = (ROOT / "product-analyzer/app/main.py").read_text(encoding="utf-8-sig")
+INGEST = (ROOT / "product-analyzer/app/ingest.py").read_text(encoding="utf-8-sig")
 SHOP = (ROOT / "product-analyzer/frontend/tienda.html").read_text(encoding="utf-8-sig")
 CARDS = (ROOT / "product-analyzer/frontend/tarjetas.html").read_text(encoding="utf-8-sig")
 
@@ -48,5 +49,11 @@ check("NULLIF(p.source_metadata->>'mongo_image_id', '')" in PUB and "COALESCE(pc
       "el escaparate acepta imágenes Mongo persistidas y exige un precio numérico real")
 check("p.is_active=TRUE AND p.is_blocked=FALSE AND COALESCE(pc.sale_price,p.current_price)>0" in API,
       "la ficha pública solo sirve publicaciones activas con precio verificable")
+
+
+check("_REFRESH_RETRY_AFTER" in INGEST and "time.monotonic()" in INGEST and "reintento en 300 s" in INGEST,
+      "la renovación OAuth fallida se limita temporalmente y no satura cada búsqueda")
+check('payload.get("error") or payload.get("code")' in INGEST and "código={error_code}" in INGEST,
+      "el registro OAuth informa el código de error sin revelar tokens")
 
 print("[PASS] Auditoría de contrato del catálogo completada.")
