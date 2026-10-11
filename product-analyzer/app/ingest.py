@@ -308,6 +308,18 @@ def fetch_mercadolibre(query, limit=20):
             or detail.get("price")
             or item.get("price")
         )
+        previous_price = (
+            detail.get("original_price")
+            or item.get("original_price")
+            or detail.get("regular_price")
+            or item.get("regular_price")
+        )
+        try:
+            previous_price = float(previous_price) if previous_price is not None else None
+        except (TypeError, ValueError):
+            previous_price = None
+        if previous_price is not None and (price is None or previous_price <= float(price)):
+            previous_price = None
         currency = (
             sale.get("currency_id")
             or detail.get("currency_id")
@@ -357,6 +369,7 @@ def fetch_mercadolibre(query, limit=20):
             ).replace("-I.", "-O."),
             "product_url": detail.get("permalink") or item.get("permalink"),
             "price": float(price),
+            "previous_price": previous_price,
             "currency": currency,
             "rating": None,
             "reviews_count": 0,
