@@ -21,6 +21,7 @@ from analysis import score_product
 from amazon_api import fetch_amazon_products
 from ingest import MercadoLibreAccessDenied, fetch_mercadolibre
 from db import get_connection, upsert_product, _affiliate_url
+from catalog_rules import discount_percentage
 from monetization import router as monetization_router
 from publications import router as publication_router
 from store_orders import router as store_orders_router
@@ -196,18 +197,12 @@ def health():
 
 def _publish_external_product(conn, product_id, product, platform_label):
     """Publica solo ofertas con descuento real >= umbral y enlace monetizable verificable."""
-    try:
-        current_price = float(product.get("price") or 0)
-        previous_price = float(product.get("previous_price") or 0)
-    except (TypeError, ValueError):
-        return False
-
+    discount_pct = discount_percentage(product.get("price"), product.get("previous_price"))
     threshold = float(os.getenv("CATALOG_MIN_DISCOUNT_PCT", "50"))
-    if current_price <= 0 or previous_price <= current_price:
+    if discount_pct is None or discount_pct < threshold:
         return False
-    discount_pct = round((previous_price - current_price) / previous_price * 100, 2)
-    if discount_pct < threshold:
-        return False
+    current_price = float(product.get("price") or 0)
+    previous_price = float(product.get("previous_price") or 0)
 
     affiliate_url = str(product.get("affiliate_url") or _affiliate_url(product) or "").strip()
     if not affiliate_url.startswith(("https://", "http://")):

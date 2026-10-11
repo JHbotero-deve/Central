@@ -296,10 +296,18 @@ def fetch_mercadolibre(query, limit=20):
         if not item_id or not title:
             continue
 
-        if public_web:
-            detail, prices, sale = {}, [], {}
-        else:
-            detail = _details(item_id)
+        # La búsqueda ya entrega precio, miniatura, permalink y precio original.
+        # Consultar tres endpoints por cada artículo multiplicaba el tráfico sin necesidad.
+        needs_detail = not public_web and (
+            not item.get("permalink")
+            or not item.get("thumbnail")
+            or not item.get("price")
+            or not item.get("title")
+        )
+        detail = _details(item_id) if needs_detail and item_id else {}
+        prices = []
+        sale = {}
+        if not public_web and not (item.get("price") or detail.get("price")) and item_id:
             prices = _prices(item_id)
             sale = _sale_price(item_id)
 
