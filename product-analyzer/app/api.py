@@ -506,7 +506,7 @@ def get_product(product_id: int):
                 JOIN platforms pl ON pl.id = p.platform_id
                 LEFT JOIN categories c ON c.id = p.category_id
                 LEFT JOIN sellers s ON s.id = p.seller_id
-                WHERE p.id = %s AND p.is_active = TRUE AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW())
+                WHERE p.id = %s AND p.is_active = TRUE AND p.current_price > 0
                 """,
                 (product_id,),
             )
@@ -539,7 +539,7 @@ def list_products(
                 LEFT JOIN categories c ON c.id = p.category_id
                 LEFT JOIN product_scores s ON s.product_id = p.id
                 WHERE p.is_active = TRUE
-                  AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW())
+                  AND p.current_price > 0
             """
             params = []
             if category:
@@ -680,7 +680,7 @@ def public_product(product_id: int):
                 JOIN platforms pl ON pl.id=p.platform_id
                 LEFT JOIN categories c ON c.id=p.category_id
                 LEFT JOIN sellers s ON s.id=p.seller_id
-                WHERE pc.product_id=%s AND pc.is_published=TRUE AND p.is_blocked=FALSE""",(product_id,))
+                WHERE pc.product_id=%s AND pc.is_published=TRUE AND p.is_active=TRUE AND p.is_blocked=FALSE AND COALESCE(pc.sale_price,p.current_price)>0""",(product_id,))
             row=cur.fetchone()
     finally: conn.close()
     if not row: raise HTTPException(404,"Producto publicado no encontrado")
@@ -1242,8 +1242,7 @@ def active_catalog(_: dict = Depends(require_admin)):
                 JOIN platforms pl ON pl.id = p.platform_id
                 LEFT JOIN categories c ON c.id = p.category_id
                 LEFT JOIN published_cards pc ON pc.product_id = p.id
-                WHERE p.is_active = TRUE AND p.is_blocked = FALSE
-                  AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW())
+                WHERE p.is_active = TRUE AND p.is_blocked = FALSE AND p.current_price > 0
                 ORDER BY p.updated_at DESC
                 LIMIT 200            """)
             return cur.fetchall()

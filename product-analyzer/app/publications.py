@@ -62,7 +62,7 @@ def list_publications(
     conn = get_connection()
     try:
         with conn.cursor() as cur:
-            where = "" if include_unpublished else "AND pc.is_published = TRUE AND COALESCE(NULLIF(pc.image_url, ''), NULLIF(p.image_url, '')) IS NOT NULL AND COALESCE(NULLIF(pc.image_url, ''), NULLIF(p.image_url, '')) <> ''"
+            where = "" if include_unpublished else "AND pc.is_published = TRUE AND COALESCE(pc.sale_price, p.current_price) > 0 AND COALESCE(NULLIF(pc.image_url, ''), NULLIF(p.image_url, ''), NULLIF(p.source_metadata->>'mongo_image_id', '')) IS NOT NULL AND COALESCE(NULLIF(pc.image_url, ''), NULLIF(p.image_url, ''), NULLIF(p.source_metadata->>'mongo_image_id', '')) <> ''"
             cur.execute(
                 f"""
                 SELECT pc.id, pc.product_id, pc.title, pc.subtitle, pc.price_display,
@@ -120,7 +120,7 @@ def publish_card(payload: PublicationPayload, _: None = Depends(require_publicat
                 FROM products p
                 JOIN platforms pl ON pl.id = p.platform_id
                 LEFT JOIN product_scores s ON s.product_id = p.id
-                WHERE p.id = %s AND p.is_active = TRUE AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW())
+                WHERE p.id = %s AND p.is_active = TRUE
                 """,
                 (payload.product_id,),
             )
@@ -211,7 +211,7 @@ def update_publication(publication_id: int, payload: PublicationPayload, _: None
                 JOIN products p ON p.id = pc.product_id
                 JOIN platforms pl ON pl.id = p.platform_id
                 LEFT JOIN product_scores s ON s.product_id = p.id
-                WHERE pc.id = %s AND p.is_active = TRUE AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW())
+                WHERE pc.id = %s AND p.is_active = TRUE
                 """,
                 (publication_id,),
             )
