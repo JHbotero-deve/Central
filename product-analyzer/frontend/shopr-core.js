@@ -25,10 +25,10 @@ function mkLinks(mt,plat,p,g){
   return L}
 function fromApi(p,detail){
   const d=detail?(detail.product||detail):p, g=k=>(d[k]!=null?d[k]:p[k]);
-  const u=unpack(g("description")), mt=u.meta||{}, gal=Array.isArray(g("image_gallery"))?g("image_gallery"):[], seller=g("seller")||{};
+  const u=unpack(g("description")), mt=u.meta||{}, gal=Array.isArray(g("image_gallery"))?g("image_gallery"):[], sourceMetadata=g("source_metadata")||{}, imageRef=g("image_url")||(sourceMetadata.mongo_image_id?"mongo://"+sourceMetadata.mongo_image_id:"")||gal.find(Boolean)||"", seller=g("seller")||{};
   const res=i=>typeof i==="string"&&i.startsWith("g:")?(gal[+i.slice(2)]||""):(i||"");
   let variants=(mt.variants||[]).map(v=>({name:v.n||"",glow:v.g|0,img:res(v.i)})).filter(v=>v.img||v.name);
-  if(!variants.length)variants=[{name:"",glow:0,img:g("image_url")||""}];
+  if(!variants.length)variants=[{name:"",glow:0,img:imageRef}];
   const plat=String(p.platform||"").toLowerCase();
   return{id:p.id,raw:p,title:g("title")||"Producto",brand:mt.brand||(plat&&plat!=="personal"?plat.toUpperCase():""),tag:mt.tag||"",
     cat:String(g("category")||"otros").toLowerCase(),desc:u.text,price:nn(g("current_price")??g("price")),prev:nn(g("previous_price")),
