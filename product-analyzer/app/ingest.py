@@ -296,10 +296,18 @@ def fetch_mercadolibre(query, limit=20):
         if not item_id or not title:
             continue
 
-        if public_web:
-            detail, prices, sale = {}, [], {}
-        else:
-            detail = _details(item_id)
+        # La búsqueda ya entrega precio, miniatura, permalink y precio original.
+        # Consultar tres endpoints por cada artículo multiplicaba el tráfico sin necesidad.
+        needs_detail = not public_web and (
+            not item.get("permalink")
+            or not item.get("thumbnail")
+            or not item.get("price")
+            or not item.get("title")
+        )
+        detail = _details(item_id) if needs_detail and item_id else {}
+        prices = []
+        sale = {}
+        if not public_web and not (item.get("price") or detail.get("price")) and item_id:
             prices = _prices(item_id)
             sale = _sale_price(item_id)
 
@@ -308,6 +316,18 @@ def fetch_mercadolibre(query, limit=20):
             or detail.get("price")
             or item.get("price")
         )
+        previous_price = (
+            detail.get("original_price")
+            or item.get("original_price")
+            or detail.get("regular_price")
+            or item.get("regular_price")
+        )
+        try:
+            previous_price = float(previous_price) if previous_price is not None else None
+        except (TypeError, ValueError):
+            previous_price = None
+        if previous_price is not None and (price is None or previous_price <= float(price)):
+            previous_price = None
         currency = (
             sale.get("currency_id")
             or detail.get("currency_id")
@@ -357,6 +377,7 @@ def fetch_mercadolibre(query, limit=20):
             ).replace("-I.", "-O."),
             "product_url": detail.get("permalink") or item.get("permalink"),
             "price": float(price),
+            "previous_price": previous_price,
             "currency": currency,
             "rating": None,
             "reviews_count": 0,
