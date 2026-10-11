@@ -26,12 +26,12 @@ check("CATALOG_MIN_DISCOUNT_PCT" in API and "discount_percentage(" in API,
       "la publicación automática exige un descuento real configurable")
 check("affiliate_url" in API and "mongo_image_id" in API,
       "la tarjeta conserva enlace monetizable e imagen persistida")
-check("catalog_rotation_deferred" in API and "catalog_expired_after_replacement" in API,
-      "la caducidad se difiere si no hay reemplazos verificados")
+check("catalog_expired_after_48h" in API and "catalog_expires_at <= NOW()" in API and "catalog_rotation_deferred" not in API,
+      "las ofertas se desactivan al cumplir 48 horas aunque falle la ingesta")
 check("previous_price" in DB.split("INSERT INTO products", 1)[1].split("ON CONFLICT", 1)[0],
       "la ingesta persiste el precio original de la oferta")
-check("WHERE p.is_active = TRUE {where}" in PUB,
-      "las ofertas vencidas se conservan visibles hasta una rotación segura")
+check("WHERE p.is_active = TRUE AND p.is_blocked = FALSE AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW()) {where}" in PUB,
+      "el escaparate excluye productos bloqueados, inactivos o caducados")
 check("CATALOG_SYNC_INTERVAL_SECONDS" in WORKER and "_error_detail(exc)" in WORKER,
       "el trabajador informa errores completos y permite configurar el intervalo")
 check('class="card-title"' in SHOP and 'class="discount-badge"' in SHOP,
@@ -41,8 +41,8 @@ check('id="central-figma-card-v3"' not in SHOP,
 check('function preview(){const m=model();S.mountDetail($("preview"),{...m,links:{},fallback:""},0)' in CARDS,
       "la vista previa administrativa no abre enlaces externos")
 
-check("catalog_expires_at IS NULL OR" not in API and "catalog_expires_at IS NULL OR" not in PUB,
-      "la lectura respeta el aplazamiento de caducidad decidido por el trabajador")
+check("p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW()" in API and "p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW()" in PUB,
+      "las vistas y publicaciones respetan la caducidad de 48 horas")
 check("p.current_price > 0" in API,
       "el radar y el catálogo administrativo excluyen productos sin precio real")
 check("NULLIF(p.source_metadata->>'mongo_image_id', '')" in PUB and "COALESCE(pc.sale_price, p.current_price) > 0" in PUB,
