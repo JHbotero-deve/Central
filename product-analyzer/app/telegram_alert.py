@@ -10,6 +10,7 @@ import requests
 from PIL import Image, ImageOps, UnidentifiedImageError
 
 from analysis import score_product
+from ingest import fetch_mercadolibre
 from db import get_connection, upsert_product
 from url_import import detect_platform, import_url
 
@@ -601,11 +602,56 @@ def _handle(token, chat_id, text):
     if command == "/buscar":
         term = argument.strip()
         if not term:
-            return _send(token, chat_id, "Uso: /buscar zapatillas")
-        products = _search_products(term)
+            return _send(token, chat_id, "Uso: /buscar audífonos bluetooth")
+
+        discovered = []
+        try:
+            discovered = fetch_mercadolibre(term, limit=8)
+        except Exception as exc:
+            print(f"[telegram-bot] búsqueda externa fallida: {type(exc).__name__}: {str(exc)[:180]}")
+
+        products = []
+        if discovered:
+            category = _category_from_text(term)
+            conn = get_connection()
+            try:
+                for item in discovered:
+                    title = str(item.get("title") or "").strip()
+                    product_url = str(item.get("product_url") or "").strip()
+                    try:
+                        price = float(item.get("price") or 0)
+                    except (TypeError, ValueError):
+                        price = 0
+                    if not title or not product_url.startswith(("https://", "http://")) or price <= 0:
+                        continue
+                    product_id = upsert_product(conn, "mercadolibre", category, item)
+                    score = score_product(conn, product_id, price)
+                    products.append({
+                        "title": title,
+                        "current_price": price,
+                        "currency": item.get("currency") or "COP",
+                        "product_url": product_url,
+                        "affiliate_url": item.get("affiliate_url") or product_url,
+                        "image_url": item.get("image_url") or "",
+                        "rating": item.get("rating"),
+                        "reviews_count": item.get("reviews_count") or 0,
+                        "sales_estimate": item.get("sales_estimate"),
+                        "platform": "mercadolibre",
+                        "category": category,
+                        "opportunity_score": float(score or 0),
+                        "price_score": None,
+                        "demand_score": None,
+                        "trend_score": None,
+                    })
+            finally:
+                conn.close()
+
         if not products:
-            return _send(token, chat_id, f"No encontré productos modelados para: {html.escape(term)}")
-        _send(token, chat_id, f"<b>Resultados: {html.escape(term)}</b>")
+            products = _search_products(term)
+        if not products:
+            return _send(token, chat_id, f"No encontré productos externos verificables ni coincidencias guardadas para: {html.escape(term)}")
+
+        _send(token, chat_id, f"<b>Resultados de búsqueda: {html.escape(term)}</b> · {len(products)} productos")
         for product in products:
             _send_product(token, chat_id, product)
         return True
