@@ -39,4 +39,14 @@ check('id="central-figma-card-v3"' not in SHOP,
       "no queda el bloque CSS que sobrescribía el marcado real de las tarjetas")
 check('function preview(){const m=model();S.mountDetail($("preview"),{...m,links:{},fallback:""},0)' in CARDS,
       "la vista previa administrativa no abre enlaces externos")
+
+check("catalog_expires_at IS NULL OR" not in API and "catalog_expires_at IS NULL OR" not in PUB,
+      "la lectura respeta el aplazamiento de caducidad decidido por el trabajador")
+check("p.current_price > 0" in API,
+      "el radar y el catálogo administrativo excluyen productos sin precio real")
+check("NULLIF(p.source_metadata->>'mongo_image_id', '')" in PUB and "COALESCE(pc.sale_price, p.current_price) > 0" in PUB,
+      "el escaparate acepta imágenes Mongo persistidas y exige un precio numérico real")
+check("p.is_active=TRUE AND p.is_blocked=FALSE AND COALESCE(pc.sale_price,p.current_price)>0" in API,
+      "la ficha pública solo sirve publicaciones activas con precio verificable")
+
 print("[PASS] Auditoría de contrato del catálogo completada.")
