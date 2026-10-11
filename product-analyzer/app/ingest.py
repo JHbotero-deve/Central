@@ -2,6 +2,7 @@ from meli_oauth import get_meli_tokens, save_meli_tokens
 import os
 import json
 import re
+import time
 from urllib.parse import quote_plus
 import requests
 
@@ -32,12 +33,23 @@ def _headers(include_auth=True):
     return headers
 
 
+_REFRESH_RETRY_AFTER = 0.0
+
+
 def _refresh_access_token():
+    global _REFRESH_RETRY_AFTER
+    now = time.monotonic()
+    if now < _REFRESH_RETRY_AFTER:
+        return None
+
     _, refresh_token = get_meli_tokens()
     client_id = os.getenv("MELI_CLIENT_ID", "").strip()
     client_secret = os.getenv("MELI_CLIENT_SECRET", "").strip()
     if not (refresh_token and client_id and client_secret):
+        _REFRESH_RETRY_AFTER = now + 300
+        print("[Mercado Libre] renovación pausada: faltan el refresh token o las credenciales de cliente.")
         return None
+
     response = requests.post(MELI_OAUTH, data={
         "grant_type": "refresh_token",
         "client_id": client_id,
@@ -45,15 +57,30 @@ def _refresh_access_token():
         "refresh_token": refresh_token,
     }, timeout=20)
     if not response.ok:
-        print(f"[Mercado Libre] renovación de token: HTTP {response.status_code}")
+        try:
+            payload = response.json()
+        except ValueError:
+            payload = {}
+        error_code = str(payload.get("error") or payload.get("code") or "unknown")[:80]
+        _REFRESH_RETRY_AFTER = time.monotonic() + 300
+        print(
+            f"[Mercado Libre] renovación rechazada: HTTP {response.status_code}; "
+            f"código={error_code}; reintento en 300 s."
+        )
         return None
+
     payload = response.json()
     token = str(payload.get("access_token") or "").strip()
     new_refresh = str(payload.get("refresh_token") or "").strip()
     if token and new_refresh:
         save_meli_tokens(token, new_refresh, int(payload.get("expires_in") or 0))
+        _REFRESH_RETRY_AFTER = 0.0
         print("[Mercado Libre] access token renovado.")
-    return token or None
+        return token
+
+    _REFRESH_RETRY_AFTER = time.monotonic() + 300
+    print("[Mercado Libre] renovación sin los tokens esperados; reintento en 300 s.")
+    return None
 
 
 def _get(url, params=None, include_auth=True, retry_auth=True):
