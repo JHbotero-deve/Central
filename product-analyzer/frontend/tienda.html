@@ -209,13 +209,6 @@ function card(p){
     : src
       ? '<img src="'+esc(mediaSrc(src))+'" alt="'+esc(title)+'" loading="lazy" decoding="async" referrerpolicy="no-referrer" data-fb="'+esc(imageFallback(p))+'"><div class="no-image" hidden>Imagen no disponible</div>'
       : '<div class="no-image">Imagen no disponible</div>';
-fix/storefront-image-first-cards
-  return '<article class="card" aria-label="'+esc(title)+'">'+
-    '<div class="card-media">'+media+'</div>'+
-    '<div class="card-footer">'+
-      '<div class="card-price">'+esc(p.price_display||money(p.sale_price??p.current_price,p.currency))+'</div>'+
-      '<div class="card-actions">'+
-       a class="card-action card-action-secondary" href="'+esc(productUrl(p))+'" aria-label="Ver ficha de '+esc(title)+'">Ver ficha</a>'
   const price=Number(p.sale_price??p.current_price??0);
   const previous=Number(p.previous_price??p.cost_price??0);
   const discount=Number(p.discount_pct)||((previous>price&&previous>0)?Math.round((previous-price)/previous*100):0);
@@ -230,7 +223,6 @@ fix/storefront-image-first-cards
       priceHtml+
       '<div class="card-actions">'+
         '<a class="card-action card-action-secondary" href="'+esc(productUrl(p))+'" aria-label="Ver ficha de '+esc(title)+'">Ver información</a>'+
-main
         second+
       '</div>'+
     '</div></article>';
