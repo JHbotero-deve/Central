@@ -260,6 +260,10 @@ def _sync_store_catalog():
     errors = []
     auto_published = []
     expired_count = 0
+    # La caducidad requiere una sincronización completa y resultados válidos.
+    # Un 403, un error de red o una búsqueda vacía no retira productos publicados.
+    meli_sync_available = False
+    meli_sync_complete = True
     try:
         with conn.cursor() as cur:
             cur.execute("""
@@ -302,6 +306,8 @@ def _sync_store_catalog():
                     break
                 try:
                     products = fetch_mercadolibre(query, limit=50)
+                    if products:
+                        meli_sync_available = True
                     for product in products:
                         if len(meli_imported) >= meli_target:
                             break
@@ -360,6 +366,7 @@ def _sync_store_catalog():
                             errors.append(f"Mercado Libre {external_id}: {exc}")
                 except Exception as exc:
                     conn.rollback()
+                    meli_sync_complete = False
                     errors.append(f"Mercado Libre '{query}': {exc}")
                     if isinstance(exc, MercadoLibreAccessDenied):
                         print({"event": "mercadolibre_access_blocked", "query": query, "error": str(exc)}, flush=True)
@@ -367,30 +374,41 @@ def _sync_store_catalog():
 
         except Exception as exc:
             conn.rollback()
+            meli_sync_complete = False
             errors.append(f"Mercado Libre: {exc}")
 
-        # Las ofertas caducan a las 48 horas aunque el proveedor no entregue reemplazos.
-        # No se prolonga la vida de un producto vencido para ocultar un fallo de ingesta.
-        with conn.cursor() as cur:
-            cur.execute("""
-                UPDATE products
-                SET is_active = FALSE, updated_at = NOW()
-                WHERE is_active = TRUE
-                  AND catalog_expires_at IS NOT NULL
-                  AND catalog_expires_at <= NOW()
-            """)
-            expired_count = cur.rowcount
-            cur.execute("""
-                UPDATE published_cards pc
-                SET is_published = FALSE, updated_at = NOW()
-                FROM products p
-                WHERE pc.product_id = p.id
-                  AND pc.is_published = TRUE
-                  AND p.is_active = FALSE
-                  AND p.catalog_expires_at IS NOT NULL
-                  AND p.catalog_expires_at <= NOW()
-            """)
-        conn.commit()
+        # La caducidad automática aplica solo al catálogo de búsqueda de Mercado Libre
+        # y únicamente si el proveedor entregó productos en esta ejecución. Los fallos
+        # del proveedor nunca deben retirar tarjetas válidas ni productos importados por URL.
+        if meli_sync_available and meli_sync_complete:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    UPDATE products
+                    SET is_active = FALSE, updated_at = NOW()
+                    WHERE is_active = TRUE
+                      AND catalog_expires_at IS NOT NULL
+                      AND catalog_expires_at <= NOW()
+                      AND COALESCE(source_metadata->>'import_method', '') <> 'product_url'
+                      AND EXISTS (
+                          SELECT 1 FROM platforms pl
+                          WHERE pl.id = products.platform_id
+                            AND pl.name = 'mercadolibre'
+                      )
+                """)
+                expired_count = cur.rowcount
+                cur.execute("""
+                    UPDATE published_cards pc
+                    SET is_published = FALSE, updated_at = NOW()
+                    FROM products p
+                    JOIN platforms pl ON pl.id = p.platform_id
+                    WHERE pc.product_id = p.id
+                      AND pc.is_published = TRUE
+                      AND p.is_active = FALSE
+                      AND p.catalog_expires_at IS NOT NULL
+                      AND p.catalog_expires_at <= NOW()
+                      AND pl.name = 'mercadolibre'
+                """)
+            conn.commit()
         if expired_count:
             print({"event": "catalog_expired_after_48h", "count": expired_count}, flush=True)
 
@@ -431,9 +449,18 @@ def sync_store_catalog(_: dict = Depends(require_admin)):
 
 @core_router.post("/amazon/sync")
 def sync_amazon_store(limit: int = Query(20, ge=1, le=20), _: dict = Depends(require_admin)):
-    """Importa productos reales de Amazon y los publica."""
-    result = _sync_store_catalog()
-    return result["amazon"]
+    """Informa del modo de importación Amazon sin ejecutar la sincronización de otros proveedores."""
+    # Amazon se importa por URL afiliada; no se debe llamar al Worker de Mercado Libre
+    # desde este endpoint porque un 403 de otro proveedor no tiene relación con Amazon.
+    return {
+        "mode": "affiliate_url_only",
+        "imported": 0,
+        "published": 0,
+        "message": (
+            "Amazon se incorpora mediante enlaces en /products/import-url. "
+            "Este endpoint no ejecuta la sincronización de Mercado Libre."
+        ),
+    }
 
 
 @core_router.get("/pipeline/summary")
