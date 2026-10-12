@@ -18,7 +18,6 @@ from psycopg2.extras import Json
 from mongo_store import store_product_image
 
 from analysis import score_product
-from amazon_api import fetch_amazon_products
 from ingest import MercadoLibreAccessDenied, fetch_mercadolibre
 from db import get_connection, upsert_product, _affiliate_url
 from catalog_rules import discount_percentage
@@ -254,7 +253,7 @@ def _publish_external_product(conn, product_id, product, platform_label):
 def _sync_store_catalog():
     """Importa, puntúa y publica ofertas verificadas; rota caducados solo si hay reemplazos."""
     conn = get_connection()
-    amazon_imported = []
+    amazon_imported = []  # Amazon se importa por URL afiliada, no mediante búsqueda API.
     meli_imported = []
     meli_refreshed = []
     meli_refreshed_keys = set()
@@ -280,36 +279,10 @@ def _sync_store_catalog():
                 for row in existing_rows
                 if str(row.get("platform") or "").lower() == "mercadolibre" and row.get("product_url")
             }
-        try:
-            amazon_products = fetch_amazon_products(
-                {external_id for platform, external_id in existing if platform == "amazon"},
-                15,
-            )
-            if not amazon_products:
-                errors.append("Amazon: no se obtuvieron productos verificables en este ciclo.")
-            for category, product in amazon_products[:15]:
-                try:
-                    product_id = upsert_product(conn, "amazon", category, product)
-                    with conn.cursor() as cur:
-                        cur.execute("""
-                            SELECT AVG(p.current_price) AS avg_price
-                            FROM products p
-                            JOIN categories c ON c.id = p.category_id
-                            WHERE p.is_active = TRUE AND c.name = %s
-                              AND p.currency = %s AND p.current_price IS NOT NULL
-                        """, (category, product.get("currency") or "USD"))
-                        average = cur.fetchone()["avg_price"]
-                    product["_score"] = score_product(conn, product_id, float(average or 0))
-                    if _publish_external_product(conn, product_id, product, "Amazon"):
-                        auto_published.append({"id": product_id, "title": product["title"], "discount_pct": round((float(product.get("previous_price") or 0) - float(product.get("price") or 0)) / float(product.get("previous_price") or 1) * 100, 2)})
-                    conn.commit()
-                    amazon_imported.append({"id": product_id, "asin": product["external_id"], "title": product["title"]})
-                except Exception as exc:
-                    conn.rollback()
-                    errors.append(f"Amazon {product.get('external_id')}: {exc}")
-        except Exception as exc:
-            conn.rollback()
-            errors.append(f"Amazon: {exc}")
+        # Amazon: no ejecutar Creators API ni scraping de catálogo. La cuenta usa enlaces
+        # de afiliado aportados por el usuario; import_url valida los metadatos y permite
+        # completar manualmente título, precio e imagen cuando la tienda bloquea lectura.
+        amazon_imported = []
         # Meta por sincronización: hasta 100 productos nuevos y únicos de Mercado Libre.
         # Se usan búsquedas variadas para evitar repetir los mismos resultados de una sola consulta.
         meli_queries = (
@@ -432,7 +405,7 @@ def _sync_store_catalog():
         amazon_ids = {p["id"] for p in amazon_imported}
         meli_ids = {p["id"] for p in meli_imported + meli_refreshed}
         return {
-            "amazon": {"imported": len(amazon_imported), "published": sum(1 for item in auto_published if item["id"] in amazon_ids), "products": amazon_imported},
+            "amazon": {"mode": "affiliate_url_only", "imported": len(amazon_imported), "published": sum(1 for item in auto_published if item["id"] in amazon_ids), "products": amazon_imported},
             "mercadolibre": {
                 "imported": len(meli_imported),
                 "refreshed": len(meli_refreshed),

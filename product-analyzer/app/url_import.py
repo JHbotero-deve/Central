@@ -240,8 +240,12 @@ def import_url(
         "sku": str(metadata.get("sku") or "").strip()[:150] or None,
         "image_url": final_image,
         "gallery_urls": gallery[:24],
-        "product_url": resolved_url,
-        "affiliate_url": _aliexpress_affiliate_url(url) if platform == "aliexpress" else None,
+        "product_url": url if platform == "amazon" else resolved_url,
+        "affiliate_url": (
+            _aliexpress_affiliate_url(url) if platform == "aliexpress"
+            else url if platform == "amazon" and re.search(r"(?:^|&)tag=", urlparse(url).query, re.I)
+            else None
+        ),
         "price": float(final_price),
         "currency": str(final_currency).upper()[:10] if final_currency else "USD",
         "rating": float(metadata["rating"]) if metadata.get("rating") not in (None, "") else None,
