@@ -100,6 +100,7 @@ def _product_jsonld(content: str) -> dict:
             "rating": rating.get("ratingValue"),
             "reviews_count": rating.get("reviewCount"),
             "seller": seller.get("name") if isinstance(seller, dict) else seller,
+            "seller_url": seller.get("url") if isinstance(seller, dict) else None,
         }
     return {}
 

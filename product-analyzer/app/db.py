@@ -75,7 +75,11 @@ def upsert_product(conn, platform_name: str, category_name: str, product: dict):
 
         seller_data = product.get("seller") or {}
         seller_id = None
-        if seller_data.get("external_id"):
+        seller_external_id = str(seller_data.get("external_id") or "").strip()
+        seller_name = str(seller_data.get("name") or "").strip() or None
+        if not seller_external_id and seller_name:
+            seller_external_id = "name-" + hashlib.sha256(seller_name.casefold().encode("utf-8")).hexdigest()[:24]
+        if seller_external_id:
             cur.execute(
                 """
                 INSERT INTO sellers (platform_id, external_id, name, reputation)
@@ -87,14 +91,18 @@ def upsert_product(conn, platform_name: str, category_name: str, product: dict):
                 """,
                 (
                     platform["id"],
-                    str(seller_data["external_id"]),
-                    seller_data.get("name"),
+                    seller_external_id,
+                    seller_name,
                     seller_data.get("reputation"),
                 ),
             )
             seller_id = cur.fetchone()["id"]
 
         source_metadata = dict(product.get("source_metadata") or {})
+        if seller_data:
+            source_metadata["seller"] = {key: value for key, value in seller_data.items() if value not in (None, "", [], {})}
+        if product.get("brand") and not source_metadata.get("brand"):
+            source_metadata["brand"] = product.get("brand")
         stored_image_url = product.get("image_url")
         stored_gallery = list(product.get("gallery_urls") or product.get("image_gallery") or [])
 
@@ -150,12 +158,12 @@ def upsert_product(conn, platform_name: str, category_name: str, product: dict):
             INSERT INTO products (
                 platform_id, category_id, seller_id, external_id, title,
                 image_url, image_gallery, product_url, affiliate_url, current_price, previous_price, currency, rating,
-                reviews_count, sales_estimate, source_metadata,
+                reviews_count, sales_estimate, description, source_metadata,
                 catalog_batch_id, catalog_expires_at, is_blocked, updated_at
             )
             VALUES (
                 %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                %s, %s, %s, %s, %s, %s, %s, NOW(), NOW() + INTERVAL '48 hours', FALSE, NOW()
+                %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW() + INTERVAL '48 hours', FALSE, NOW()
             )
             ON CONFLICT (platform_id, external_id) DO UPDATE SET
                 category_id = EXCLUDED.category_id,
@@ -180,6 +188,7 @@ def upsert_product(conn, platform_name: str, category_name: str, product: dict):
                 rating = COALESCE(EXCLUDED.rating, products.rating),
                 reviews_count = COALESCE(EXCLUDED.reviews_count, products.reviews_count),
                 sales_estimate = COALESCE(EXCLUDED.sales_estimate, products.sales_estimate),
+                description = COALESCE(NULLIF(EXCLUDED.description, ''), products.description),
                 source_metadata = EXCLUDED.source_metadata,
                 catalog_batch_id = NOW(),
                 catalog_expires_at = NOW() + INTERVAL '48 hours',
@@ -203,6 +212,7 @@ def upsert_product(conn, platform_name: str, category_name: str, product: dict):
                 product.get("rating"),
                 product.get("reviews_count", 0),
                 product.get("sales_estimate"),
+                product.get("description"),
                 Json(source_metadata),
             ),
         )
