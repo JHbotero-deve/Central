@@ -42,7 +42,7 @@ body:not(.auth-ready) .sh-wrap{display:none!important}#panel{display:none}.centr
 <div class="central-auth-brand"><img src="/central-icon.svg" alt=""><div><strong>CENTRAL</strong><span>Administración segura</span></div></div>
 <p class="central-auth-kicker">ACCESO PRIVADO</p><h1 id="auth-title">Iniciar sesión</h1><p class="central-auth-copy" id="auth-copy">Accede al panel administrativo de Central.</p>
 <form id="auth-form" class="central-auth-form">
-<label>Correo administrativo<input id="auth-email" type="email" autocomplete="username" required value="jorgebotero190@gmail.com"></label>
+<label>Correo administrativo<input id="auth-email" type="email" autocomplete="username" required maxlength="254"></label>
 <label>Contraseña<input id="auth-password" type="password" autocomplete="current-password" required></label>
 <button class="central-auth-submit" id="auth-submit" type="submit">Entrar</button><p class="central-auth-message" id="auth-message" role="status" aria-live="polite"></p>
 </form>
@@ -263,6 +263,8 @@ $("cancelEdit").addEventListener("click",resetEditor);
 async function initAuth(){
  const screen=$("auth-screen"),loginForm=$("auth-form"),loginMsg=$("auth-message"),loginBtn=$("auth-submit");
  const email=$("auth-email"),password=$("auth-password"),forgotForm=$("forgot-form"),resetForm=$("reset-form");
+ const rememberEmail=value=>{try{localStorage.setItem("central_admin_email",String(value||"").trim().toLowerCase())}catch{}};
+ try{email.value=localStorage.getItem("central_admin_email")||""}catch{}
  const say=(id,text,ok=false)=>{const el=$(id);el.textContent=text;el.style.color=ok?"var(--brand)":"var(--danger)";};
  const view=(name)=>{
    loginForm.hidden=name!=="login";
@@ -285,9 +287,11 @@ async function initAuth(){
  $("back-forgot").addEventListener("click",()=>{say("forgot-message","");view("forgot");});
  try{const status=await S.api("/auth/status");if(status.authenticated){showPanel();return}}
  catch{say("auth-message","No se pudo conectar con el servicio de autenticación.");loginBtn.disabled=true;return}
+ if(email.value.trim())password.focus();else email.focus();
  loginForm.addEventListener("submit",async e=>{
    e.preventDefault();say("auth-message","");loginBtn.disabled=true;
-   try{await S.api("/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:email.value.trim(),password:password.value})});password.value="";showPanel();}
+   const target=email.value.trim().toLowerCase();rememberEmail(target);
+   try{await S.api("/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:target,password:password.value})});password.value="";showPanel();}
    catch(err){say("auth-message",err.message||"No fue posible autenticarte.");}
    finally{loginBtn.disabled=false;}
  });
@@ -295,6 +299,7 @@ async function initAuth(){
    e.preventDefault();const btn=$("forgot-submit");btn.disabled=true;say("forgot-message","");
    try{
      const target=$("forgot-email").value.trim().toLowerCase();
+     rememberEmail(target);
      await S.api("/auth/password/forgot",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:target})});
      $("auth-email").value=target;
      view("reset");
