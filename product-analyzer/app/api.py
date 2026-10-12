@@ -260,9 +260,10 @@ def _sync_store_catalog():
     errors = []
     auto_published = []
     expired_count = 0
-    # Solo renovar/caducar catálogo automático cuando Mercado Libre entregó resultados.
-    # Un 403 o una búsqueda vacía no debe ocultar productos ya publicados.
+    # La caducidad requiere una sincronización completa y resultados válidos.
+    # Un 403, un error de red o una búsqueda vacía no retira productos publicados.
     meli_sync_available = False
+    meli_sync_complete = True
     try:
         with conn.cursor() as cur:
             cur.execute("""
@@ -365,6 +366,7 @@ def _sync_store_catalog():
                             errors.append(f"Mercado Libre {external_id}: {exc}")
                 except Exception as exc:
                     conn.rollback()
+                    meli_sync_complete = False
                     errors.append(f"Mercado Libre '{query}': {exc}")
                     if isinstance(exc, MercadoLibreAccessDenied):
                         print({"event": "mercadolibre_access_blocked", "query": query, "error": str(exc)}, flush=True)
@@ -372,12 +374,13 @@ def _sync_store_catalog():
 
         except Exception as exc:
             conn.rollback()
+            meli_sync_complete = False
             errors.append(f"Mercado Libre: {exc}")
 
         # La caducidad automática aplica solo al catálogo de búsqueda de Mercado Libre
         # y únicamente si el proveedor entregó productos en esta ejecución. Los fallos
         # del proveedor nunca deben retirar tarjetas válidas ni productos importados por URL.
-        if meli_sync_available:
+        if meli_sync_available and meli_sync_complete:
             with conn.cursor() as cur:
                 cur.execute("""
                     UPDATE products
