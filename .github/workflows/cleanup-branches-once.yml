@@ -1,0 +1,41 @@
+name: Limpieza puntual de ramas obsoletas
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  eliminar-ramas-integradas:
+    if: github.event.head_commit.message == 'Limpieza puntual de ramas obsoletas'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Eliminar ramas ya integradas en main
+        env:
+          GH_TOKEN: \${{ github.token }}
+          REPO: \${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          branches=(
+            "fix/catalog-sync-success-state"
+            "fix/central-admin-import-and-card-flow"
+            "fix/central-admin-mongo-images"
+            "fix/central-layout-responsive-login"
+            "fix/central-production-views-auth-telegram"
+            "fix/central-publication-list-consistency"
+            "fix/product-detail-public-data"
+            "fix/single-central-admin-auth"
+            "test/storefront-card-contract"
+          )
+          for branch in "\${branches[@]}"; do
+            if [[ "$branch" == "main" ]]; then
+              echo "Protección: no se permite borrar main."
+              exit 1
+            fi
+            echo "Eliminando rama ya integrada: $branch"
+            gh api --method DELETE "repos/$REPO/git/refs/heads/$branch"
+          done
+          echo "Limpieza de ramas completada."

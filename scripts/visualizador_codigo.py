@@ -79,7 +79,7 @@ def make_html(paths, errors):
             lines = raw.count(b"\n") + (1 if raw and not raw.endswith(b"\n") else 0)
         except OSError: size, lines = 0, 0
         total += size; ext_counts[ext] += 1; group_counts[category] += 1
-        rows.append({"path":name,"category":category,"ext":ext,"size":size,"lines":lines,"url":"../"+name})
+        rows.append({"path":name,"category":category,"ext":ext,"size":size,"lines":lines,"url":name})
     data = json.dumps(rows, ensure_ascii=False).replace("</", "<\\/")
     issues = "".join("<li>"+html.escape(e)+"</li>" for e in errors) or "<li>Sin hallazgos en las comprobaciones de este auditor.</li>"
     cats = "".join("<li>"+html.escape(k)+" <b>"+str(v)+"</b></li>" for k,v in group_counts.most_common())
