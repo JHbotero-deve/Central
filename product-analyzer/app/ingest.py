@@ -288,31 +288,18 @@ def fetch_mercadolibre(query, limit=20):
         data = _get(MELI_SEARCH, {"q": query, "limit": min(limit, 50)}, include_auth=True)
         print(f"[Mercado Libre] API autenticada OK '{query}': {len(data.get('results') or [])} resultados")
     except MercadoLibreAccessDenied as search_exc:
-        print(f"[Mercado Libre] búsqueda principal bloqueada '{query}': {search_exc}")
-        try:
-            _get("https://api.mercadolibre.com/users/me", include_auth=True)
-        except MercadoLibreAccessDenied as identity_exc:
-            raise MercadoLibreAccessDenied(
-                "Mercado Libre también devuelve 403 en /users/me. La integración no puede consultar la API; "
-                "verifica el estado de la aplicación en DevCenter y sus restricciones. "
-                f"Diagnóstico: {identity_exc}"
-            ) from identity_exc
-        except (RuntimeError, requests.RequestException) as identity_exc:
-            raise RuntimeError(
-                f"No se pudo validar la autorización de Mercado Libre mediante /users/me: {identity_exc}"
-            ) from identity_exc
-
+        print(f"[Mercado Libre] API bloqueada; se activa búsqueda pública '{query}': {search_exc}")
         try:
             catalog_products = _catalog_search(query, limit)
-        except MercadoLibreAccessDenied as catalog_exc:
-            raise MercadoLibreAccessDenied(
-                "El token identifica al usuario, pero Mercado Libre también bloquea la búsqueda de catálogo. "
-                "Revisa el estado/permisos de la aplicación y la disponibilidad del recurso en DevCenter. "
-                f"Diagnóstico: {catalog_exc}"
-            ) from catalog_exc
+        except (MercadoLibreAccessDenied, RuntimeError, requests.RequestException) as catalog_exc:
+            print(f"[Mercado Libre] catálogo API no disponible; se usa búsqueda pública: {catalog_exc}")
+            catalog_products = []
         if catalog_products:
             print(f"[Mercado Libre] usando catálogo autenticado '{query}': {len(catalog_products)} productos")
             return catalog_products
+        data = _public_search(query, limit)
+
+    if not data.get("results"):
         data = _public_search(query, limit)
 
     products = []
