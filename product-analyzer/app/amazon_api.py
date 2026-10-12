@@ -119,6 +119,25 @@ def _first_image(item: dict[str, Any]) -> str | None:
     return None
 
 
+def _all_images(item: dict[str, Any]) -> list[str]:
+    images = item.get("images") or {}
+    urls = []
+    primary = images.get("primary") or {}
+    for node in primary.values():
+        if isinstance(node, dict) and node.get("url"):
+            urls.append(str(node["url"]))
+    variants = images.get("variants") or []
+    if isinstance(variants, dict):
+        variants = list(variants.values())
+    for variant in variants:
+        if not isinstance(variant, dict):
+            continue
+        for node in variant.values():
+            if isinstance(node, dict) and node.get("url"):
+                urls.append(str(node["url"]))
+    return list(dict.fromkeys(url for url in urls if url.startswith("https://")))[:24]
+
+
 def _title(item: dict[str, Any]) -> str | None:
     title = (
         ((item.get("itemInfo") or {}).get("title") or {}).get("displayValue")
@@ -370,9 +389,13 @@ def search_products(keywords: str, limit: int = 10) -> list[dict[str, Any]]:
                         "images.primary.large",
                         "images.primary.medium",
                         "images.primary.small",
+                        "images.variants.large",
                         "itemInfo.title",
+                        "itemInfo.byLineInfo",
+                        "itemInfo.features",
                         "offersV2.listings.price",
                         "offersV2.listings.savingBasis",
+                        "offersV2.listings.merchantInfo",
                     ],
                 },
             )
@@ -436,12 +459,28 @@ def _map_item(
     if not image and not allow_missing_image:
         return None
 
+    all_images = _all_images(item)
+    if image and image not in all_images:
+        all_images.insert(0, image)
+    item_info = item.get("itemInfo") or {}
+    byline = item_info.get("byLineInfo") or {}
+    brand_node = byline.get("brand") or byline.get("manufacturer") or {}
+    brand = brand_node.get("displayValue") if isinstance(brand_node, dict) else brand_node
+    features = item_info.get("features") or {}
+    feature_values = features.get("displayValues") or [] if isinstance(features, dict) else []
+    description = " · ".join(str(value).strip() for value in feature_values if str(value).strip())[:5000] or None
+    listings = ((item.get("offersV2") or {}).get("listings") or [])
+    listing = listings[0] if listings else {}
+    merchant = listing.get("merchantInfo") or {}
+    seller_name = merchant.get("name") or merchant.get("displayName")
     return {
         "platform": "amazon",
         "external_id": asin,
         "title": title[:500],
+        "description": description,
+        "brand": str(brand).strip() if brand else None,
         "image_url": image,
-        "gallery_urls": [image] if image else [],
+        "gallery_urls": all_images,
         "product_url": str(url),
         "price": price,
         "previous_price": _previous_offer(item),
@@ -449,10 +488,14 @@ def _map_item(
         "rating": None,
         "reviews_count": 0,
         "sales_estimate": None,
+        "seller": {"name": seller_name, "external_id": str(merchant.get("id")) if merchant.get("id") else None} if seller_name or merchant.get("id") else {},
         "source_metadata": {
             "import_method": "creators_api",
             "metadata_source": "amazon_creators_api",
             "marketplace": MARKETPLACE,
+            "brand": str(brand).strip() if brand else None,
+            "seller": {"name": seller_name, "external_id": str(merchant.get("id")) if merchant.get("id") else None} if seller_name or merchant.get("id") else {},
+            "features": feature_values,
             "keywords": category,
         },
     }
