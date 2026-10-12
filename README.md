@@ -54,3 +54,8 @@ El mismo control corre en GitHub Actions. Comprueba sintaxis Python, JSON, IDs e
 ## Herramientas de prueba
 
 Los scripts `app/seed_500_demo.py` y `app/seed_wompi_test.py` están protegidos para evitar insertar productos de demostración por accidente. Solo deben ejecutarse contra una base de pruebas, definiendo respectivamente `CENTRAL_ALLOW_DEMO_SEED=true` o `CENTRAL_ALLOW_WOMPI_TEST_SEED=true` junto con `DATABASE_URL` de esa base. No activar estas variables en producción.
+
+
+## Documentación operativa
+
+Antes de retomar o modificar el proyecto, consulta [`docs/OPERACION_Y_CONTINUIDAD.md`](docs/OPERACION_Y_CONTINUIDAD.md). Documenta el recorrido del producto, la galería de imágenes, las URLs comerciales, los fallos de fuentes y la independencia de Telegram.

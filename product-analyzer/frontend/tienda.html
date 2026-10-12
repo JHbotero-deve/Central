@@ -202,7 +202,7 @@ function renderFeature(selected){
   $("featurePrice").textContent=p.price_display||money(p.sale_price??p.current_price,p.currency);
   $("featureMeta").innerHTML=[p.brand,p.category,p.platform].filter(Boolean).map(x=>'<span class="pill">'+esc(x)+'</span>').join("");
   const gallery=(p.image_gallery||[]).filter(Boolean);
-  $("variants").innerHTML=gallery.length>1?gallery.slice(0,5).map((im,i)=>'<button class="variant '+(i===0?"active":"")+'" data-image="'+esc(im)+'" style="background-image:url(\''+esc(im).replace(/'/g,"%27")+'\');background-size:cover" aria-label="Imagen '+(i+1)+'"></button>').join(""):"";
+  $("variants").innerHTML=gallery.length>1?gallery.slice(0,20).map((im,i)=>'<button class="variant '+(i===0?"active":"")+'" data-image="'+esc(im)+'" style="background-image:url(\''+esc(im).replace(/'/g,"%27")+'\');background-size:cover" aria-label="Imagen '+(i+1)+'"></button>').join(""):"";
   const own=isOwn(p), ext=externalUrl(p);
   const action=$("featureAction");
   if(own){action.textContent="Añadir al carrito";action.href="#";action.onclick=e=>{e.preventDefault();addToCart(p)}}
