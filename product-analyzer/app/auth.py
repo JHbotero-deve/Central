@@ -3,7 +3,10 @@ import hashlib
 import hmac
 import os
 import secrets
+import smtplib
 import time
+from datetime import datetime, timezone
+from email.message import EmailMessage
 from typing import Optional
 
 from fastapi import APIRouter, Header, HTTPException, Request, Response
@@ -14,12 +17,25 @@ from db import get_connection
 router = APIRouter(prefix="/auth", tags=["authentication"])
 COOKIE = "central_admin_session"
 TTL = 604800
+RESET_TTL = 600
+RESET_MAX_ATTEMPTS = 5
+RESET_MAX_REQUESTS = 3
 ITERATIONS = 310000
 
 
 class Credentials(BaseModel):
     email: str = Field(min_length=5, max_length=254)
     password: str = Field(min_length=1, max_length=256)
+
+
+class ResetRequest(BaseModel):
+    email: str = Field(min_length=5, max_length=254)
+
+
+class ResetPassword(BaseModel):
+    email: str = Field(min_length=5, max_length=254)
+    code: str = Field(pattern="^[0-9]{6}$")
+    new_password: str = Field(min_length=12, max_length=256)
 
 
 def _secret():
@@ -79,6 +95,58 @@ def _record():
         return row
     finally:
         conn.close()
+
+
+
+def _reset_table(cur):
+    cur.execute(
+        "CREATE TABLE IF NOT EXISTS central_admin_password_resets ("
+        "id BIGSERIAL PRIMARY KEY, email TEXT NOT NULL, code_hash TEXT NOT NULL, "
+        "expires_at TIMESTAMPTZ NOT NULL, attempts SMALLINT NOT NULL DEFAULT 0, "
+        "created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), consumed_at TIMESTAMPTZ)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_central_admin_password_resets_email_created "
+        "ON central_admin_password_resets(email, created_at DESC)"
+    )
+
+
+def _reset_digest(email, code):
+    message = (email.strip().lower() + "|" + code).encode()
+    return hmac.new(_secret(), message, hashlib.sha256).hexdigest()
+
+
+def _send_reset_email(email, code):
+    host = os.getenv("SMTP_HOST", "").strip()
+    user = os.getenv("SMTP_USER", "").strip()
+    password = os.getenv("SMTP_PASSWORD", "")
+    sender = os.getenv("SMTP_FROM", "").strip() or user
+    try:
+        port = int(os.getenv("SMTP_PORT", "587"))
+    except ValueError as exc:
+        raise HTTPException(503, "El servicio de correo no está configurado correctamente") from exc
+    if not host or not user or not password or not sender:
+        raise HTTPException(503, "El servicio de correo de recuperación no está configurado")
+    message = EmailMessage()
+    message["Subject"] = "Código para recuperar tu acceso a Central"
+    message["From"] = sender
+    message["To"] = email
+    message.set_content(
+        "Solicitaste recuperar la contraseña de Central.\n\n"
+        f"Tu código de verificación es: {code}\n\n"
+        "El código vence en 10 minutos y solo se puede utilizar una vez. "
+        "Si no solicitaste este cambio, ignora este mensaje.\n"
+    )
+    try:
+        with smtplib.SMTP(host, port, timeout=15) as smtp:
+            smtp.ehlo()
+            if os.getenv("SMTP_STARTTLS", "true").strip().lower() not in {"0", "false", "no"}:
+                smtp.starttls()
+                smtp.ehlo()
+            smtp.login(user, password)
+            smtp.send_message(message)
+    except (OSError, smtplib.SMTPException) as exc:
+        raise HTTPException(503, "No fue posible enviar el correo de recuperación. Inténtalo más tarde") from exc
 
 
 def is_authenticated(request: Request):
@@ -153,6 +221,109 @@ def login(data: Credentials, response: Response):
         raise HTTPException(401, "Correo o contraseña incorrectos")
     _session(response, record["email"])
     return {"ok": True}
+
+
+
+@router.post("/password/forgot")
+def forgot_password(data: ResetRequest):
+    email = data.email.strip().lower()
+    # Verifica el SMTP antes de consultar la cuenta para no revelar cuentas registradas.
+    if not all(os.getenv(k, "").strip() for k in ("SMTP_HOST", "SMTP_USER", "SMTP_PASSWORD")):
+        raise HTTPException(503, "El servicio de recuperación por correo no está configurado")
+    record = _record()
+    generic = {"ok": True, "message": "Si el correo corresponde a una cuenta, recibirás un código válido durante 10 minutos."}
+    if not record or not hmac.compare_digest(email, record["email"].lower()):
+        return generic
+
+    code = f"{secrets.randbelow(1000000):06d}"
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            _reset_table(cur)
+            cur.execute(
+                "SELECT COUNT(*) AS total FROM central_admin_password_resets "
+                "WHERE email=%s AND created_at > NOW() - INTERVAL '15 minutes'",
+                (email,),
+            )
+            if int(cur.fetchone()["total"]) >= RESET_MAX_REQUESTS:
+                conn.commit()
+                return generic
+            cur.execute(
+                "UPDATE central_admin_password_resets SET consumed_at=NOW() "
+                "WHERE email=%s AND consumed_at IS NULL",
+                (email,),
+            )
+            cur.execute(
+                "INSERT INTO central_admin_password_resets(email,code_hash,expires_at) "
+                "VALUES(%s,%s,NOW() + INTERVAL '10 minutes')",
+                (email, _reset_digest(email, code)),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+    try:
+        _send_reset_email(email, code)
+    except HTTPException:
+        conn = get_connection()
+        try:
+            with conn.cursor() as cur:
+                _reset_table(cur)
+                cur.execute(
+                    "UPDATE central_admin_password_resets SET consumed_at=NOW() "
+                    "WHERE email=%s AND consumed_at IS NULL",
+                    (email,),
+                )
+            conn.commit()
+        finally:
+            conn.close()
+        raise
+    return generic
+
+
+@router.post("/password/reset")
+def reset_password(data: ResetPassword, response: Response):
+    email = data.email.strip().lower()
+    code = data.code.strip()
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            _reset_table(cur)
+            cur.execute(
+                "SELECT id,code_hash,expires_at,attempts FROM central_admin_password_resets "
+                "WHERE email=%s AND consumed_at IS NULL ORDER BY created_at DESC LIMIT 1 FOR UPDATE",
+                (email,),
+            )
+            reset = cur.fetchone()
+            if not reset:
+                conn.commit()
+                raise HTTPException(400, "Código inválido o vencido. Solicita uno nuevo.")
+            if int(reset["attempts"]) >= RESET_MAX_ATTEMPTS:
+                cur.execute("UPDATE central_admin_password_resets SET consumed_at=NOW() WHERE id=%s", (reset["id"],))
+                conn.commit()
+                raise HTTPException(400, "Se agotaron los intentos. Solicita un código nuevo.")
+            if reset["expires_at"] <= datetime.now(timezone.utc):
+                cur.execute("UPDATE central_admin_password_resets SET consumed_at=NOW() WHERE id=%s", (reset["id"],))
+                conn.commit()
+                raise HTTPException(400, "El código venció. Solicita uno nuevo.")
+            if not hmac.compare_digest(_reset_digest(email, code), reset["code_hash"]):
+                cur.execute("UPDATE central_admin_password_resets SET attempts=attempts+1 WHERE id=%s", (reset["id"],))
+                conn.commit()
+                raise HTTPException(400, "Código inválido o vencido.")
+            cur.execute(
+                "UPDATE central_admin_auth SET password_hash=%s WHERE id=1 AND email=%s",
+                (_hash(data.new_password), email),
+            )
+            cur.execute(
+                "UPDATE central_admin_password_resets SET consumed_at=NOW() "
+                "WHERE email=%s AND consumed_at IS NULL",
+                (email,),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+    _session(response, email)
+    return {"ok": True, "message": "Contraseña actualizada. Ya tienes la sesión iniciada."}
 
 
 @router.post("/logout")
