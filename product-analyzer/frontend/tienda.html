@@ -64,6 +64,26 @@
 .card:hover .card-media>img{transform:translateY(-3px) scale(1.035);filter:drop-shadow(0 14px 12px rgba(20,23,26,.12))}
 .card-actions{position:relative;z-index:7}
 @media(max-width:700px){.card-title{font-size:11px}.card-price-row .card-price{font-size:12px}.card-old-price{font-size:9px}.card-actions{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.card-action{min-height:34px;font-size:9px}}
+
+/* Tarjetas adaptables: la imagen y el pie ocupan filas separadas para evitar solapamientos. */
+.card{display:flex;flex-direction:column;min-height:0;aspect-ratio:auto;height:100%}
+.card-media{position:relative;inset:auto;flex:0 0 auto;height:clamp(150px,18vw,220px);min-height:0}
+.card-media>img{position:absolute;inset:0;width:100%;height:100%;max-width:100%;max-height:100%;padding:12px;object-fit:contain;object-position:center}
+.card-3d{position:absolute;inset:0;width:100%;height:100%;padding:0}
+.no-image{position:absolute;inset:0;z-index:2;display:grid;place-items:center;padding:14px}
+.card-footer{position:relative;inset:auto;z-index:6;flex:1 0 auto;min-width:0}
+.card-title{overflow-wrap:anywhere}
+.card-price,.card-old-price{overflow-wrap:anywhere}
+@media(max-width:700px){
+  .card-media{height:clamp(108px,31vw,150px)}
+  .card-footer{padding:9px}
+  .card-title{font-size:11px;min-height:2.3em}
+  .card-price-row .card-price{font-size:12px}
+  .card-actions{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:5px}
+  .card-action{min-height:36px;padding:6px 4px;font-size:9px}
+}
+@media(prefers-reduced-motion:reduce){.card,.card-media>img,.card-action{transition:none!important}}
+
 </style>
 
 
