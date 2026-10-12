@@ -22,7 +22,7 @@
     },
     {
       "source": "/admin",
-      "destination": "/index.html"
+      "destination": "/tarjetas.html"
     },
     {
       "source": "/central",
@@ -178,6 +178,13 @@
           "value": "camera=(), microphone=(), geolocation=(), payment=(self)"
         }
       ]
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/tienda/:path+",
+      "destination": "/tienda",
+      "permanent": false
     }
   ]
 }
