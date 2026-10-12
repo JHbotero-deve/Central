@@ -163,7 +163,10 @@ def upsert_product(conn, platform_name: str, category_name: str, product: dict):
             )
             VALUES (
                 %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW() + INTERVAL '48 hours', FALSE, NOW()
+                %s, %s, %s, %s, %s, %s, %s, %s, NOW(),
+                CASE WHEN COALESCE(%s::jsonb->>'import_method', '') = 'product_url'
+                     THEN NULL ELSE NOW() + INTERVAL '48 hours' END,
+                FALSE, NOW()
             )
             ON CONFLICT (platform_id, external_id) DO UPDATE SET
                 category_id = EXCLUDED.category_id,
@@ -191,7 +194,11 @@ def upsert_product(conn, platform_name: str, category_name: str, product: dict):
                 description = COALESCE(NULLIF(EXCLUDED.description, ''), products.description),
                 source_metadata = EXCLUDED.source_metadata,
                 catalog_batch_id = NOW(),
-                catalog_expires_at = NOW() + INTERVAL '48 hours',
+                catalog_expires_at = CASE
+                    WHEN COALESCE(EXCLUDED.source_metadata->>'import_method', '') = 'product_url'
+                    THEN NULL
+                    ELSE NOW() + INTERVAL '48 hours'
+                END,
                 is_active = CASE WHEN products.is_blocked THEN FALSE ELSE TRUE END,
                 updated_at = NOW()
             RETURNING id
@@ -213,6 +220,7 @@ def upsert_product(conn, platform_name: str, category_name: str, product: dict):
                 product.get("reviews_count", 0),
                 product.get("sales_estimate"),
                 product.get("description"),
+                Json(source_metadata),
                 Json(source_metadata),
             ),
         )
