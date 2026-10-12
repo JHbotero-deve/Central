@@ -45,7 +45,22 @@ body:not(.auth-ready) .sh-wrap{display:none!important}#panel{display:none}.centr
 <label>Correo administrativo<input id="auth-email" type="email" autocomplete="username" required value="jorgebotero190@gmail.com"></label>
 <label>Contraseña<input id="auth-password" type="password" autocomplete="current-password" required></label>
 <button class="central-auth-submit" id="auth-submit" type="submit">Entrar</button><p class="central-auth-message" id="auth-message" role="status" aria-live="polite"></p>
-</form><p class="central-auth-note" id="auth-note">Sesión segura en este dispositivo.</p>
+</form>
+<button class="central-auth-note" id="forgot-link" type="button" style="border:0;background:none;padding:0;cursor:pointer;color:var(--brand);font:inherit">¿Olvidaste tu contraseña?</button>
+<form id="forgot-form" class="central-auth-form" hidden>
+<label>Correo administrativo<input id="forgot-email" type="email" autocomplete="email" required maxlength="254"></label>
+<button class="central-auth-submit" id="forgot-submit" type="submit">Enviar código al correo</button>
+<p class="central-auth-message" id="forgot-message" role="status" aria-live="polite"></p>
+<button class="central-auth-note" id="back-login" type="button" style="border:0;background:none;padding:0;cursor:pointer;font:inherit">Volver al inicio de sesión</button>
+</form>
+<form id="reset-form" class="central-auth-form" hidden>
+<label>Código de 6 dígitos<input id="reset-code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required></label>
+<label>Nueva contraseña (mínimo 12 caracteres)<input id="reset-password" type="password" minlength="12" maxlength="256" autocomplete="new-password" required></label>
+<button class="central-auth-submit" id="reset-submit" type="submit">Guardar contraseña nueva</button>
+<p class="central-auth-message" id="reset-message" role="status" aria-live="polite"></p>
+<button class="central-auth-note" id="back-forgot" type="button" style="border:0;background:none;padding:0;cursor:pointer;font:inherit">Solicitar otro código</button>
+</form>
+<p class="central-auth-note" id="auth-note">Sesión segura en este dispositivo.</p>
 </section></main><div class="sh-wrap">
 <header class="sh-top"><a class="sh-logo" href="/">CENTRAL</a><div class="admin-session-actions"><a class="sh-pill" href="/tienda">Ver tienda</a><button class="sh-pill" id="logout" type="button">Cerrar sesión</button></div></header>
 
@@ -246,12 +261,57 @@ $("save").addEventListener("click",async()=>{
   }catch(e){show(msg,"err",e.message)}finally{b.disabled=false}});
 $("cancelEdit").addEventListener("click",resetEditor);
 async function initAuth(){
- const screen=$("auth-screen"),form=$("auth-form"),msg=$("auth-message"),btn=$("auth-submit"),email=$("auth-email"),password=$("auth-password");
- const say=(text,ok=false)=>{msg.textContent=text;msg.style.color=ok?"var(--brand)":"var(--danger)"};
- const showPanel=()=>{document.body.classList.add("auth-ready");screen.hidden=true;$("panel").style.display="block";$("logout").addEventListener("click",async()=>{try{await S.api("/auth/logout",{method:"POST"})}finally{location.reload()}});gate()};
+ const screen=$("auth-screen"),loginForm=$("auth-form"),loginMsg=$("auth-message"),loginBtn=$("auth-submit");
+ const email=$("auth-email"),password=$("auth-password"),forgotForm=$("forgot-form"),resetForm=$("reset-form");
+ const say=(id,text,ok=false)=>{const el=$(id);el.textContent=text;el.style.color=ok?"var(--brand)":"var(--danger)";};
+ const view=(name)=>{
+   loginForm.hidden=name!=="login";
+   $("forgot-link").hidden=name!=="login";
+   $("auth-note").hidden=name!=="login";
+   forgotForm.hidden=name!=="forgot";
+   resetForm.hidden=name!=="reset";
+   $("auth-title").textContent=name==="login"?"Iniciar sesión":name==="forgot"?"Recuperar contraseña":"Crear contraseña nueva";
+   $("auth-copy").textContent=name==="login"?"Accede al panel administrativo de Central.":name==="forgot"?"Te enviaremos un código temporal al correo de tu cuenta.":"Introduce el código recibido y elige una contraseña nueva.";
+   if(name==="forgot"){$("forgot-email").value=email.value.trim();}
+   if(name==="reset"){$("reset-code").focus();}
+ };
+ const showPanel=()=>{
+   document.body.classList.add("auth-ready");screen.hidden=true;$("panel").style.display="block";
+   $("logout").addEventListener("click",async()=>{try{await S.api("/auth/logout",{method:"POST"})}finally{location.reload()}});
+   gate();
+ };
+ $("forgot-link").addEventListener("click",()=>{say("forgot-message","");view("forgot");});
+ $("back-login").addEventListener("click",()=>view("login"));
+ $("back-forgot").addEventListener("click",()=>{say("forgot-message","");view("forgot");});
  try{const status=await S.api("/auth/status");if(status.authenticated){showPanel();return}}
- catch{say("No se pudo conectar con el servicio de autenticación.");btn.disabled=true;return}
- form.addEventListener("submit",async e=>{e.preventDefault();say("");btn.disabled=true;try{await S.api("/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:email.value.trim(),password:password.value})});password.value="";showPanel()}catch(err){say(err.message||"No fue posible autenticarte.")}finally{btn.disabled=false}});
+ catch{say("auth-message","No se pudo conectar con el servicio de autenticación.");loginBtn.disabled=true;return}
+ loginForm.addEventListener("submit",async e=>{
+   e.preventDefault();say("auth-message","");loginBtn.disabled=true;
+   try{await S.api("/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:email.value.trim(),password:password.value})});password.value="";showPanel();}
+   catch(err){say("auth-message",err.message||"No fue posible autenticarte.");}
+   finally{loginBtn.disabled=false;}
+ });
+ forgotForm.addEventListener("submit",async e=>{
+   e.preventDefault();const btn=$("forgot-submit");btn.disabled=true;say("forgot-message","");
+   try{
+     const target=$("forgot-email").value.trim().toLowerCase();
+     await S.api("/auth/password/forgot",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:target})});
+     $("auth-email").value=target;
+     view("reset");
+     say("reset-message","Si el correo corresponde a la cuenta, recibirás un código válido durante 10 minutos.",true);
+   }catch(err){say("forgot-message",err.message||"No fue posible solicitar el código.");}
+   finally{btn.disabled=false;}
+ });
+ resetForm.addEventListener("submit",async e=>{
+   e.preventDefault();const btn=$("reset-submit");btn.disabled=true;say("reset-message","");
+   try{
+     const target=$("forgot-email").value.trim().toLowerCase();
+     await S.api("/auth/password/reset",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:target,code:$("reset-code").value.trim(),new_password:$("reset-password").value})});
+     $("reset-password").value="";showPanel();
+   }catch(err){say("reset-message",err.message||"No fue posible cambiar la contraseña.");}
+   finally{btn.disabled=false;}
+ });
 }
+
 initAuth();})();
 </script></body></html>
