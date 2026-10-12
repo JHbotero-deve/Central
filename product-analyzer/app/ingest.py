@@ -318,10 +318,16 @@ def fetch_mercadolibre(query, limit=20):
 
         # La búsqueda ya entrega precio, miniatura, permalink y precio original.
         # Consultar tres endpoints por cada artículo multiplicaba el tráfico sin necesidad.
-        # El resultado de búsqueda suele traer solo la miniatura. Para conservar
-        # la cápsula completa consultamos el detalle de la publicación y sus pictures.
-        # La búsqueda pública alternativa no dispone de una galería estructurada.
-        needs_detail = not public_web and bool(item_id)
+        # Conserva el contrato de la búsqueda: no dispara una consulta de detalle
+        # por cada producto si la búsqueda ya entrega los campos básicos. Solo pide
+        # detalle cuando falta información imprescindible; pictures se aprovecha si
+        # viene en el resultado o en ese detalle solicitado.
+        needs_detail = not public_web and (
+            not item.get("permalink")
+            or not item.get("thumbnail")
+            or not item.get("price")
+            or not item.get("title")
+        )
         detail = _details(item_id) if needs_detail and item_id else {}
         prices = []
         sale = {}
