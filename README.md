@@ -34,3 +34,8 @@ No se cargan productos de demostración ni catálogos de respaldo. Si una fuente
 ## Configuración
 
 Las credenciales y secretos se gestionan mediante variables de entorno de Railway y Vercel. La base de datos de producción es PostgreSQL de Railway.
+
+
+## Herramientas de prueba
+
+Los scripts `app/seed_500_demo.py` y `app/seed_wompi_test.py` están protegidos para evitar insertar productos de demostración por accidente. Solo deben ejecutarse contra una base de pruebas, definiendo respectivamente `CENTRAL_ALLOW_DEMO_SEED=true` o `CENTRAL_ALLOW_WOMPI_TEST_SEED=true` junto con `DATABASE_URL` de esa base. No activar estas variables en producción.

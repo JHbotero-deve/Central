@@ -44,6 +44,8 @@ jobs:
         run: python scripts/audit_storefront_cards.py
       - name: Audit dashboard and card-creation flow
         run: python scripts/audit_admin_flow.py
+      - name: Audit safe seed scripts and worker image
+        run: python scripts/audit_seed_safety.py
       - name: Build Figma showcase
         shell: bash
         run: |
