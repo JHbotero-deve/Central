@@ -707,7 +707,11 @@ try{
         <div class="fact">
             Vendedor
             <b>
-                ${esc(seller)}
+                ${
+                    sellerUrl
+                        ? '<a href="'+esc(sellerUrl)+'" target="_blank" rel="noopener noreferrer">'+esc(seller)+'</a>'
+                        : esc(seller)
+                }
                 ${
                     reputation!=null
                         ?" · reputación "+esc(reputation)
