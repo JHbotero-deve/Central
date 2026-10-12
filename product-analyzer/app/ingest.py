@@ -343,15 +343,16 @@ def fetch_mercadolibre(query, limit=20):
         if not item_id or not title:
             continue
 
-        # La búsqueda ya entrega precio, miniatura, permalink y precio original.
-        # Consultar tres endpoints por cada artículo multiplicaba el tráfico sin necesidad.
-        # Conserva el contrato de la búsqueda: no dispara una consulta de detalle
-        # por cada producto si la búsqueda ya entrega los campos básicos. Solo pide
-        # detalle cuando falta información imprescindible; pictures se aprovecha si
-        # viene en el resultado o en ese detalle solicitado.
-        # El detalle oficial permite recuperar las fotos de la galería y los atributos;
-        # la búsqueda sola suele traer una miniatura y no la ficha completa.
-        detail = _details(item_id) if not public_web and item_id else {}
+        # Priorizar los datos de búsqueda para evitar tres llamadas por producto.
+        # Consultar el detalle solo si faltan campos esenciales; si la búsqueda ya
+        # entrega precio, miniatura, título y enlace, conservar su precio original.
+        needs_detail = not public_web and (
+            not item.get("permalink")
+            or not item.get("thumbnail")
+            or not item.get("price")
+            or not item.get("title")
+        )
+        detail = _details(item_id) if needs_detail and item_id else {}
         prices = []
         sale = {}
         if not public_web and not (item.get("price") or detail.get("price")) and item_id:
@@ -395,7 +396,7 @@ def fetch_mercadolibre(query, limit=20):
             continue
 
         seller_id = detail.get("seller_id") or (item.get("seller") or {}).get("id")
-        seller = _seller_details(seller_id) if seller_id and not public_web else {}
+        seller = _seller_details(seller_id) if seller_id and not public_web and detail else {}
         seller_rep = seller.get("seller_reputation") or {}
         seller_transactions = seller_rep.get("transactions") or {}
         seller_ratings = seller_transactions.get("ratings") or {}
