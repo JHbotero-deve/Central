@@ -463,6 +463,8 @@ try{
     const reputation=
         p.seller_reputation
         ||(meta.seller&&meta.seller.reputation);
+    const sellerUrl=(meta.seller&&meta.seller.permalink)||meta.seller_url||"";
+    const brand=p.brand||meta.brand||"Marca no informada";
 
     let gallery=
         Array.isArray(p.image_gallery)
@@ -600,7 +602,7 @@ try{
     </div>
 
     <div class="gallery">
-        ${gallery.slice(0,10).map(x=>`
+        ${gallery.slice(0,20).map(x=>`
             <img
                 src="${esc(mediaSrc(x))}"
                 data-original="${esc(x)}"
@@ -712,6 +714,11 @@ try{
                         :""
                 }
             </b>
+        </div>
+
+        <div class="fact">
+            Marca
+            <b>${esc(brand)}</b>
         </div>
 
         <div class="fact">
@@ -912,7 +919,7 @@ try{
         "name":p.title,
         "description":
             realDescription||p.title,
-        "image":gallery.slice(0,10),
+        "image":gallery.slice(0,20),
         "sku":
             p.sku
             ||p.external_id
