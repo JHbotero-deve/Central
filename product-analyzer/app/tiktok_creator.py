@@ -105,13 +105,11 @@ def _image_gallery(item: dict) -> list[str]:
     )
     urls = []
     for image in images:
-        value = (
-            image.get("url")
-            or image.get("uri")
-            or image.get("url_list", [None])[0]
-            if isinstance(image, dict)
-            else image
-        )
+        if isinstance(image, dict):
+            url_list = image.get("url_list") or []
+            value = image.get("url") or image.get("uri") or (url_list[0] if url_list else None)
+        else:
+            value = image
         if isinstance(value, str) and value.strip() and value.strip() not in urls:
             urls.append(value.strip())
     return urls
