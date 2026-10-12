@@ -294,18 +294,26 @@ def fetch_mercadolibre(query, limit=20):
         data = _get(MELI_SEARCH, {"q": query, "limit": min(limit, 50)}, include_auth=True)
         print(f"[Mercado Libre] API autenticada OK '{query}': {len(data.get('results') or [])} resultados")
     except MercadoLibreAccessDenied as search_exc:
-        print(f"[Mercado Libre] API bloqueada; se activa búsqueda pública '{query}': {search_exc}")
+        print(f"[Mercado Libre] API bloqueada; se intenta catálogo autenticado '{query}': {search_exc}")
         try:
             catalog_products = _catalog_search(query, limit)
-        except (MercadoLibreAccessDenied, RuntimeError, requests.RequestException) as catalog_exc:
-            print(f"[Mercado Libre] catálogo API no disponible; se usa búsqueda pública: {catalog_exc}")
+        except MercadoLibreAccessDenied as catalog_exc:
+            # Ambos endpoints oficiales rechazaron la aplicación. No insistir con
+            # el lector público: además de no ser una fuente estable, una llamada
+            # por cada consulta provoca límites 429 y amplifica el fallo.
+            print(f"[Mercado Libre] búsqueda detenida por falta de permisos: {catalog_exc}")
+            return []
+        except (RuntimeError, requests.RequestException) as catalog_exc:
+            print(f"[Mercado Libre] catálogo API no disponible; se evalúa lector público: {catalog_exc}")
             catalog_products = []
         if catalog_products:
             print(f"[Mercado Libre] usando catálogo autenticado '{query}': {len(catalog_products)} productos")
             return catalog_products
         data = _public_search(query, limit)
 
-    if not data.get("results"):
+    # Si ya se consultó la web pública, no repetir la misma petición cuando
+    # devuelve cero resultados; evita duplicar carga y acelerar respuestas 429.
+    if not data.get("results") and data.get("_source") != "public_web":
         data = _public_search(query, limit)
 
     products = []
