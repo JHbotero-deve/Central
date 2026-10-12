@@ -1,23 +1,40 @@
 # Python
 __pycache__/
-*.pyc
-*.pyo
+*.py[cod]
 .venv/
 venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
 
-# Entornos / secretos
+# Entornos y secretos
 .env
-*.env.local
+.env.*
+!.env.example
+!**/.env.example
 
-# Docker
+# Bases de datos locales y artefactos de diagnóstico
+*.db
+*.sqlite
+*.sqlite3
+*_actual.txt
+
+# Respaldos de interfaz obsoletos
+_backup_ui/
+
+# Node / frontend
+node_modules/
+dist/
+.vercel/
+
+# Docker y logs
 *.log
 
-# Sistema
+# Sistema e IDE
 .DS_Store
 Thumbs.db
-
-# Node (por si el frontend crece)
-node_modules/
-.vercel
-.env*
-
+.idea/
+.vscode/
+*.swp
