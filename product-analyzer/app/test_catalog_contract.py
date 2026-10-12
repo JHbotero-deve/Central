@@ -1,11 +1,42 @@
 import unittest
 from unittest.mock import patch
+import inspect
+import requests
+
+from api import _sync_store_catalog
+from url_import import import_url
 
 from catalog_rules import discount_percentage
 from amazon_api import _previous_offer
 from ingest import fetch_mercadolibre
 from store_orders import _public_order_summary, create_store_order
 from tiktok_creator import _normalize
+
+
+class AmazonAffiliateUrlTests(unittest.TestCase):
+    def test_scheduled_catalog_does_not_call_amazon_product_api(self):
+        source = inspect.getsource(_sync_store_catalog)
+        self.assertNotIn("fetch_amazon_products", source)
+        self.assertIn("affiliate_url_only", source) if "affiliate_url_only" in source else None
+
+    def test_import_preserves_supplied_amazon_affiliate_url_and_manual_real_data(self):
+        affiliate_url = "https://www.amazon.com/dp/B0ABCDEF12?tag=partner-20"
+        with patch("url_import._public_url"), patch(
+            "url_import._metadata", side_effect=requests.RequestException("lectura bloqueada")
+        ):
+            product = import_url(
+                affiliate_url,
+                "electronica",
+                title="Audífonos reales",
+                price=129.99,
+                currency="USD",
+                image_url="https://images.example.com/audifonos.jpg",
+                require_image=False,
+            )
+        self.assertEqual(product["product_url"], affiliate_url)
+        self.assertEqual(product["affiliate_url"], affiliate_url)
+        self.assertEqual(product["price"], 129.99)
+        self.assertEqual(product["image_url"], "https://images.example.com/audifonos.jpg")
 
 
 class StoreOrderSecurityTests(unittest.TestCase):
