@@ -14,8 +14,8 @@ jobs:
     steps:
       - name: Eliminar ramas ya integradas en main
         env:
-          GH_TOKEN: \${{ github.token }}
-          REPO: \${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
         shell: bash
         run: |
           set -euo pipefail
@@ -30,7 +30,7 @@ jobs:
             "fix/single-central-admin-auth"
             "test/storefront-card-contract"
           )
-          for branch in "\${branches[@]}"; do
+          for branch in "${branches[@]}"; do
             if [[ "$branch" == "main" ]]; then
               echo "Protección: no se permite borrar main."
               exit 1
