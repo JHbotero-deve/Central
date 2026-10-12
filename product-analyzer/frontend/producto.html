@@ -192,7 +192,33 @@ body{
         padding:0
     }
 }
+
+:root{color-scheme:light;--bg:#faf6ee;--panel:#fffdf8;--panel2:#f4eee3;--line:#e7dece;--text:#20231f;--muted:#697067;--accent:#4f7a2a;--accent-ink:#fff;--shadow:0 18px 50px rgba(38,42,33,.08)}
+body{background:var(--bg);color:var(--text)}
+.shell{width:min(1240px,calc(100% - 40px))}
+.top{height:76px}
+.brand{color:var(--text);letter-spacing:.04em}
+.back{font-size:12px;text-decoration:none}
+.product{gap:clamp(24px,4vw,56px);padding:clamp(24px,5vw,58px) 0;align-items:start}
+.media{min-height:clamp(320px,42vw,560px);background:radial-gradient(circle at 50% 42%,#fffdf8 0,#f4eee3 68%,#eee5d6 100%);border:1px solid var(--line);border-radius:24px;padding:clamp(18px,4vw,42px);box-shadow:var(--shadow)}
+.media img{max-height:540px;filter:drop-shadow(0 18px 24px rgba(30,32,27,.08))}
+.copy{padding:12px 0}
+.kicker{color:#527a32;letter-spacing:.15em}
+.copy h1{font-size:clamp(30px,4.4vw,54px);line-height:1.05;letter-spacing:-.04em;color:var(--text)}
+.desc{font-size:15px;line-height:1.75;max-width:62ch}
+.price{font-size:clamp(28px,3vw,38px);color:#355c22;letter-spacing:-.03em}
+.meta,.facts{gap:10px}
+.meta div,.fact{background:var(--panel);border-color:var(--line);border-radius:13px;padding:14px;color:var(--muted);font-size:12px;line-height:1.5}
+.meta b,.fact b{color:var(--text);overflow-wrap:anywhere}
+.gallery{gap:10px;margin-top:12px}
+.gallery img{background:var(--panel);border-color:var(--line);border-radius:12px;width:76px;height:76px;padding:5px}
+.cta{min-height:46px;border-radius:12px;padding:13px 20px;background:#4f7a2a;color:#fff;box-shadow:0 8px 18px rgba(79,122,42,.14)}
+.cta.secondary{background:transparent;color:var(--text);border-color:var(--line);box-shadow:none}
+.status{line-height:1.6}
+@media(max-width:800px){.shell{width:calc(100% - 28px)}.product{grid-template-columns:minmax(0,1fr);gap:22px;padding:22px 0 36px}.media{min-height:0;aspect-ratio:1/1;padding:20px}.media img{max-height:100%;width:100%;height:100%;object-fit:contain}.copy{padding:0}.copy h1{font-size:clamp(30px,9vw,44px)}.price{margin:18px 0}.meta{grid-template-columns:repeat(2,minmax(0,1fr))}.cta{width:100%;text-align:center}.cta.secondary{margin:10px 0 0}.gallery img{width:64px;height:64px}}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
 </style>
+<script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
 </head>
 
 <body>
@@ -228,6 +254,8 @@ const esc=v=>String(v??"").replace(
         "'":"&#39;"
     }[c])
 );
+
+const mediaSrc=url=>url?API+"/media/image?url="+encodeURIComponent(url):"";
 
 const money=(v,c)=>{
     if(v==null||v==="") return "Consultar";
@@ -307,37 +335,59 @@ const unpackDescription=v=>{
 };
 
 try{
-    const response=await fetch(
-        API+"/products/"+encodeURIComponent(id),
-        {
-            cache:"no-store",
-            headers:{
-                "Accept":"application/json"
+
+    // Una URL pública debe resolverse primero contra su publicación.
+    // /products/{id} omite productos cuyo ciclo de catálogo de 48 horas venció.
+    const endpoints=[
+        API+"/publications/product/"+encodeURIComponent(id),
+        API+"/products/"+encodeURIComponent(id)
+    ];
+    let response=null;
+    const statuses=[];
+    for(const endpoint of endpoints){
+        try{
+            const controller=new AbortController();
+            const timer=setTimeout(()=>controller.abort(),12000);
+            let candidate;
+            try{
+                candidate=await fetch(endpoint,{
+                    cache:"no-store",
+                    signal:controller.signal,
+                    headers:{"Accept":"application/json"}
+                });
+            }finally{
+                clearTimeout(timer);
             }
+            if(candidate.ok){
+                response=candidate;
+                break;
+            }
+            statuses.push(candidate.status);
+        }catch(fetchError){
+            statuses.push(0);
+            console.warn("No se pudo consultar la ficha en",endpoint,fetchError);
         }
-    );
+    }
 
-    if(!response.ok){
-
-        if(response.status===404){
-            document.getElementById("app").innerHTML=
-                "<p>Producto no encontrado.</p>";
-        }else{
-            document.getElementById("app").innerHTML=
-                "<p>No fue posible cargar el producto.</p>";
-        }
-
+    if(!response){
+        const notFound=statuses.length===endpoints.length&&statuses.every(x=>x===404);
+        document.getElementById("app").innerHTML=notFound
+            ?'<section class="cn-card cn-pad"><h1>Producto no disponible</h1><p>La ficha no existe o fue retirada de la tienda.</p><a class="cta" href="/tienda">Volver a la tienda</a></section>'
+            :'<section class="cn-card cn-pad" role="alert"><h1>No se pudo cargar el producto</h1><p>El servicio tardó demasiado o no respondió. Puedes reintentar sin perder la dirección de esta ficha.</p><button class="cta" id="retryProduct" type="button">Reintentar carga</button><a class="cta secondary" href="/tienda">Volver a la tienda</a></section>';
+        const retry=document.getElementById("retryProduct");
+        if(retry) retry.addEventListener("click",()=>location.reload());
         return;
     }
 
     const data=await response.json();
     const p=data.product||data;
 
+    // El endpoint público devuelve product_id; normalizamos la clave que usa la ficha.
+    if(p&&!p.id&&p.product_id) p.id=p.product_id;
+
     if(!p||!p.id){
-
         document.getElementById("app").innerHTML=
-            "<p>Producto no disponible.</p>";
-
+            "<p>La ficha no contiene un identificador de producto válido.</p>";
         return;
     }
 
@@ -411,20 +461,15 @@ try{
         gallery.unshift(p.image_url);
     }
 
-    if(!gallery.length){
-
-        document.getElementById("app").innerHTML=
-            "<p>Producto disponible, pero la fuente no proporcionó una imagen.</p>";
-
-        return;
-    }
-
     const platform=
         String(p.platform||"").toLowerCase();
 
     const own=
         String(p.checkout_mode||"").toUpperCase()==="CENTRAL"
         ||platform==="personal";
+
+    const sourceStale=p.source_active===false
+        ||(p.catalog_expires_at&&Date.parse(p.catalog_expires_at)<Date.now());
 
     document.title=
         (p.title||"Producto")+" | Central";
@@ -517,6 +562,8 @@ try{
         ||platform==="meli"
     ){
         buttonText="Ver oferta en Mercado Libre";
+    }else if(platform==="aliexpress"){
+        buttonText="Comprar en AliExpress";
     }
 
     document.getElementById("app").innerHTML=`
@@ -525,19 +572,26 @@ try{
 <section>
 
     <div class="media">
-        <img
-            id="mainImg"
-            src="${esc(gallery[0])}"
-            alt="${esc(p.title)}"
-        >
+        ${gallery.length ? `
+            <img
+                id="mainImg"
+                src="${esc(mediaSrc(gallery[0]))}"
+                alt="${esc(p.title)}"
+            >
+            <p id="imageMissing" style="color:var(--muted);text-align:center;font-size:12px" hidden>La imagen de origen no está disponible ahora.</p>
+        ` : `
+            <p style="color:var(--muted);text-align:center;font-size:12px">La fuente no proporcionó una imagen. El resto de la ficha sigue disponible.</p>
+        `}
     </div>
 
     <div class="gallery">
         ${gallery.slice(0,10).map(x=>`
             <img
-                src="${esc(x)}"
+                src="${esc(mediaSrc(x))}"
+                data-original="${esc(x)}"
                 alt="${esc(p.title)}"
                 loading="lazy"
+                onerror="this.hidden=true"
             >
         `).join("")}
     </div>
@@ -549,6 +603,7 @@ try{
     <div class="kicker">
         ${esc(p.platform||"Central")}
     </div>
+    ${sourceStale?'<p class="status" role="status">Esta ficha conserva los últimos datos guardados, pero la fuente está pendiente de actualización. Verifica el precio y la disponibilidad en el proveedor antes de comprar.</p>':""}
 
     <h1>${esc(p.title)}</h1>
 
@@ -562,7 +617,7 @@ try{
     <div class="price">
         ${esc(
             money(
-                p.current_price,
+                p.current_price ?? p.sale_price,
                 p.currency
             )
         )}
@@ -571,14 +626,18 @@ try{
     <div class="meta">
 
         <div>
-            SKU / ID
+            SKU
             <br>
             <b>
-                ${esc(
-                    p.sku
-                    ||p.external_id
-                    ||p.id
-                )}
+                ${esc(p.sku||p.external_id||p.id)}
+            </b>
+        </div>
+
+        <div>
+            GTIN / EAN / UPC
+            <br>
+            <b>
+                ${esc(p.gtin||meta.gtin||meta.ean||meta.upc||"No informado por la fuente")}
             </b>
         </div>
 
@@ -663,6 +722,11 @@ try{
 
     <div class="status" id="actionStatus"></div>
 
+    <div class="meta">
+        <div>Fuente original<br><b>${p.product_url?'<a href="'+esc(p.product_url)+'" target="_blank" rel="nofollow sponsored noopener">Abrir publicación</a>':"No disponible"}</b></div>
+        <div>Actualizado<br><b>${esc(p.updated_at||"Fuente externa")}</b></div>
+    </div>
+
     <button class="cta" id="buy">
         ${buttonText}
     </button>
@@ -679,15 +743,34 @@ try{
 </div>
 `;
 
-    document
-        .querySelectorAll(".gallery img")
-        .forEach(x=>{
-            x.onclick=()=>{
-                document.getElementById(
-                    "mainImg"
-                ).src=x.src;
-            };
+    const mainImage=document.getElementById("mainImg");
+    let mainImageIndex=0;
+    if(mainImage){
+        mainImage.addEventListener("error",()=>{
+            mainImageIndex+=1;
+            if(mainImageIndex<gallery.length){
+                mainImage.src=mediaSrc(gallery[mainImageIndex]);
+                return;
+            }
+            mainImage.hidden=true;
+            const placeholder=document.getElementById("imageMissing");
+            if(placeholder) placeholder.hidden=false;
         });
+    }
+
+    document.querySelectorAll(".gallery img").forEach(x=>{
+        x.onclick=()=>{
+            const main=document.getElementById("mainImg");
+            if(!main)return;
+            const placeholder=document.getElementById("imageMissing");
+            if(placeholder) placeholder.hidden=true;
+            main.hidden=false;
+            const selected=x.dataset.original||gallery[0];
+            const selectedIndex=gallery.indexOf(selected);
+            mainImageIndex=selectedIndex>=0?selectedIndex:0;
+            main.src=mediaSrc(selected);
+        };
+    });
 
     document.getElementById("buy").onclick=async()=>{
 
@@ -799,8 +882,8 @@ try{
             }
         }
 
-        if(p.product_url){
-            location.href=p.product_url;
+        if(p.affiliate_url||p.product_url){
+            location.href=p.affiliate_url||p.product_url;
             return;
         }
 
@@ -822,7 +905,7 @@ try{
             "@type":"Offer",
             "url":canonicalUrl,
             "price":Number(
-                p.current_price||0
+                p.current_price ?? p.sale_price ?? 0
             ),
             "priceCurrency":
                 p.currency||"COP",

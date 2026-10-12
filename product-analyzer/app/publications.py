@@ -3,10 +3,11 @@ from typing import Optional
 import os
 import secrets
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Header
+from fastapi import APIRouter, Depends, HTTPException, Query, Header, Request
 from pydantic import BaseModel, Field
 
 from db import get_connection
+from auth import is_authenticated
 from notifications import send_telegram_publication
 
 router = APIRouter(tags=["publications"])
@@ -14,13 +15,19 @@ router = APIRouter(tags=["publications"])
 CAMPOS_PRIVADOS = ("cost_price", "profit_amount", "profit_margin_pct", "opportunity_score")
 
 
-def es_admin(x_admin_key: Optional[str]) -> bool:
-    """True si la cabecera X-Admin-Key coincide con la variable de entorno ADMIN_API_KEY."""
-    clave = os.getenv("ADMIN_API_KEY", "")
+def es_admin(x_admin_key: Optional[str], request: Optional[Request] = None) -> bool:
+    """True si la cabecera X-Admin-Key coincide con ADMIN_API_KEY."""
+    if request is not None and is_authenticated(request):
+        return True
+    clave = os.getenv("ADMIN_API_KEY", "").strip()
     if not clave or not x_admin_key:
         return False
-    # compare_digest evita ataques de tiempo; se usa bytes para aceptar cualquier carácter
-    return secrets.compare_digest(x_admin_key.encode(), clave.encode())
+    return secrets.compare_digest(x_admin_key.strip().encode(), clave.encode())
+
+
+def require_publication_admin(request: Request, x_admin_key: Optional[str] = Header(default=None)):
+    if not es_admin(x_admin_key, request):
+        raise HTTPException(status_code=401, detail="Inicia sesión para administrar Central")
 
 
 
@@ -41,11 +48,13 @@ class PublicationPayload(BaseModel):
 
 @router.get("/publications")
 def list_publications(
+    request: Request,
     limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0, le=100000),
     include_unpublished: bool = False,
     x_admin_key: Optional[str] = Header(default=None),
 ):
-    admin = es_admin(x_admin_key)
+    admin = es_admin(x_admin_key, request)
     # Los borradores solo los puede ver el administrador
     if include_unpublished and not admin:
         raise HTTPException(status_code=401, detail="No autorizado")
@@ -53,26 +62,30 @@ def list_publications(
     conn = get_connection()
     try:
         with conn.cursor() as cur:
-            where = "" if include_unpublished else "AND pc.is_published = TRUE AND COALESCE(NULLIF(pc.image_url, ''), NULLIF(p.image_url, '')) IS NOT NULL AND COALESCE(NULLIF(pc.image_url, ''), NULLIF(p.image_url, '')) <> ''"
+            where = "" if include_unpublished else "AND pc.is_published = TRUE AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW()) AND COALESCE(pc.sale_price, p.current_price) > 0 AND COALESCE(NULLIF(pc.image_url, ''), NULLIF(p.image_url, ''), NULLIF(p.source_metadata->>'mongo_image_id', '')) IS NOT NULL AND COALESCE(NULLIF(pc.image_url, ''), NULLIF(p.image_url, ''), NULLIF(p.source_metadata->>'mongo_image_id', '')) <> ''"
             cur.execute(
                 f"""
                 SELECT pc.id, pc.product_id, pc.title, pc.subtitle, pc.price_display,
-                       COALESCE(NULLIF(pc.image_url, ''), NULLIF(p.image_url, '')) AS image_url,
+                       CASE WHEN COALESCE(p.source_metadata->>'mongo_image_id','') <> '' THEN 'mongo://' || (p.source_metadata->>'mongo_image_id') ELSE COALESCE(NULLIF(pc.image_url, ''), NULLIF(p.image_url, '')) END AS image_url,
                        COALESCE(NULLIF(pc.product_url, ''), NULLIF(p.product_url, '')) AS product_url,
                        pc.sale_price, pc.cost_price,
                        pc.profit_amount, pc.profit_margin_pct, pc.opportunity_score, pc.footer,
                        pc.accent, pc.is_published, pc.sort_order, pc.published_at,
-                       p.current_price, p.currency, p.image_gallery, p.affiliate_url, p.external_id, p.sku,
-                       p.description, p.stock, p.rating, p.reviews_count, p.sales_estimate, pl.name AS platform, c.name AS category
+                       p.current_price, p.previous_price,
+                       CASE WHEN p.previous_price > p.current_price AND p.current_price > 0
+                            THEN ROUND(((p.previous_price - p.current_price) / p.previous_price * 100)::numeric, 2)
+                            ELSE NULL END AS discount_pct,
+                       p.currency, p.image_gallery, p.affiliate_url, p.external_id, p.sku,
+                       p.description, p.stock, p.rating, p.reviews_count, p.sales_estimate, p.source_metadata->>'mongo_image_id' AS image_mongo_id, pl.name AS platform, c.name AS category
                 FROM published_cards pc
                 JOIN products p ON p.id = pc.product_id
                 JOIN platforms pl ON pl.id = p.platform_id
                 LEFT JOIN categories c ON c.id = p.category_id
-                WHERE p.is_active = TRUE {where}
-                ORDER BY pc.sort_order ASC, pc.published_at DESC
-                LIMIT %s
+                WHERE p.is_active = TRUE AND p.is_blocked = FALSE AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW()) {where}
+                ORDER BY pc.sort_order ASC, pc.published_at DESC, pc.id ASC
+                LIMIT %s OFFSET %s
                 """,
-                (limit,),
+                (limit, offset),
             )
             rows = cur.fetchall()
 
@@ -95,19 +108,19 @@ def list_publications(
 
 
 @router.post("/publications")
-def publish_card(payload: PublicationPayload):
+def publish_card(payload: PublicationPayload, _: None = Depends(require_publication_admin)):
     conn = get_connection()
     try:
         with conn.cursor() as cur:
             cur.execute(
                 """
                 SELECT p.id, p.image_url, p.product_url, p.current_price, p.currency,
-                       p.title, p.description, p.image_gallery, p.affiliate_url,
+                       p.title, p.description, p.image_gallery, p.affiliate_url, p.source_metadata,
                        pl.name AS platform, s.opportunity_score
                 FROM products p
                 JOIN platforms pl ON pl.id = p.platform_id
                 LEFT JOIN product_scores s ON s.product_id = p.id
-                WHERE p.id = %s AND p.is_active = TRUE
+                WHERE p.id = %s AND p.is_active = TRUE AND p.is_blocked = FALSE AND p.current_price > 0 AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW())
                 """,
                 (payload.product_id,),
             )
@@ -115,7 +128,9 @@ def publish_card(payload: PublicationPayload):
             if not product:
                 raise HTTPException(status_code=404, detail="Producto activo no encontrado")
 
-            canonical_image = product["image_url"] or ((product["image_gallery"] or [None])[0])
+            source_metadata = product.get("source_metadata") or {}
+            mongo_image_id = source_metadata.get("mongo_image_id") if isinstance(source_metadata, dict) else None
+            canonical_image = product["image_url"] or ((product["image_gallery"] or [None])[0]) or (f"mongo://{mongo_image_id}" if mongo_image_id else None)
             if not canonical_image:
                 raise HTTPException(status_code=422, detail="No se puede publicar un producto sin imagen real")
 
@@ -183,20 +198,20 @@ def publish_card(payload: PublicationPayload):
 
 
 @router.patch("/publications/{publication_id}")
-def update_publication(publication_id: int, payload: PublicationPayload):
+def update_publication(publication_id: int, payload: PublicationPayload, _: None = Depends(require_publication_admin)):
     conn = get_connection()
     try:
         with conn.cursor() as cur:
             cur.execute(
                 """
                 SELECT pc.product_id, p.title, p.image_url, p.image_gallery, p.product_url,
-                       p.affiliate_url, p.current_price, p.currency, pl.name AS platform,
+                       p.affiliate_url, p.current_price, p.currency, p.source_metadata, pl.name AS platform,
                        s.opportunity_score
                 FROM published_cards pc
                 JOIN products p ON p.id = pc.product_id
                 JOIN platforms pl ON pl.id = p.platform_id
                 LEFT JOIN product_scores s ON s.product_id = p.id
-                WHERE pc.id = %s AND p.is_active = TRUE
+                WHERE pc.id = %s AND p.is_active = TRUE AND p.is_blocked = FALSE AND p.current_price > 0 AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW())
                 """,
                 (publication_id,),
             )
@@ -204,7 +219,9 @@ def update_publication(publication_id: int, payload: PublicationPayload):
             if not current:
                 raise HTTPException(status_code=404, detail="Publicación no encontrada")
 
-            canonical_image = current["image_url"] or ((current["image_gallery"] or [None])[0])
+            source_metadata = current.get("source_metadata") or {}
+            mongo_image_id = source_metadata.get("mongo_image_id") if isinstance(source_metadata, dict) else None
+            canonical_image = current["image_url"] or ((current["image_gallery"] or [None])[0]) or (f"mongo://{mongo_image_id}" if mongo_image_id else None)
             if not canonical_image:
                 raise HTTPException(status_code=422, detail="No se puede actualizar una publicación sin imagen real")
 
@@ -254,8 +271,30 @@ def update_publication(publication_id: int, payload: PublicationPayload):
         conn.close()
 
 
+@router.delete("/publications/{publication_id}")
+def delete_publication(publication_id: int, _: None = Depends(require_publication_admin)):
+    """Elimina la ficha publicada sin borrar el producto del catálogo."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM published_cards WHERE id=%s RETURNING id,product_id", (publication_id,))
+            removed = cur.fetchone()
+            if not removed:
+                raise HTTPException(status_code=404, detail="Publicación no encontrada")
+        conn.commit()
+        return {"status": "removed", "publication": removed}
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
 @router.post("/publications/{publication_id}/telegram")
-def publish_publication_telegram(publication_id: int):
+def publish_publication_telegram(publication_id: int, _: None = Depends(require_publication_admin)):
     conn = get_connection()
     try:
         with conn.cursor() as cur:

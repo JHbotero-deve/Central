@@ -7,8 +7,8 @@
 .admin-card{background:var(--panel);border:1px solid var(--line);border-radius:18px;overflow:hidden;text-align:left;color:inherit;cursor:pointer;padding:0;font:inherit;transition:transform .15s ease,border-color .15s ease}
 .admin-card:hover{transform:translateY(-3px);border-color:var(--brand)}
 .admin-card:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
-.admin-card-media{aspect-ratio:4/3;display:grid;place-items:center;overflow:hidden;background:linear-gradient(160deg,#25171a,#0f0f12)}
-.admin-card-media img{width:100%;height:100%;object-fit:contain}
+.admin-card-media{aspect-ratio:4/3;display:grid;place-items:center;overflow:hidden;background:#f8f7f3}
+.admin-card-media img{display:block;width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;object-position:center}
 .admin-card-media.plate img{background:#fff}
 .admin-card-noimg{font-size:12px;color:var(--muted)}
 .admin-card-body{padding:12px 14px;display:flex;flex-direction:column;gap:3px}
@@ -17,18 +17,52 @@
 .admin-card-price{font:800 16px var(--display);color:var(--brand)}
 .admin-card-meta{display:flex;align-items:center;justify-content:space-between;gap:8px;color:var(--muted);font-size:11px}
 .admin-card-status{display:inline-flex;width:max-content;padding:2px 6px;border:1px solid color-mix(in srgb,var(--ok) 45%,var(--line));border-radius:999px;color:var(--ok);font-weight:700}
-</style></head>
-<body><div class="sh-wrap">
-<header class="sh-top"><a class="sh-logo" href="/vitrina">CENTRAL</a><div style="display:flex;gap:8px"><a class="sh-pill" href="/vitrina">Ver vitrina</a></div></header>
+.admin-card-wrap{min-width:0;display:flex;flex-direction:column;gap:7px}.admin-card-actions{display:flex;gap:6px;flex-wrap:wrap}.admin-card-actions button{font-size:11px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:inherit;cursor:pointer}
+.meli-search{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;margin:8px 0}
+.meli-search .ed-in{min-width:0}
+.meli-results{display:flex;flex-direction:column;gap:8px;margin:8px 0 16px}
+.meli-result{display:grid;grid-template-columns:56px minmax(0,1fr);gap:10px;align-items:center;width:100%;padding:8px;border:1px solid var(--line);border-radius:12px;background:var(--panel);color:inherit;text-align:left;cursor:pointer;font:inherit}
+.meli-result:hover,.meli-result:focus-visible{border-color:var(--brand);outline-color:var(--brand)}
+.meli-result img{width:56px;height:56px;object-fit:contain;border-radius:8px;background:#fff}
+.meli-result b{display:block;font-size:12px;line-height:1.3}
+.meli-result small{display:block;color:var(--muted);font-size:11px;margin-top:4px}
+.meli-search-note{font-size:11px;color:var(--muted);margin:4px 0 8px}
+
+body:not(.auth-ready) .sh-wrap{display:none!important}#panel{display:none}.central-auth{min-height:100vh;display:grid;place-items:center;padding:24px;background:var(--bg);color:var(--ink);font-family:var(--font)}.central-auth-card{width:min(100%,440px);padding:clamp(22px,5vw,34px);background:var(--panel);border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow)}.central-auth-brand{display:flex;align-items:center;gap:12px;margin-bottom:28px}.central-auth-brand img{width:48px;height:48px}.central-auth-brand strong{display:block;font:800 17px var(--display)}.central-auth-brand span,.central-auth-copy,.central-auth-note{color:var(--muted);font-size:13px}.central-auth-kicker{font-size:11px;font-weight:800;letter-spacing:.14em;color:var(--brand);margin:0}.central-auth-card h1{font:700 clamp(28px,7vw,36px)/1.1 var(--display);margin:10px 0}.central-auth-form{display:grid;gap:14px;margin-top:22px}.central-auth-form label{display:grid;gap:7px;font-size:12px;font-weight:700;color:var(--muted)}.central-auth-form input{width:100%;min-width:0;border:1px solid var(--line);border-radius:10px;padding:13px;background:var(--panel2);color:var(--ink);font:14px var(--font)}.central-auth-form input:focus-visible{outline:2px solid var(--brand);outline-offset:2px}.central-auth-submit{min-height:48px;border:0;border-radius:10px;background:var(--brand);color:white;font:700 14px var(--font);cursor:pointer}.central-auth-submit:disabled{opacity:.6;cursor:wait}.central-auth-message{font-size:13px;color:var(--danger);min-height:18px;margin:0}.central-auth-note{margin:18px 0 0}.admin-session-actions{display:flex;gap:8px;align-items:center}
+.admin-card{background:#fffdf8!important;box-shadow:0 5px 20px rgba(35,39,32,.055)}
+.admin-card-media{background:#f8f7f3!important}
+.admin-card-body{background:#fffdf8}
+.admin-card-actions button{background:#fffdf8;color:#3d5639;border-color:#e4e2da}
+.admin-card-actions button:hover{background:#e8eee4;border-color:#dce5d7}
+#preview .sh-stage{background:linear-gradient(145deg,#fdfcf9,#f7f6f1);border-color:#e7e4dc}
+#preview .sh-stage img{filter:drop-shadow(0 10px 14px rgba(35,39,32,.12))}
+</style><script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+</head>
+<body><main id="auth-screen" class="central-auth"><section class="central-auth-card">
+<div class="central-auth-brand"><img src="/central-icon.svg" alt=""><div><strong>CENTRAL</strong><span>Administración segura</span></div></div>
+<p class="central-auth-kicker">ACCESO PRIVADO</p><h1 id="auth-title">Iniciar sesión</h1><p class="central-auth-copy" id="auth-copy">Accede al panel administrativo de Central.</p>
+<form id="auth-form" class="central-auth-form">
+<label>Correo administrativo<input id="auth-email" type="email" autocomplete="username" required value="jorgebotero190@gmail.com"></label>
+<label>Contraseña<input id="auth-password" type="password" autocomplete="current-password" required></label>
+<button class="central-auth-submit" id="auth-submit" type="submit">Entrar</button><p class="central-auth-message" id="auth-message" role="status" aria-live="polite"></p>
+</form><p class="central-auth-note" id="auth-note">Sesión segura en este dispositivo.</p>
+</section></main><div class="sh-wrap">
+<header class="sh-top"><a class="sh-logo" href="/">CENTRAL</a><div class="admin-session-actions"><a class="sh-pill" href="/tienda">Ver tienda</a><button class="sh-pill" id="logout" type="button">Cerrar sesión</button></div></header>
 
 <section id="panel"><div class="ed-grid">
  <aside class="ed-side">
-  <div class="ed-tabs"><button type="button" data-tab="mine">Productos</button><button type="button" data-tab="add" class="on">Agregar</button><button type="button" data-tab="theme">Tema</button></div>
+  <div class="ed-tabs"><button type="button" data-tab="mine">Productos</button><button type="button" data-tab="add" class="on">Agregar</button></div>
 
   <div class="ed-body" id="tab-mine" hidden><div class="ed-l">Productos</div><div class="sh-grid admin-cards" id="mine"></div></div>
 
   <div class="ed-body" id="tab-add">
-   <div class="ed-l">NUEVO PRODUCTO</div>
+   <div class="ed-l" id="formHeading">NUEVO PRODUCTO</div>
+   <label class="ed-l">Tipo de producto<select class="ed-in" id="productType"><option value="personal">Producto propio · compra en Central/Wompi</option><option value="mercadolibre">Mercado Libre · compra externa</option></select></label>
+   <div class="ed-l">BUSCAR PRODUCTO EN MERCADO LIBRE</div>
+   <div class="meli-search"><input class="ed-in" id="meliQuery" maxlength="120" placeholder="Ej: Raspberry Pi Pico original"><button class="ed-btn" id="meliSearch" type="button">Buscar</button></div>
+   <div class="meli-search-note">Elige un resultado para cargar título, precio, imagen y enlace automáticamente.</div>
+   <div id="meliMsg" class="ed-msg" hidden></div><div id="meliResults" class="meli-results"></div>
+   <div class="ed-l">O completa los datos manualmente</div>
    <label class="ed-l">Nombre del producto *<input class="ed-in" id="title" maxlength="200" placeholder="Ej: Air Street Pro X"></label>
    <div class="ed-2">
     <label class="ed-l">Marca<input class="ed-in" id="brand" maxlength="60" placeholder="Ej: Nike"></label>
@@ -47,44 +81,54 @@
    <label class="ed-l">N° reseñas<input class="ed-in" id="reviews" inputmode="numeric" placeholder="0"></label>
    <div class="ed-l">Características (hasta 4)</div>
    <div class="ed-2"><input class="ed-in" id="feat1" placeholder="Característica 1"><input class="ed-in" id="feat2" placeholder="Característica 2"><input class="ed-in" id="feat3" placeholder="Característica 3"><input class="ed-in" id="feat4" placeholder="Característica 4"></div>
-   <div style="display:flex;justify-content:space-between"><span class="ed-l">Variantes de color *</span><button type="button" class="ed-x" id="addVar" style="color:var(--muted)">＋ Agregar</button></div>
+   <div style="display:flex;justify-content:space-between"><span class="ed-l">Imagen del producto * · variantes opcionales</span><button type="button" class="ed-x" id="addVar" style="color:var(--muted)">＋ Agregar</button></div>
    <div id="vars" style="display:flex;flex-direction:column;gap:10px"></div>
    <label class="ed-l" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" id="plate"> Marco claro para la imagen (útil si tiene fondo blanco)</label>
    <div class="ed-l">Links de compra</div>
    <input class="ed-in" id="l_amz" placeholder="🟠 Amazon: https://…"><input class="ed-in" id="l_meli" placeholder="🟡 Mercado Libre: https://…"><input class="ed-in" id="l_wmp" placeholder="🔵 Wompi (link de pago): https://…">
-   <button class="ed-btn" id="save" type="button">Crear tarjeta</button><div id="msg" class="ed-msg" hidden></div>
+   <button class="ed-btn" id="save" type="button">Crear tarjeta</button><button class="ed-x" id="cancelEdit" type="button" hidden>Cancelar edición</button><div id="msg" class="ed-msg" hidden></div>
   </div>
 
-  <div class="ed-body" id="tab-theme" hidden><div class="ed-l">Fondo de la vitrina (se guarda en este navegador)</div><div class="ed-themes" id="themes"></div></div>
+  
  </aside>
  <main><div class="ed-l" style="margin-bottom:10px">VISTA PREVIA EN VIVO</div><div id="preview"></div></main>
 </div></section>
 </div>
 
 <script>
-(()=>{"use strict";const S=Shopr,$=id=>document.getElementById(id);S.applyTheme();
+(()=>{"use strict";const S=Shopr,$=id=>document.getElementById(id);
 const f=id=>$(id).value.trim();
 const num=v=>{v=String(v).trim().replace(",",".");return v===""||isNaN(Number(v))?null:Number(v)};
 let V=[{name:"",glow:0,img:""}];
 
 function show(el,k,t){el.hidden=false;el.className="ed-msg "+k;el.textContent=t}
-function gate(){renderVars();preview();loadMine();renderThemes()}
-function tab(n){["mine","add","theme"].forEach(x=>{$("tab-"+x).hidden=x!==n});document.querySelectorAll("[data-tab]").forEach(b=>b.classList.toggle("on",b.dataset.tab===n))}
+function gate(){renderVars();preview();loadMine()}
+function tab(n){["mine","add"].forEach(x=>{$("tab-"+x).hidden=x!==n});document.querySelectorAll("[data-tab]").forEach(b=>b.classList.toggle("on",b.dataset.tab===n))}
 
 function renderVars(){
-  $("vars").innerHTML=V.map((v,i)=>{const up=v.img.startsWith("data:");return `<div class="ed-var" data-i="${i}">
-   <div class="ed-varh"><b>Variante ${i+1}</b>${V.length>1?`<button type="button" class="ed-x" data-del="${i}">Quitar</button>`:""}</div>
-   <input class="ed-in" data-f="name" placeholder="Nombre del color (Ej: Rojo Fuego)" value="${S.esc(v.name)}">
-   <div class="ed-row"><input class="ed-in" data-f="img" placeholder="URL de imagen (Amazon / Mercado Libre)" value="${up?"":S.esc(v.img)}"><label class="ed-up" title="Subir imagen">⬆<input type="file" accept="image/*" data-file hidden></label></div>
-   ${up?'<div class="ed-note">Imagen subida ✓</div>':""}
-   <div class="ed-glows">${S.GLOWS.map((g,gi)=>`<button type="button" class="ed-g ${gi===v.glow?"on":""}" data-g="${gi}" title="${g[0]}" style="background:${g[1]}"></button>`).join("")}</div></div>`}).join("");
+  $("vars").innerHTML=V.map((v,i)=>{
+    const stored=v.img.startsWith("data:")||v.img.startsWith("mongo://");
+    const imagePreview=v.img
+      ? '<div class="ed-image-ready"><img src="'+S.esc(S.imageSrc(v.img))+'" alt="Vista previa de la imagen" loading="lazy"><span>'+(v.img.startsWith("mongo://")?"Imagen guardada en Central":"Imagen preparada para guardar")+'</span></div>'
+      : '<div class="ed-image-empty">Primero sube una imagen real del producto.</div>';
+    return `<div class="ed-var" data-i="${i}">
+      <div class="ed-varh"><b>Variante ${i+1}</b>${V.length>1?`<button type="button" class="ed-x" data-del="${i}">Quitar</button>`:""}</div>
+      <input class="ed-in" data-f="name" placeholder="Nombre de la variante (opcional)" value="${S.esc(v.name)}">
+      <label class="ed-upload-primary">${v.img?"Reemplazar imagen":"Subir imagen del producto"}<input type="file" accept="image/*" data-file hidden></label>
+      ${imagePreview}
+      <details class="ed-image-url"><summary>Usar una URL de imagen existente (opcional)</summary>
+        <input class="ed-in" data-f="img" type="url" placeholder="https://…" value="${S.esc(stored?"":v.img)}">
+      </details>
+      <div class="ed-glows">${S.GLOWS.map((g,gi)=>`<button type="button" class="ed-g ${gi===v.glow?"on":""}" data-g="${gi}" title="${g[0]}" style="background:${g[1]}"></button>`).join("")}</div>
+    </div>`;
+  }).join("");
   $("addVar").hidden=V.length>=4;
 }
 function model(){return{id:"preview",title:f("title")||"Nombre del producto",brand:f("brand"),tag:f("tag"),cat:f("category"),desc:f("description"),
   price:num(f("price")),prev:num(f("prev")),currency:f("currency"),rating:num(f("rating"))||0,reviews:parseInt(f("reviews"),10)||0,
   features:[1,2,3,4].map(i=>f("feat"+i)).filter(Boolean),variants:V.map(v=>({...v})),
-  links:{amazon:f("l_amz"),meli:f("l_meli"),wompi:f("l_wmp")},fallback:"",platform:"personal",plate:$("plate").checked}}
-function preview(){S.mountDetail($("preview"),model(),0)}
+  links:{amazon:f("l_amz"),meli:f("l_meli"),wompi:f("l_wmp")},fallback:"",platform:f("productType"),plate:$("plate").checked}}
+function preview(){const m=model();S.mountDetail($("preview"),{...m,links:{},fallback:""},0)}
 
 function resize(file,max=700){return new Promise((res,rej)=>{const im=new Image(),u=URL.createObjectURL(file);
   im.onload=()=>{const s=Math.min(1,max/Math.max(im.width,im.height)),c=document.createElement("canvas");c.width=Math.round(im.width*s);c.height=Math.round(im.height*s);
@@ -101,29 +145,75 @@ $("addVar").addEventListener("click",()=>{if(V.length<4){V.push({name:"",glow:Ma
 $("tab-add").addEventListener("input",preview);$("plate").addEventListener("change",preview);
 document.querySelectorAll("[data-tab]").forEach(b=>b.addEventListener("click",()=>tab(b.dataset.tab)));
 
-function adminCardHtml(m){
-  const v=m.variants[0]||{},src=S.imgOk(v.img);
-  const img=src?'<img src="'+S.esc(src)+'" alt="'+S.esc(m.title)+'" loading="lazy" referrerpolicy="no-referrer">':'<span class="admin-card-noimg">Sin imagen</span>';
-  return '<button type="button" class="admin-card" data-id="'+S.esc(m.id)+'" aria-label="Abrir '+S.esc(m.title)+'"><div class="admin-card-media '+(m.plate?"plate":"")+'">'+img+'</div><div class="admin-card-body"><span class="admin-card-brand">'+S.esc(m.brand||m.cat)+'</span><span class="admin-card-title">'+S.esc(m.title)+'</span><span class="admin-card-price">'+S.money(m.price,m.currency)+'</span><div class="admin-card-meta"><span>'+S.esc(m.cat)+'</span><span class="admin-card-status">Activo</span></div></div></button>'
+let meliItems=[];
+ async function searchMeli(){
+   const q=$("meliQuery").value.trim(),btn=$("meliSearch"),box=$("meliResults"),msg=$("meliMsg");
+   msg.hidden=true;box.innerHTML="";
+   if(q.length<2)return show(msg,"err","Escribe al menos 2 caracteres para buscar.");
+   btn.disabled=true;btn.textContent="Buscando…";
+   try{
+     const data=await S.api("/mercadolibre/search?q="+encodeURIComponent(q)+"&limit=8");
+     meliItems=Array.isArray(data.items)?data.items:[];
+     if(!meliItems.length){show(msg,"err","No encontramos productos con precio disponible. Prueba otra búsqueda.");return}
+     box.innerHTML=meliItems.map((p,i)=>{
+       const src=S.imgOk(p.image_url);
+       return '<button type="button" class="meli-result" data-meli-index="'+i+'">'+
+         (src?'<img src="'+S.esc(src)+'" alt="" loading="lazy" referrerpolicy="no-referrer">':'<span class="admin-card-noimg">Sin imagen</span>')+
+         '<span><b>'+S.esc(p.title)+'</b><small>'+S.money(p.price,p.currency)+' · Mercado Libre</small></span></button>';
+     }).join("");
+   }catch(e){show(msg,"err",e.message||"No fue posible buscar en Mercado Libre.")}
+   finally{btn.disabled=false;btn.textContent="Buscar"}
+ }
+ $("meliSearch").addEventListener("click",searchMeli);
+ $("meliQuery").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();searchMeli()}});
+ $("meliResults").addEventListener("click",e=>{
+   const b=e.target.closest("[data-meli-index]");if(!b)return;
+   const p=meliItems[Number(b.dataset.meliIndex)];if(!p)return;
+   $("title").value=p.title;
+   $("price").value=String(p.price);
+   $("currency").value=["COP","USD"].includes(p.currency)?p.currency:"COP";
+   $("l_meli").value=p.product_url;
+   $("productType").value="mercadolibre";
+   V[0]={...V[0],name:V[0].name||"Principal",img:p.image_url||V[0].img};
+   renderVars();preview();
+   show($("msg"),"ok","Producto cargado. Revisa los datos y pulsa «Crear tarjeta».");
+   $("msg").scrollIntoView({behavior:"smooth",block:"nearest"});
+ });
+ function adminCardHtml(m){
+  const v=m.variants[0]||{},src=S.imageSrc(v.img),own=m.platform==="personal";
+  const img=src?'<img src="'+S.esc(src)+'" alt="'+S.esc(m.title)+'" loading="lazy" referrerpolicy="no-referrer" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span class="admin-card-noimg" hidden>Imagen no disponible</span>':'<span class="admin-card-noimg">Sin imagen</span>';
+  return '<div class="admin-card-wrap"><button type="button" class="admin-card" data-open="'+S.esc(m.id)+'" aria-label="Ver '+S.esc(m.title)+'"><div class="admin-card-media '+(m.plate?"plate":"")+'">'+img+'</div><div class="admin-card-body"><span class="admin-card-brand">'+S.esc(m.brand||m.cat)+'</span><span class="admin-card-title">'+S.esc(m.title)+'</span><span class="admin-card-price">'+S.money(m.price,m.currency)+'</span><div class="admin-card-meta"><span>'+S.esc(m.platform||m.cat)+'</span><span class="admin-card-status">Activo</span></div></div></button><div class="admin-card-actions">'+(own?'<button type="button" data-edit="'+S.esc(m.id)+'">Editar</button>':'')+'<button type="button" data-publish="'+S.esc(m.id)+'">Publicar en tienda</button><button type="button" data-delete="'+S.esc(m.id)+'">Eliminar</button></div></div>'
+}
+let editingId=null;
+function resetEditor(){
+  editingId=null;$("formHeading").textContent="NUEVO PRODUCTO";$("save").textContent="Crear tarjeta";$("cancelEdit").hidden=true;$("productType").disabled=false;
+  ["title","brand","description","tag","price","prev","rating","reviews","feat1","feat2","feat3","feat4","l_amz","l_meli","l_wmp"].forEach(id=>$(id).value="");
+  $("category").value="otros";$("currency").value="COP";$("productType").value="personal";V=[{name:"",glow:0,img:""}];renderVars();preview();
 }
 function bindAdminCards(){
-  document.querySelectorAll(".admin-card").forEach(card=>card.addEventListener("click",()=>{
-    const m=mineModels.find(x=>String(x.id)===String(card.dataset.id));
-    if(m)S.mountDetail($("preview"),m,0);
+  document.querySelectorAll("[data-open]").forEach(b=>b.addEventListener("click",()=>{const m=mineModels.find(x=>String(x.id)===String(b.dataset.open));if(m)S.mountDetail($("preview"),m,0)}));
+  document.querySelectorAll("[data-edit]").forEach(b=>b.addEventListener("click",()=>{
+    const m=mineModels.find(x=>String(x.id)===String(b.dataset.edit));if(!m)return;
+    editingId=m.id;$("formHeading").textContent="EDITAR PRODUCTO";$("save").textContent="Guardar cambios";$("cancelEdit").hidden=false;$("productType").value="personal";$("productType").disabled=true;
+    $("title").value=m.title;$("brand").value=m.brand;$("description").value=m.desc;$("category").value=m.cat;$("price").value=m.price??"";$("prev").value=m.prev??"";$("currency").value=m.currency||"COP";$("tag").value=m.tag;$("rating").value=m.rating||"";$("reviews").value=m.reviews||"";
+    ["feat1","feat2","feat3","feat4"].forEach((id,i)=>$(id).value=m.features[i]||"");$("l_amz").value=m.links.amazon||"";$("l_meli").value=m.links.meli||"";$("l_wmp").value=m.links.wompi||"";
+    V=m.variants.map(v=>({...v}));if(!V.length)V=[{name:"",glow:0,img:""}];renderVars();preview();tab("add");
+  }));
+  document.querySelectorAll("[data-delete]").forEach(b=>b.addEventListener("click",async()=>{
+    const m=mineModels.find(x=>String(x.id)===String(b.dataset.delete));if(!m||!confirm("¿Desactivar y retirar '"+m.title+"' del catálogo?"))return;b.disabled=true;
+    try{await S.api("/products/"+encodeURIComponent(m.id)+"/status",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({active:false})});show($("msg"),"ok","Producto retirado del catálogo.");await loadMine()}catch(e){show($("msg"),"err",e.message)}finally{b.disabled=false}
+  }));
+  document.querySelectorAll("[data-publish]").forEach(b=>b.addEventListener("click",async()=>{
+    const m=mineModels.find(x=>String(x.id)===String(b.dataset.publish));if(!m)return;const raw=m.raw||{},img=m.variants.find(v=>v.img)?.img||raw.image_url;
+    if(!img||String(img).startsWith("data:"))return show($("msg"),"err","La publicación necesita una imagen guardada como URL pública.");b.disabled=true;
+    try{const out=await S.api("/publications",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({product_id:m.id,title:m.title,subtitle:m.desc||null,price_display:S.money(m.price,m.currency),image_url:img,product_url:raw.affiliate_url||raw.product_url||m.fallback||null,sale_price:m.price,cost_price:m.price,footer:"Disponible en Central",accent:"#b6f23a",is_published:true})});show($("msg"),"ok","Producto publicado correctamente (ID "+out.id+").")}catch(e){show($("msg"),"err",e.message)}finally{b.disabled=false}
   }));
 }
 let mineModels=[];
 async function loadMine(){
-  try{const d=await S.api("/products?limit=50");const l=(Array.isArray(d)?d:(d.items||d.products||[])).filter(p=>String(p.platform||"").toLowerCase()==="personal");
-    mineModels=l.map(p=>S.fromApi(p));
-    $("mine").innerHTML=mineModels.length?mineModels.map(adminCardHtml).join(""):'<div class="ed-note" style="color:var(--muted)">Aún no tienes productos.</div>';
-    bindAdminCards();
-  }catch(e){$("mine").innerHTML='<div class="ed-msg err">'+S.esc(e.message)+'</div>'}
+  try{const d=await S.api("/products?limit=100");const l=Array.isArray(d)?d:(d.items||d.products||[]);mineModels=l.map(p=>S.fromApi(p));$("mine").innerHTML=mineModels.length?mineModels.map(adminCardHtml).join(""):'<div class="ed-note" style="color:var(--muted)">Aún no tienes productos.</div>';bindAdminCards()}
+  catch(e){$("mine").innerHTML='<div class="ed-msg err">'+S.esc(e.message)+'</div>'}
 }
-function renderThemes(){const cur=S.theme()[0];
-  $("themes").innerHTML=S.THEMES.map((t,i)=>`<button type="button" class="ed-t ${t[0]===cur?"on":""}" data-t="${i}" style="background:${t[1]}">${t[0]}</button>`).join("");
-  $("themes").querySelectorAll("[data-t]").forEach(b=>b.addEventListener("click",()=>{S.setTheme(S.THEMES[+b.dataset.t]);renderThemes()}))}
- 
 $("save").addEventListener("click",async()=>{
   const m=model(),msg=$("msg");msg.hidden=true;
   if(f("title").length<2)return show(msg,"err","El nombre necesita al menos 2 caracteres");
@@ -140,14 +230,28 @@ $("save").addEventListener("click",async()=>{
   const description=S.pack(f("description"),meta);
   if(description.length>5000)return show(msg,"err","Descripción + datos extra superan 5000 caracteres ("+description.length+"). Acórtala.");
   const first=V.find(v=>v.img);
-  const body={title:f("title"),description,price:m.price,previous_price:m.prev>0?m.prev:null,currency:m.currency,category:m.cat||"otros",
-    image_url:first.img,image_gallery:gallery,product_url:links.amazon||links.meli||links.wompi||null};
+  const body={title:f("title"),description,price:m.price,previous_price:m.prev>0?m.prev:null,currency:m.currency,category:m.cat||"otros",image_url:first.img,image_gallery:gallery,product_url:links.amazon||links.meli||links.wompi||null};
   const b=$("save");b.disabled=true;
-  try{await S.api("/products/personal",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
-    show(msg,"ok","Tarjeta creada");
-    ["title","brand","description","tag","price","prev","rating","reviews","feat1","feat2","feat3","feat4","l_amz","l_meli","l_wmp"].forEach(id=>$(id).value="");
-    V=[{name:"",glow:0,img:""}];renderVars();preview();loadMine()}
-  catch(e){show(msg,"err",e.message)}
-  finally{b.disabled=false}});
-gate();})();
+  try{
+    if(editingId){await S.api("/products/"+encodeURIComponent(editingId),{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});show(msg,"ok","Cambios guardados");resetEditor();await loadMine()}
+    else if(m.platform==="mercadolibre"){
+      const item=meliItems.find(p=>p.product_url===links.meli);
+      if(!item)return show(msg,"err","Selecciona un resultado de Mercado Libre para importar sus datos reales.");
+      const result=await S.api("/products/mercadolibre",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({external_id:item.id,title:item.title,image_url:item.image_url,product_url:item.product_url,price:item.price,currency:item.currency,category:m.cat||"otros"})});
+      show(msg,"ok","Producto externo guardado (ID "+result.product.id+"). No usa checkout Wompi.");await loadMine()
+    }else{
+      if(links.meli)return show(msg,"err","Este producto tiene enlace de Mercado Libre. Cambia el tipo a Mercado Libre para no tratarlo como producto propio.");
+      await S.api("/products/personal",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});show(msg,"ok","Tarjeta creada");resetEditor();await loadMine()
+    }
+  }catch(e){show(msg,"err",e.message)}finally{b.disabled=false}});
+$("cancelEdit").addEventListener("click",resetEditor);
+async function initAuth(){
+ const screen=$("auth-screen"),form=$("auth-form"),msg=$("auth-message"),btn=$("auth-submit"),email=$("auth-email"),password=$("auth-password");
+ const say=(text,ok=false)=>{msg.textContent=text;msg.style.color=ok?"var(--brand)":"var(--danger)"};
+ const showPanel=()=>{document.body.classList.add("auth-ready");screen.hidden=true;$("panel").style.display="block";$("logout").addEventListener("click",async()=>{try{await S.api("/auth/logout",{method:"POST"})}finally{location.reload()}});gate()};
+ try{const status=await S.api("/auth/status");if(status.authenticated){showPanel();return}}
+ catch{say("No se pudo conectar con el servicio de autenticación.");btn.disabled=true;return}
+ form.addEventListener("submit",async e=>{e.preventDefault();say("");btn.disabled=true;try{await S.api("/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:email.value.trim(),password:password.value})});password.value="";showPanel()}catch(err){say(err.message||"No fue posible autenticarte.")}finally{btn.disabled=false}});
+}
+initAuth();})();
 </script></body></html>

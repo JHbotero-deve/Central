@@ -1,40 +1,41 @@
-﻿"""
+"""
 Central Product Analyzer REST API.
 """
 
 import os
 import time
+import secrets
 
 import requests
 from typing import Optional
-from urllib.parse import quote
+from urllib.parse import quote, urljoin, urlparse, urlunparse
 
-from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Header
 from fastapi.responses import Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from psycopg2.extras import Json
+from mongo_store import store_product_image
 
 from analysis import score_product
 from amazon_api import fetch_amazon_products
-from ingest import fetch_mercadolibre
-from db import get_connection, upsert_product
+from ingest import MercadoLibreAccessDenied, fetch_mercadolibre
+from db import get_connection, upsert_product, _affiliate_url
+from catalog_rules import discount_percentage
 from monetization import router as monetization_router
 from publications import router as publication_router
 from store_orders import router as store_orders_router
 from commerce import router as commerce_router
+from auth import router as auth_router, require_admin
 from tiktok_api import router as tiktok_creator_router
 from url_import import import_url, _public_url
 from wompi import router as wompi_router
 from meli_oauth import router as meli_oauth_router, notification_router as meli_notification_router
+from aliexpress_oauth import router as aliexpress_oauth_router
 
 
 API_VERSION = "1.3.0"
 
-# Central opera sin login. Las rutas que antes dependian de require_admin
-# se mantienen para conservar compatibilidad con el codigo existente.
-def require_admin() -> dict:
-    return {}
 
 app = FastAPI(
     title="Central Product Analyzer API",
@@ -42,10 +43,12 @@ app = FastAPI(
     version=API_VERSION,
 )
 
+app.include_router(auth_router, prefix="/api/v1")
 app.include_router(monetization_router, prefix="/api/v1")
 app.include_router(wompi_router, prefix="/api/v1")
 app.include_router(meli_oauth_router, prefix="/api/v1")
 app.include_router(meli_notification_router, prefix="/api/v1")
+app.include_router(aliexpress_oauth_router, prefix="/api/v1")
 app.include_router(tiktok_creator_router, prefix="/api/v1")
 app.include_router(publication_router, prefix="/api/v1")
 app.include_router(store_orders_router, prefix="/api/v1")
@@ -84,20 +87,43 @@ app.add_middleware(
 core_router = APIRouter(tags=["core"])
 @core_router.get("/media/image")
 def proxy_product_image(url: str = Query(..., min_length=8, max_length=2_000_000)):
-    """Entrega imágenes públicas de productos con validación SSRF y caché corta."""
+    """Entrega imágenes públicas de fuentes comerciales permitidas."""
+    if url.startswith("mongo://"):
+        from mongo_store import read_product_image
+        data, content_type = read_product_image(url[8:])
+        if not data:
+            raise HTTPException(status_code=404, detail="Imagen Mongo no encontrada")
+        return Response(content=data, media_type=content_type, headers={"Cache-Control":"public, max-age=86400"})
+
+    current = url.strip()
     try:
-        _public_url(url)
-        response = requests.get(
-            url,
-            headers={
-                "User-Agent": "Mozilla/5.0 (compatible; CentralImageProxy/1.0)",
-                "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
-            },
-            timeout=12,
-            allow_redirects=True,
-        )
-        response.raise_for_status()
-        _public_url(response.url)
+        for _ in range(4):
+            parsed = urlparse(current)
+            if parsed.scheme == "http":
+                current = urlunparse(("https", parsed.netloc, parsed.path, parsed.params, parsed.query, parsed.fragment))
+            _public_url(current)
+            response = requests.get(
+                current,
+                headers={
+                    "User-Agent": "Mozilla/5.0 (compatible; CentralImageProxy/1.0)",
+                    "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+                },
+                timeout=12,
+                allow_redirects=False,
+            )
+            if 300 <= response.status_code < 400:
+                location = response.headers.get("Location")
+                if not location:
+                    raise HTTPException(status_code=502, detail="La fuente de imagen devolvió una redirección sin destino")
+                current = urljoin(current, location)
+                continue
+            response.raise_for_status()
+            _public_url(response.url)
+            break
+        else:
+            raise HTTPException(status_code=502, detail="Demasiadas redirecciones de imagen")
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"No fue posible obtener la imagen: {exc}")
 
@@ -139,6 +165,14 @@ def telegram_status():
         return {"configured": True, "connected": False, "username": None, "name": None}
 
 
+@core_router.get("/media/mongo/{file_id}")
+def mongo_product_image(file_id: str):
+    from mongo_store import read_product_image
+    data, content_type = read_product_image(file_id)
+    if not data:
+        raise HTTPException(status_code=404, detail="Imagen no encontrada")
+    return Response(content=data, media_type=content_type, headers={"Cache-Control":"public, max-age=86400"})
+
 @core_router.get("/mongo/health")
 def mongo_health(_: dict = Depends(require_admin)):
     from mongo_store import health
@@ -162,12 +196,40 @@ def health():
 
 
 def _publish_external_product(conn, product_id, product, platform_label):
-    price = product.get("price")
-    currency = product.get("currency") or "COP"
-    price_display = f"{price:,.2f} {currency}" if price is not None else "Consultar"
-    image_url = product.get("image_url") or None
-    product_url = product.get("product_url") or None
-    score = product.get("_score")
+    """Publica solo ofertas con descuento real >= umbral y enlace monetizable verificable."""
+    discount_pct = discount_percentage(product.get("price"), product.get("previous_price"))
+    threshold = float(os.getenv("CATALOG_MIN_DISCOUNT_PCT", "50"))
+    if discount_pct is None or discount_pct < threshold:
+        return False
+    current_price = float(product.get("price") or 0)
+    previous_price = float(product.get("previous_price") or 0)
+
+    affiliate_url = str(product.get("affiliate_url") or _affiliate_url(product) or "").strip()
+    if not affiliate_url.startswith(("https://", "http://")):
+        return False
+
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT p.title, p.current_price, p.previous_price, p.currency, p.product_url,
+                   p.image_url, p.affiliate_url, p.source_metadata
+            FROM products p WHERE p.id = %s AND p.is_active = TRUE AND p.is_blocked = FALSE
+        """, (product_id,))
+        stored = cur.fetchone()
+    if not stored:
+        return False
+
+    metadata = stored.get("source_metadata") or {}
+    mongo_image_id = metadata.get("mongo_image_id") if isinstance(metadata, dict) else None
+    image_url = ("mongo://" + str(mongo_image_id)) if mongo_image_id else (stored.get("image_url") or product.get("image_url"))
+    product_url = affiliate_url or stored.get("affiliate_url") or stored.get("product_url")
+    if not image_url or not str(image_url).strip() or not product_url:
+        return False
+
+    price = float(stored.get("current_price") or current_price)
+    previous = float(stored.get("previous_price") or previous_price)
+    currency = stored.get("currency") or product.get("currency") or "COP"
+    price_display = f"{price:,.2f} {currency}"
+    score = max(float(product.get("_score") or 0), discount_pct)
     with conn.cursor() as cur:
         cur.execute("""
             INSERT INTO published_cards (
@@ -182,32 +244,49 @@ def _publish_external_product(conn, product_id, product, platform_label):
                 cost_price=EXCLUDED.cost_price, opportunity_score=EXCLUDED.opportunity_score,
                 is_published=TRUE, published_at=NOW(), updated_at=NOW()
         """, (
-            product_id, product["title"], f"{platform_label} · producto original",
+            product_id, stored.get("title") or product["title"],
+            f"{platform_label} · descuento verificado {discount_pct:.0f}%",
             price_display, image_url, product_url,
-            price, price, score or 0, f"Oferta {platform_label}", "#b6f23a"
+            price, previous, score, f"Oferta -{discount_pct:.0f}% · {platform_label}", "#ff8a00"
         ))
-
+    return True
 
 def _sync_store_catalog():
-    """Importa productos reales al catálogo; las tarjetas se publican únicamente desde Studio."""
+    """Importa, puntúa y publica ofertas verificadas; rota caducados solo si hay reemplazos."""
     conn = get_connection()
     amazon_imported = []
     meli_imported = []
+    meli_refreshed = []
+    meli_refreshed_keys = set()
     errors = []
+    auto_published = []
+    expired_count = 0
     try:
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT p.external_id, pl.name AS platform
+                SELECT p.external_id, p.title, p.product_url, pl.name AS platform
                 FROM products p
                 JOIN platforms pl ON pl.id = p.platform_id
                 WHERE p.is_active = TRUE AND pl.name IN ('amazon', 'mercadolibre')
             """)
-            existing = {(str(row["platform"]).lower(), str(row["external_id"]).upper()) for row in cur.fetchall()}
+            existing_rows = cur.fetchall()
+            existing = {(str(row["platform"]).lower(), str(row["external_id"]).upper()) for row in existing_rows}
+            meli_seen_titles = {
+                " ".join(str(row.get("title") or "").lower().split())
+                for row in existing_rows if str(row.get("platform") or "").lower() == "mercadolibre"
+            }
+            meli_seen_urls = {
+                str(row.get("product_url") or "").split("?")[0].rstrip("/").lower()
+                for row in existing_rows
+                if str(row.get("platform") or "").lower() == "mercadolibre" and row.get("product_url")
+            }
         try:
             amazon_products = fetch_amazon_products(
                 {external_id for platform, external_id in existing if platform == "amazon"},
                 15,
             )
+            if not amazon_products:
+                errors.append("Amazon: no se obtuvieron productos verificables en este ciclo.")
             for category, product in amazon_products[:15]:
                 try:
                     product_id = upsert_product(conn, "amazon", category, product)
@@ -221,6 +300,8 @@ def _sync_store_catalog():
                         """, (category, product.get("currency") or "USD"))
                         average = cur.fetchone()["avg_price"]
                     product["_score"] = score_product(conn, product_id, float(average or 0))
+                    if _publish_external_product(conn, product_id, product, "Amazon"):
+                        auto_published.append({"id": product_id, "title": product["title"], "discount_pct": round((float(product.get("previous_price") or 0) - float(product.get("price") or 0)) / float(product.get("previous_price") or 1) * 100, 2)})
                     conn.commit()
                     amazon_imported.append({"id": product_id, "asin": product["external_id"], "title": product["title"]})
                 except Exception as exc:
@@ -229,50 +310,140 @@ def _sync_store_catalog():
         except Exception as exc:
             conn.rollback()
             errors.append(f"Amazon: {exc}")
-        meli_queries = ("soporte celular", "audifonos bluetooth", "smartwatch", "mouse gamer", "lampara led")
+        # Meta por sincronización: hasta 100 productos nuevos y únicos de Mercado Libre.
+        # Se usan búsquedas variadas para evitar repetir los mismos resultados de una sola consulta.
+        meli_queries = (
+            "audifonos bluetooth", "smartwatch", "mouse gamer", "lampara led",
+            "soporte celular", "teclado mecanico", "parlante bluetooth", "cargador usb c",
+            "camara seguridad wifi", "disco ssd", "memoria ram", "silla ergonomica",
+            "mochila portatil", "audifonos gamer", "monitor gamer", "router wifi",
+            "freidora aire", "cafetera", "licuadora", "aspiradora robot",
+            "power bank", "reloj inteligente", "webcam full hd", "microfono usb",
+            "control videojuegos", "impresora", "proyector", "tablet android",
+            "organizador escritorio", "luz led escritorio",
+        )
+        meli_target = 300
         try:
             for query in meli_queries:
-                if len(meli_imported) >= 5:
+                if len(meli_imported) >= meli_target:
                     break
                 try:
-                    products = fetch_mercadolibre(query, limit=10)
+                    products = fetch_mercadolibre(query, limit=50)
                     for product in products:
-                        if len(meli_imported) >= 5:
+                        if len(meli_imported) >= meli_target:
                             break
-                        key = ("mercadolibre", str(product.get("external_id") or "").upper())
-                        if not key[1] or key in existing:
+                        external_id = str(product.get("external_id") or "").strip()
+                        key = ("mercadolibre", external_id.upper())
+                        title_key = " ".join(str(product.get("title") or "").lower().split())
+                        product_url = str(product.get("product_url") or "").split("?")[0].rstrip("/").lower()
+                        if not external_id or not title_key:
                             continue
-                        product_id = upsert_product(conn, "mercadolibre", "accesorios", product)
-                        with conn.cursor() as cur:
-                            cur.execute("""
-                                SELECT AVG(p.current_price) AS avg_price
-                                FROM products p
-                                JOIN categories c ON c.id = p.category_id
-                                WHERE p.is_active = TRUE AND c.name = %s
-                                  AND p.currency = %s AND p.current_price IS NOT NULL
-                            """, ("accesorios", product.get("currency") or "COP"))
-                            average = cur.fetchone()["avg_price"]
-                        product["_score"] = score_product(conn, product_id, float(average or 0))
-                        conn.commit()
-                        existing.add(key)
-                        meli_imported.append({"id": product_id, "item_id": product["external_id"], "title": product["title"]})
+                        if key in existing:
+                            if key in meli_refreshed_keys:
+                                continue
+                            try:
+                                product_id = upsert_product(conn, "mercadolibre", "accesorios", product)
+                                if _publish_external_product(conn, product_id, product, "Mercado Libre"):
+                                    auto_published.append({"id": product_id, "title": product["title"], "discount_pct": round((float(product.get("previous_price") or 0) - float(product.get("price") or 0)) / float(product.get("previous_price") or 1) * 100, 2)})
+                                conn.commit()
+                                meli_refreshed_keys.add(key)
+                                meli_refreshed.append({
+                                    "id": product_id,
+                                    "item_id": external_id,
+                                    "title": product["title"],
+                                })
+                            except Exception as exc:
+                                conn.rollback()
+                                errors.append(f"Mercado Libre {external_id}: {exc}")
+                            continue
+                        if title_key in meli_seen_titles or (product_url and product_url in meli_seen_urls):
+                            continue
+                        try:
+                            product_id = upsert_product(conn, "mercadolibre", "accesorios", product)
+                            with conn.cursor() as cur:
+                                cur.execute("""
+                                    SELECT AVG(p.current_price) AS avg_price
+                                    FROM products p
+                                    JOIN categories c ON c.id = p.category_id
+                                    WHERE p.is_active = TRUE AND c.name = %s
+                                      AND p.currency = %s AND p.current_price IS NOT NULL
+                                """, ("accesorios", product.get("currency") or "COP"))
+                                average = cur.fetchone()["avg_price"]
+                            product["_score"] = score_product(conn, product_id, float(average or 0))
+                            if _publish_external_product(conn, product_id, product, "Mercado Libre"):
+                                auto_published.append({"id": product_id, "title": product["title"], "discount_pct": round((float(product.get("previous_price") or 0) - float(product.get("price") or 0)) / float(product.get("previous_price") or 1) * 100, 2)})
+                            conn.commit()
+                            existing.add(key)
+                            meli_seen_titles.add(title_key)
+                            if product_url:
+                                meli_seen_urls.add(product_url)
+                            meli_imported.append({
+                                "id": product_id,
+                                "item_id": external_id,
+                                "title": product["title"],
+                            })
+                        except Exception as exc:
+                            conn.rollback()
+                            errors.append(f"Mercado Libre {external_id}: {exc}")
                 except Exception as exc:
                     conn.rollback()
                     errors.append(f"Mercado Libre '{query}': {exc}")
+                    if isinstance(exc, MercadoLibreAccessDenied):
+                        print({"event": "mercadolibre_access_blocked", "query": query, "error": str(exc)}, flush=True)
+                        break
 
         except Exception as exc:
             conn.rollback()
             errors.append(f"Mercado Libre: {exc}")
 
-        if not amazon_imported and not meli_imported:
+        # Las ofertas caducan a las 48 horas aunque el proveedor no entregue reemplazos.
+        # No se prolonga la vida de un producto vencido para ocultar un fallo de ingesta.
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE products
+                SET is_active = FALSE, updated_at = NOW()
+                WHERE is_active = TRUE
+                  AND catalog_expires_at IS NOT NULL
+                  AND catalog_expires_at <= NOW()
+            """)
+            expired_count = cur.rowcount
+            cur.execute("""
+                UPDATE published_cards pc
+                SET is_published = FALSE, updated_at = NOW()
+                FROM products p
+                WHERE pc.product_id = p.id
+                  AND pc.is_published = TRUE
+                  AND p.is_active = FALSE
+                  AND p.catalog_expires_at IS NOT NULL
+                  AND p.catalog_expires_at <= NOW()
+            """)
+        conn.commit()
+        if expired_count:
+            print({"event": "catalog_expired_after_48h", "count": expired_count}, flush=True)
+
+
+        if not amazon_imported and not meli_imported and not meli_refreshed:
             raise HTTPException(status_code=502, detail={
-                "message": "No se pudo importar ningún producto real.",
+                "message": "No se importaron productos nuevos ni se renovaron productos existentes.",
                 "errors": errors[:10],
+                "published": len(auto_published),
+                "expired_deactivated": expired_count,
             })
+        amazon_ids = {p["id"] for p in amazon_imported}
+        meli_ids = {p["id"] for p in meli_imported + meli_refreshed}
         return {
-            "amazon": {"imported": len(amazon_imported), "published": 0, "products": amazon_imported},
-            "mercadolibre": {"imported": len(meli_imported), "published": 0, "products": meli_imported},
-            "total_published": 0,
+            "amazon": {"imported": len(amazon_imported), "published": sum(1 for item in auto_published if item["id"] in amazon_ids), "products": amazon_imported},
+            "mercadolibre": {
+                "imported": len(meli_imported),
+                "refreshed": len(meli_refreshed),
+                "published": sum(1 for item in auto_published if item["id"] in meli_ids),
+                "products": meli_imported,
+                "refreshed_products": meli_refreshed,
+            },
+            "total_published": len(auto_published),
+            "published_products": auto_published,
+            "expired_deactivated": expired_count,
+            "discount_threshold_pct": float(os.getenv("CATALOG_MIN_DISCOUNT_PCT", "50")),
             "errors": errors[:10],
         }
     finally:
@@ -313,6 +484,38 @@ def pipeline_summary(_: dict = Depends(require_admin)):
         conn.close()
 
 
+@core_router.get("/products/{product_id}")
+def get_product(product_id: int):
+    """Ficha pública completa de un producto real, enlazada a su fuente original."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT p.id, p.title, pl.name AS platform, c.name AS category,
+                       p.current_price, p.previous_price, p.currency, p.image_url,
+                       p.image_gallery, p.product_url, p.affiliate_url, p.stock,
+                       p.sku, p.external_id, p.description, p.rating, p.reviews_count,
+                       p.sales_estimate, p.source_metadata, p.updated_at,
+                       p.catalog_expires_at, p.model_url, p.model_shape,
+                       s.name AS seller_name, s.reputation AS seller_reputation
+                FROM products p
+                JOIN platforms pl ON pl.id = p.platform_id
+                LEFT JOIN categories c ON c.id = p.category_id
+                LEFT JOIN sellers s ON s.id = p.seller_id
+                WHERE p.id = %s AND p.is_active = TRUE AND p.is_blocked = FALSE AND p.current_price > 0 AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW())
+                """,
+                (product_id,),
+            )
+            product = cur.fetchone()
+            if not product:
+                raise HTTPException(status_code=404, detail="Producto no encontrado")
+            product["checkout_mode"] = "CENTRAL" if str(product["platform"]).lower() == "personal" else "EXTERNAL"
+            return {"product": product}
+    finally:
+        conn.close()
+
+
 @core_router.get("/products")
 def list_products(
     category: Optional[str] = Query(None),
@@ -332,7 +535,9 @@ def list_products(
                 JOIN platforms pl ON pl.id = p.platform_id
                 LEFT JOIN categories c ON c.id = p.category_id
                 LEFT JOIN product_scores s ON s.product_id = p.id
-                WHERE p.is_active = TRUE
+                WHERE p.is_active = TRUE AND p.is_blocked = FALSE
+                  AND p.current_price > 0
+                  AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW())
             """
             params = []
             if category:
@@ -430,15 +635,50 @@ def public_product(product_id: int):
     conn=get_connection()
     try:
         with conn.cursor() as cur:
-            cur.execute("""SELECT pc.id AS publication_id,pc.product_id,pc.title,pc.subtitle,pc.price_display,
-                pc.sale_price,pc.opportunity_score,pc.footer,p.description,p.current_price,p.previous_price,p.currency,
-                COALESCE(NULLIF(pc.image_url, ''), NULLIF(p.image_url, '')) AS image_url,p.image_gallery,
+            cur.execute("""SELECT
+                p.id AS id,
+                pc.id AS publication_id,
+                pc.product_id,
+                COALESCE(NULLIF(pc.title, ''), p.title) AS title,
+                pc.subtitle,
+                pc.price_display,
+                pc.sale_price,
+                pc.opportunity_score,
+                pc.footer,
+                p.description,
+                p.current_price,
+                p.previous_price,
+                p.currency,
+                CASE
+                    WHEN COALESCE(p.source_metadata->>'mongo_image_id', '') <> ''
+                    THEN 'mongo://' || (p.source_metadata->>'mongo_image_id')
+                    ELSE COALESCE(NULLIF(pc.image_url, ''), NULLIF(p.image_url, ''))
+                END AS image_url,
+                p.image_gallery,
                 COALESCE(NULLIF(pc.product_url, ''), NULLIF(p.product_url, '')) AS product_url,
-                p.affiliate_url,p.sku,p.external_id,p.stock,
-                pl.name AS platform,c.name AS category,p.rating,p.reviews_count,p.updated_at
-                FROM published_cards pc JOIN products p ON p.id=pc.product_id JOIN platforms pl ON pl.id=p.platform_id
+                p.affiliate_url,
+                p.sku,
+                p.external_id,
+                p.stock,
+                p.sales_estimate,
+                p.source_metadata,
+                p.model_url,
+                p.model_shape,
+                p.catalog_expires_at,
+                p.is_active AS source_active,
+                s.name AS seller_name,
+                s.reputation AS seller_reputation,
+                pl.name AS platform,
+                c.name AS category,
+                p.rating,
+                p.reviews_count,
+                p.updated_at
+                FROM published_cards pc
+                JOIN products p ON p.id=pc.product_id
+                JOIN platforms pl ON pl.id=p.platform_id
                 LEFT JOIN categories c ON c.id=p.category_id
-                WHERE pc.product_id=%s AND pc.is_published=TRUE AND p.is_active=TRUE""",(product_id,))
+                LEFT JOIN sellers s ON s.id=p.seller_id
+                WHERE pc.product_id=%s AND pc.is_published=TRUE AND p.is_active=TRUE AND p.is_blocked=FALSE AND COALESCE(pc.sale_price,p.current_price)>0 AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW())""",(product_id,))
             row=cur.fetchone()
     finally: conn.close()
     if not row: raise HTTPException(404,"Producto publicado no encontrado")
@@ -483,7 +723,6 @@ def affiliate_click(payload: dict):
                     p.id,
                     p.product_url,
                     p.affiliate_url,
-                    p.checkout_mode,
                     pl.name AS platform
                 FROM products p
                 JOIN platforms pl
@@ -506,14 +745,7 @@ def affiliate_click(payload: dict):
                 row["platform"] or ""
             ).strip().lower()
 
-            checkout_mode = str(
-                row["checkout_mode"] or ""
-            ).strip().upper()
-
-            is_own = (
-                checkout_mode == "CENTRAL"
-                or platform == "personal"
-            )
+            is_own = platform == "personal"
 
             if is_own:
                 raise HTTPException(
@@ -650,6 +882,86 @@ def public_sitemap():
     xml='<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'+''.join("<url><loc>"+u+"</loc></url>" for u in urls)+"</urlset>"
     return Response(xml,media_type="application/xml")
 
+@core_router.get("/mercadolibre/search")
+def search_mercadolibre_products(
+    q: str = Query(..., min_length=2, max_length=120),
+    limit: int = Query(8, ge=1, le=20),
+):
+    """Busca productos reales de Mercado Libre para precargar una tarjeta sin copiar URLs."""
+    try:
+        found = fetch_mercadolibre(q.strip(), limit=limit)
+    except Exception as exc:
+        print(f"[Mercado Libre] búsqueda de tarjetas falló: {type(exc).__name__}: {exc}")
+        raise HTTPException(
+            status_code=502,
+            detail="Mercado Libre no respondió. Revisa la conexión OAuth y vuelve a intentar.",
+        )
+    results = []
+    for product in found[:limit]:
+        title = str(product.get("title") or "").strip()
+        image_url = str(product.get("image_url") or "").strip()
+        product_url = str(product.get("product_url") or "").strip()
+        try:
+            price = float(product.get("price") or 0)
+        except (TypeError, ValueError):
+            price = 0
+        if not title or price <= 0 or not product_url:
+            continue
+        results.append({
+            "id": str(product.get("external_id") or ""),
+            "title": title[:200],
+            "image_url": image_url,
+            "product_url": product_url,
+            "price": price,
+            "currency": str(product.get("currency") or "COP").upper(),
+        })
+    return {"query": q.strip(), "count": len(results), "items": results}
+
+
+class MercadoLibreCardImport(BaseModel):
+    external_id: str = Field(min_length=2, max_length=200)
+    title: str = Field(min_length=2, max_length=500)
+    image_url: str = Field(min_length=8, max_length=2_000_000)
+    product_url: str = Field(min_length=10, max_length=2000)
+    price: float = Field(gt=0)
+    currency: str = Field(default="COP", min_length=3, max_length=10)
+    category: str = Field(default="otros", min_length=2, max_length=100)
+
+
+@core_router.post("/products/mercadolibre")
+def import_mercadolibre_card(payload: MercadoLibreCardImport, _: dict = Depends(require_admin)):
+    """Guarda el producto seleccionado como fuente externa, nunca como producto propio/Wompi."""
+    from urllib.parse import urlparse
+    parsed = urlparse(payload.product_url)
+    host = (parsed.hostname or "").lower()
+    if parsed.scheme != "https" or not (host == "mercadolibre.com" or host.endswith(".mercadolibre.com") or host == "mercadolibre.com.co" or host.endswith(".mercadolibre.com.co")):
+        raise HTTPException(status_code=422, detail="El enlace debe pertenecer a Mercado Libre y usar HTTPS")
+    product = {
+        "external_id": payload.external_id.strip(), "title": payload.title.strip(),
+        "image_url": payload.image_url.strip(), "product_url": payload.product_url.strip(),
+        "price": payload.price, "currency": payload.currency.upper(), "rating": None,
+        "reviews_count": 0, "source_metadata": {"origin": "tarjetas-search", "source": "mercadolibre"},
+    }
+    conn = get_connection()
+    try:
+        product_id = upsert_product(conn, "mercadolibre", payload.category.lower().strip(), product)
+        with conn.cursor() as cur:
+            cur.execute("""SELECT p.id,p.title,pl.name AS platform,c.name AS category,p.current_price,
+                p.currency,p.image_url,p.image_gallery,p.product_url,p.affiliate_url,p.updated_at
+                FROM products p JOIN platforms pl ON pl.id=p.platform_id
+                LEFT JOIN categories c ON c.id=p.category_id WHERE p.id=%s""", (product_id,))
+            saved = cur.fetchone()
+        return {"product": saved}
+    except ValueError as exc:
+        conn.rollback()
+        raise HTTPException(status_code=422, detail=str(exc))
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
 class ProductImport(BaseModel):
     url: str = Field(min_length=10, max_length=2000)
     category: str = Field(default="accesorios", min_length=2, max_length=100)
@@ -701,7 +1013,7 @@ def import_product_from_url(payload: ProductImport, _: dict = Depends(require_ad
             cur.execute(
                 """
                 SELECT p.id, p.title, pl.name AS platform, c.name AS category,
-                       p.current_price, p.currency, p.image_url, p.product_url,
+                       p.current_price, p.currency, p.image_url, p.product_url, p.affiliate_url,
                        p.updated_at, p.catalog_expires_at, p.model_url, p.model_shape
                 FROM products p
                 JOIN platforms pl ON pl.id = p.platform_id
@@ -714,6 +1026,46 @@ def import_product_from_url(payload: ProductImport, _: dict = Depends(require_ad
         return {"product": saved, "opportunity_score": score}
     finally:
         conn.close()
+
+
+def _persist_product_image_reference(value: str | None, *, platform: str, external_id: str, index: int = 0):
+    """Guarda imágenes subidas como mongo:// y mantiene URL pública si el proveedor remoto falla."""
+    value = str(value or "").strip()
+    if not value:
+        return None, None
+    if value.startswith("mongo://"):
+        return value, value[8:]
+
+    is_data_uri = value.startswith("data:")
+    if not is_data_uri:
+        try:
+            _public_url(value)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    try:
+        mongo_id = store_product_image(
+            value,
+            platform=platform,
+            external_id=external_id,
+            image_index=index,
+        )
+        if mongo_id:
+            return "mongo://" + mongo_id, mongo_id
+    except Exception as exc:
+        if is_data_uri:
+            raise HTTPException(
+                status_code=422,
+                detail="No se pudo guardar la imagen subida. Comprueba que MongoDB esté conectado y vuelve a intentar.",
+            ) from exc
+        print(f"[media] imagen externa no cacheada ({platform}): {type(exc).__name__}")
+
+    if is_data_uri:
+        raise HTTPException(
+            status_code=503,
+            detail="El almacenamiento de imágenes no está disponible; la tarjeta no se guardó para evitar perder la imagen.",
+        )
+    return value, None
 
 
 class PersonalProduct(BaseModel):
@@ -746,26 +1098,39 @@ def create_personal_product(payload: PersonalProduct, _: dict = Depends(require_
                 cur.execute("INSERT INTO categories(name) VALUES(%s) RETURNING id", (category_name,))
                 category = cur.fetchone()
             sku = (payload.sku or "").strip() or f"PERSONAL-{int(time.time()*1000)}"
+            primary_image, primary_mongo_id = _persist_product_image_reference(
+                payload.image_url, platform="personal", external_id=sku, index=0
+            )
+            saved_gallery = []
+            for image_index, image_value in enumerate(payload.image_gallery or [], start=1):
+                stored_ref, _ = _persist_product_image_reference(
+                    image_value, platform="personal", external_id=sku, index=image_index
+                )
+                if stored_ref:
+                    saved_gallery.append(stored_ref)
+            source_metadata = {"mongo_image_id": primary_mongo_id} if primary_mongo_id else {}
             cur.execute("""
                 INSERT INTO products (
                     platform_id,category_id,external_id,sku,title,description,image_url,image_gallery,
-                    product_url,current_price,previous_price,currency,stock,is_active,
+                    product_url,current_price,previous_price,currency,stock,source_metadata,is_active,
                     catalog_expires_at,updated_at
-                ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,TRUE,NULL,NOW())
+                ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,TRUE,NULL,NOW())
                 ON CONFLICT(platform_id,external_id) DO UPDATE SET
                     category_id=EXCLUDED.category_id,sku=EXCLUDED.sku,title=EXCLUDED.title,
                     description=EXCLUDED.description,image_url=EXCLUDED.image_url,
-                    product_url=EXCLUDED.product_url,current_price=EXCLUDED.current_price,
-                    previous_price=EXCLUDED.previous_price,currency=EXCLUDED.currency,
-                    stock=EXCLUDED.stock,is_active=TRUE,catalog_expires_at=NULL,updated_at=NOW()
+                    image_gallery=EXCLUDED.image_gallery,product_url=EXCLUDED.product_url,
+                    current_price=EXCLUDED.current_price,previous_price=EXCLUDED.previous_price,
+                    currency=EXCLUDED.currency,stock=EXCLUDED.stock,source_metadata=EXCLUDED.source_metadata,
+                    is_active=TRUE,catalog_expires_at=NULL,updated_at=NOW()
                 RETURNING id
             """,(platform["id"],category["id"],sku,sku,payload.title.strip(),payload.description,
-                 payload.image_url,Json(payload.image_gallery or []),payload.product_url,payload.price,payload.previous_price,
-                 payload.currency.upper(),payload.stock))
+                 primary_image,Json(saved_gallery or ([primary_image] if primary_image else [])),payload.product_url,
+                 payload.price,payload.previous_price,payload.currency.upper(),payload.stock,Json(source_metadata)))
             product_id=cur.fetchone()["id"]
             cur.execute("INSERT INTO price_history(product_id,price) VALUES(%s,%s)",(product_id,payload.price))
             cur.execute("""SELECT p.id,p.title,pl.name AS platform,c.name AS category,p.current_price,
-                p.previous_price,p.currency,p.image_url,p.image_gallery,p.product_url,p.stock,p.sku,p.description,p.updated_at
+                p.previous_price,p.currency,p.image_url,p.image_gallery,p.product_url,p.affiliate_url,p.stock,p.sku,
+                p.description,p.source_metadata,p.updated_at
                 FROM products p JOIN platforms pl ON pl.id=p.platform_id LEFT JOIN categories c ON c.id=p.category_id
                 WHERE p.id=%s""",(product_id,))
             saved=cur.fetchone()
@@ -791,14 +1156,40 @@ def update_product_images(product_id: int, payload: ProductImages, _: dict = Dep
     conn=get_connection()
     try:
         with conn.cursor() as cur:
-            cur.execute("""UPDATE products SET image_gallery=%s,image_url=%s,updated_at=NOW()
-                           WHERE id=%s RETURNING id,image_url,image_gallery,updated_at""",(Json(clean),clean[0] if clean else None,product_id))
+            cur.execute("SELECT pl.name AS platform,p.external_id FROM products p JOIN platforms pl ON pl.id=p.platform_id WHERE p.id=%s",(product_id,))
+            current=cur.fetchone()
+            if not current:
+                raise HTTPException(status_code=404,detail="Producto no encontrado")
+            saved=[]
+            first_mongo_id=None
+            for index,image in enumerate(clean):
+                stored_ref,mongo_id=_persist_product_image_reference(
+                    image,platform=str(current["platform"]),external_id=str(current["external_id"]),index=index
+                )
+                if stored_ref:
+                    saved.append(stored_ref)
+                    if index==0:
+                        first_mongo_id=mongo_id
+            metadata={"mongo_image_id":first_mongo_id} if first_mongo_id else {}
+            cur.execute("""UPDATE products SET image_gallery=%s,image_url=%s,
+                           source_metadata=(COALESCE(source_metadata,'{}'::jsonb)-'mongo_image_id') || %s,
+                           updated_at=NOW()
+                           WHERE id=%s RETURNING id,image_url,image_gallery,source_metadata,updated_at""",
+                        (Json(saved),saved[0] if saved else None,Json(metadata),product_id))
             result=cur.fetchone()
-            if not result: raise HTTPException(status_code=404,detail="Producto no encontrado")
-        conn.commit(); return result
+            cur.execute("UPDATE published_cards SET image_url=%s,updated_at=NOW() WHERE product_id=%s",
+                        (saved[0] if saved else None,product_id))
+        conn.commit()
+        return result
     except HTTPException:
-        conn.rollback(); raise
-    finally: conn.close()
+        conn.rollback()
+        raise
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
 
 
 class ModelUpdate(BaseModel):
@@ -849,11 +1240,78 @@ def active_catalog(_: dict = Depends(require_admin)):
                 JOIN platforms pl ON pl.id = p.platform_id
                 LEFT JOIN categories c ON c.id = p.category_id
                 LEFT JOIN published_cards pc ON pc.product_id = p.id
-                WHERE p.is_active = TRUE AND p.is_blocked = FALSE
+                WHERE p.is_active = TRUE AND p.is_blocked = FALSE AND p.current_price > 0 AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW())
                 ORDER BY p.updated_at DESC
-                LIMIT 200
-            """)
+                LIMIT 200            """)
             return cur.fetchall()
+    finally:
+        conn.close()
+
+
+class ProductUpdate(BaseModel):
+    title: str = Field(min_length=2, max_length=500)
+    description: Optional[str] = Field(default=None, max_length=5000)
+    price: float = Field(gt=0)
+    previous_price: Optional[float] = Field(default=None, gt=0)
+    currency: str = Field(default="COP", min_length=3, max_length=10)
+    category: str = Field(default="otros", min_length=2, max_length=100)
+    image_url: str = Field(min_length=8, max_length=2_000_000)
+    image_gallery: list[str] = Field(default_factory=list, max_length=5)
+    product_url: Optional[str] = Field(default=None, max_length=2000)
+
+
+@core_router.patch("/products/{product_id}")
+def update_personal_product(product_id: int, payload: ProductUpdate, _: dict = Depends(require_admin)):
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id FROM platforms WHERE name='personal'")
+            platform = cur.fetchone()
+            if not platform:
+                raise HTTPException(status_code=500, detail="Fuente personal no configurada")
+            category_name = payload.category.lower().strip()
+            cur.execute("SELECT id FROM categories WHERE name=%s", (category_name,))
+            category = cur.fetchone()
+            if not category:
+                cur.execute("INSERT INTO categories(name) VALUES(%s) RETURNING id", (category_name,))
+                category = cur.fetchone()
+            primary_image, primary_mongo_id = _persist_product_image_reference(
+                payload.image_url, platform="personal", external_id=str(product_id), index=0
+            )
+            saved_gallery = []
+            for image_index, image_value in enumerate(payload.image_gallery or [], start=1):
+                stored_ref, _ = _persist_product_image_reference(
+                    image_value, platform="personal", external_id=str(product_id), index=image_index
+                )
+                if stored_ref:
+                    saved_gallery.append(stored_ref)
+            image_metadata = {"mongo_image_id": primary_mongo_id} if primary_mongo_id else {}
+            cur.execute("""UPDATE products SET category_id=%s,title=%s,description=%s,current_price=%s,
+                previous_price=%s,currency=%s,image_url=%s,image_gallery=%s,product_url=%s,
+                source_metadata=(COALESCE(source_metadata,'{}'::jsonb)-'mongo_image_id') || %s,updated_at=NOW()
+                WHERE id=%s AND platform_id=%s AND is_active=TRUE
+                RETURNING id,title,description,current_price AS price,previous_price,currency,image_url,image_gallery,product_url""",
+                (category["id"],payload.title.strip(),payload.description,payload.price,payload.previous_price,
+                 payload.currency.upper(),primary_image,Json(saved_gallery or ([primary_image] if primary_image else [])),
+                 payload.product_url,Json(image_metadata),product_id,platform["id"]))
+            saved = cur.fetchone()
+            if not saved:
+                raise HTTPException(status_code=404, detail="Producto propio no encontrado")
+            cur.execute("""UPDATE published_cards
+                SET title=%s,subtitle=%s,price_display=%s,image_url=%s,product_url=%s,
+                    sale_price=%s,updated_at=NOW()
+                WHERE product_id=%s""",
+                (payload.title.strip(),payload.description,
+                 f"{payload.price:,.0f} {payload.currency.upper()}",primary_image,
+                 payload.product_url,payload.price,product_id))
+        conn.commit()
+        return {"product": saved}
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         conn.close()
 
@@ -913,41 +1371,6 @@ def remove_product(product_id: int, _: dict = Depends(require_admin)):
         conn.close()
 
 
-@core_router.get("/products/{product_id}")
-def get_product(product_id: int):
-    conn = get_connection()
-    try:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT p.*, pl.name AS platform, c.name AS category,
-                       s.opportunity_score
-                FROM products p
-                JOIN platforms pl ON pl.id = p.platform_id
-                LEFT JOIN categories c ON c.id = p.category_id
-                LEFT JOIN product_scores s ON s.product_id = p.id
-                WHERE p.id = %s
-                """,
-                (product_id,),
-            )
-            product = cur.fetchone()
-            if not product:
-                raise HTTPException(status_code=404, detail="Producto no encontrado")
-            cur.execute(
-                """
-                SELECT price, recorded_at
-                FROM price_history
-                WHERE product_id = %s
-                ORDER BY recorded_at ASC
-                """,
-                (product_id,),
-            )
-            history = cur.fetchall()
-        return {"product": product, "price_history": history}
-    finally:
-        conn.close()
-
-
 @core_router.get("/comparison")
 def price_comparison(limit: int = Query(100, ge=1, le=500), _: dict = Depends(require_admin)):
     conn = get_connection()
@@ -964,14 +1387,16 @@ def top_opportunities(limit: int = Query(20, ge=1, le=100), _: dict = Depends(re
     conn = get_connection()
     try:
         with conn.cursor() as cur:
-            cur.execute(
-                """
+            cur.execute("""
                 SELECT p.id, p.title, pl.name AS platform, c.name AS category,
                        p.current_price, p.currency, p.rating, p.reviews_count,
                        p.sales_estimate, s.price_score, s.demand_score,
                        s.trend_score, s.opportunity_score, p.product_url,
-                       p.image_url, p.updated_at, p.catalog_expires_at,
-                       p.model_url, p.model_shape, p.source_metadata
+                       CASE WHEN COALESCE(p.source_metadata->>'mongo_image_id','') <> ''
+                            THEN 'mongo://' || (p.source_metadata->>'mongo_image_id')
+                            ELSE p.image_url END AS image_url,
+                       p.updated_at, p.catalog_expires_at, p.model_url, p.model_shape,
+                       p.source_metadata
                 FROM product_scores s
                 JOIN products p ON p.id = s.product_id
                 JOIN platforms pl ON pl.id = p.platform_id
@@ -979,13 +1404,10 @@ def top_opportunities(limit: int = Query(20, ge=1, le=100), _: dict = Depends(re
                 WHERE p.is_active = TRUE
                 ORDER BY s.opportunity_score DESC
                 LIMIT %s
-                """,
-                (limit,),
-            )
+            """, (limit,))
             return cur.fetchall()
     finally:
         conn.close()
 
 
 app.include_router(core_router, prefix="/api/v1")
-
