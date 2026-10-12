@@ -4,6 +4,28 @@ from unittest.mock import patch
 from catalog_rules import discount_percentage
 from amazon_api import _previous_offer
 from ingest import fetch_mercadolibre
+from store_orders import _public_order_summary, create_store_order
+
+
+class StoreOrderSecurityTests(unittest.TestCase):
+    def test_public_order_summary_does_not_expose_cost_or_profit(self):
+        order = {
+            "id": 1, "reference": "REQ-TEST", "total_amount": 50000,
+            "estimated_profit": 20000, "cost_unit_price": 30000,
+            "currency": "COP", "status": "PENDING", "payment_status": "PENDING",
+        }
+        result = _public_order_summary(order)
+        self.assertEqual(set(result), {"id", "reference", "total_amount", "currency", "status", "payment_status"})
+        self.assertNotIn("estimated_profit", result)
+        self.assertNotIn("cost_unit_price", result)
+
+    def test_store_orders_only_accept_visible_unblocked_unexpired_products(self):
+        import inspect
+        source = inspect.getsource(create_store_order)
+        self.assertIn("JOIN published_cards pc", source)
+        self.assertNotIn("LEFT JOIN published_cards pc", source)
+        self.assertIn("p.is_blocked=FALSE", source)
+        self.assertIn("p.catalog_expires_at > NOW()", source)
 
 
 class DiscountRuleTests(unittest.TestCase):
