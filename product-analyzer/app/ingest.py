@@ -261,12 +261,18 @@ def _catalog_search(query, limit=20):
         if not price:
             continue
         pictures = detail.get("pictures") or []
-        image = (pictures[0].get("url") if pictures else "") or ""
+        gallery_urls = list(dict.fromkeys(
+            str(pic.get("url") or pic.get("secure_url") or "").strip()
+            for pic in pictures
+            if isinstance(pic, dict) and (pic.get("url") or pic.get("secure_url"))
+        ))
+        image = gallery_urls[0] if gallery_urls else ""
         item_id = winner.get("item_id") or product_id
         products.append({
             "external_id": item_id,
             "title": detail.get("name") or result.get("name") or query,
             "image_url": image,
+            "gallery_urls": gallery_urls,
             "product_url": winner.get("permalink") or detail.get("permalink") or "",
             "price": float(price),
             "currency": winner.get("currency_id") or "COP",
@@ -312,12 +318,10 @@ def fetch_mercadolibre(query, limit=20):
 
         # La búsqueda ya entrega precio, miniatura, permalink y precio original.
         # Consultar tres endpoints por cada artículo multiplicaba el tráfico sin necesidad.
-        needs_detail = not public_web and (
-            not item.get("permalink")
-            or not item.get("thumbnail")
-            or not item.get("price")
-            or not item.get("title")
-        )
+        # El resultado de búsqueda suele traer solo la miniatura. Para conservar
+        # la cápsula completa consultamos el detalle de la publicación y sus pictures.
+        # La búsqueda pública alternativa no dispone de una galería estructurada.
+        needs_detail = not public_web and bool(item_id)
         detail = _details(item_id) if needs_detail and item_id else {}
         prices = []
         sale = {}
@@ -381,14 +385,24 @@ def fetch_mercadolibre(query, limit=20):
             "tags": detail.get("tags") or [],
         }
 
+        item_pictures = detail.get("pictures") or item.get("pictures") or []
+        gallery_urls = list(dict.fromkeys(
+            str(pic.get("secure_url") or pic.get("url") or "").strip().replace("-I.", "-O.")
+            for pic in item_pictures
+            if isinstance(pic, dict) and (pic.get("secure_url") or pic.get("url"))
+        ))
+        primary_image = (
+            detail.get("secure_thumbnail") or detail.get("thumbnail")
+            or item.get("secure_thumbnail") or item.get("thumbnail") or ""
+        ).replace("-I.", "-O.")
+        if primary_image and primary_image not in gallery_urls:
+            gallery_urls.insert(0, primary_image)
+
         products.append({
             "external_id": item_id,
             "title": title,
-            "image_url": (
-                detail.get("thumbnail")
-                or item.get("thumbnail")
-                or ""
-            ).replace("-I.", "-O."),
+            "image_url": primary_image,
+            "gallery_urls": gallery_urls,
             "product_url": detail.get("permalink") or item.get("permalink"),
             "price": float(price),
             "previous_price": previous_price,
