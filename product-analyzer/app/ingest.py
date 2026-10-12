@@ -125,6 +125,8 @@ def _get(url, params=None, include_auth=True, retry_auth=True):
 def _details(item_id):
     try:
         return _get(MELI_ITEM.format(id=item_id))
+    except MercadoLibreAccessDenied:
+        raise
     except (requests.RequestException, RuntimeError) as exc:
         print(f"[Mercado Libre] detalle {item_id}: {exc}")
         return {}
@@ -134,6 +136,8 @@ def _description(item_id):
     try:
         data = _get(f"https://api.mercadolibre.com/items/{item_id}/description")
         return str(data.get("plain_text") or data.get("text") or "").strip()[:5000] or None
+    except MercadoLibreAccessDenied:
+        raise
     except (requests.RequestException, RuntimeError) as exc:
         print(f"[Mercado Libre] descripción {item_id}: {exc}")
         return None
@@ -144,6 +148,8 @@ def _seller_details(seller_id):
         return {}
     try:
         return _get(f"https://api.mercadolibre.com/users/{seller_id}")
+    except MercadoLibreAccessDenied:
+        raise
     except (requests.RequestException, RuntimeError) as exc:
         print(f"[Mercado Libre] vendedor {seller_id}: {exc}")
         return {}
@@ -152,6 +158,8 @@ def _seller_details(seller_id):
 def _prices(item_id):
     try:
         return _get(MELI_PRICES.format(id=item_id)).get("prices") or []
+    except MercadoLibreAccessDenied:
+        raise
     except (requests.RequestException, RuntimeError) as exc:
         print(f"[Mercado Libre] prices {item_id}: {exc}")
         return []
@@ -163,6 +171,8 @@ def _sale_price(item_id):
             MELI_SALE_PRICE.format(id=item_id),
             {"context": "channel_marketplace"},
         )
+    except MercadoLibreAccessDenied:
+        raise
     except (requests.RequestException, RuntimeError) as exc:
         print(f"[Mercado Libre] sale_price {item_id}: {exc}")
         return {}
@@ -273,6 +283,8 @@ def _catalog_search(query, limit=20):
             continue
         try:
             detail = _get(MELI_PRODUCT.format(id=product_id), include_auth=True)
+        except MercadoLibreAccessDenied:
+            raise
         except (RuntimeError, requests.RequestException):
             continue
         winner = detail.get("buy_box_winner") or {}
