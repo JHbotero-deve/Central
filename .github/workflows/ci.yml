@@ -82,3 +82,11 @@ jobs:
           file: ./product-analyzer/app/Dockerfile
           push: false
           tags: central-api:ci
+
+      - name: Build worker image
+        uses: docker/build-push-action@v7
+        with:
+          context: ./product-analyzer
+          file: ./product-analyzer/Dockerfile
+          push: false
+          tags: central-worker:ci
