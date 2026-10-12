@@ -15,7 +15,7 @@ from url_import import detect_platform, import_url
 
 POLL_INTERVAL = int(os.getenv("TELEGRAM_POLL_INTERVAL", "3"))
 API_BASE = "https://api.telegram.org"
-CENTRAL_API_BASE = (os.getenv("CENTRAL_API_BASE") or "https://gracious-renewal-production-aadd.up.railway.app").rstrip("/")
+CENTRAL_API_BASE = (os.getenv("CENTRAL_API_BASE") or "https://gracious-renewal-production-76df.up.railway.app").rstrip("/")
 ALLOWED_PLATFORMS = {"mercadolibre", "amazon", "tiktok", "aliexpress", "personal"}
 ALLOWED_CATEGORIES = {"ropa", "calzado", "accesorios", "electronica", "hogar", "fitness", "otros"}
 
@@ -694,6 +694,26 @@ def _acquire_polling_lock():
         raise
 
 
+def _validate_bot_token(token):
+    try:
+        response = requests.get(f"{API_BASE}/bot{token}/getMe", timeout=10)
+        payload = response.json()
+        if response.status_code == 401 or not payload.get("ok"):
+            rejected = response.status_code == 401
+            if rejected:
+                print("[telegram-bot] TELEGRAM_BOT_TOKEN rechazado por Telegram (HTTP 401); actualiza la variable en Railway.")
+            else:
+                print("[telegram-bot] Telegram no validó el token configurado.")
+            return False, rejected
+        response.raise_for_status()
+        username = (payload.get("result") or {}).get("username") or "bot"
+        print(f"[telegram-bot] token validado para @{username}.")
+        return True, False
+    except (requests.RequestException, ValueError) as exc:
+        print(f"[telegram-bot] validación de token no disponible: {type(exc).__name__}")
+        return False, False
+
+
 def run_bot():
     token = _token()
     if not token:
@@ -702,6 +722,12 @@ def run_bot():
     if not (os.getenv("TELEGRAM_CHAT_ID") or os.getenv("CHAT_ID")):
         print("[telegram-bot] Bot deshabilitado: falta TELEGRAM_CHAT_ID.")
         return
+
+    while True:
+        valid, rejected = _validate_bot_token(token)
+        if valid:
+            break
+        time.sleep(300 if rejected else max(POLL_INTERVAL, 30))
 
     lock_conn = None
     while lock_conn is None:
@@ -751,6 +777,10 @@ def run_bot():
                 if status == 409:
                     print("[telegram-bot] Telegram devolvió 409: hay otro consumidor de getUpdates. Se detiene esta instancia.")
                     return
+                if status == 401:
+                    print("[telegram-bot] Telegram rechazó TELEGRAM_BOT_TOKEN (HTTP 401); se revalidará en cinco minutos.")
+                    time.sleep(300)
+                    continue
                 print(f"[telegram-bot] polling HTTP error: {status}")
                 time.sleep(max(POLL_INTERVAL, 5))
             except (requests.RequestException, ValueError, RuntimeError) as exc:
@@ -761,29 +791,3 @@ def run_bot():
             lock_conn.close()
         except Exception:
             pass
-
-
-async def handle_telegram_product_search(update, context):
-    query = update.message.text.replace("/buscar", "").strip()
-    if not query:
-        return await update.message.reply_text("Por favor ingresa un término de búsqueda válido, ej: /buscar iPhone")
-    
-    results = fetch_mercadolibre(query, limit=5)
-    if not results:
-        return await update.message.reply_text("No se encontraron productos activos para este término.")
-    
-    saved_count = len(results)
-    await update.message.reply_text(f"¡Éxito! Se han procesado e ingresado {saved_count} productos a la tienda central.")
-
-async def handle_telegram_product_search(update, context):
-    try:
-        query = update.message.text.replace("/buscar", "").strip()
-        if not query:
-            return await update.message.reply_text("Ingresa un término válido.")
-        results = fetch_mercadolibre(query, limit=5)
-        if not results:
-            return await update.message.reply_text("No se encontraron productos.")
-        saved_count = len(results)
-        await update.message.reply_text(f"¡Éxito! Se ingresaron {saved_count} productos.")
-    except Exception:
-        await update.message.reply_text("Ocurrió un error interno.")

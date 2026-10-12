@@ -50,7 +50,7 @@ for selector in required_selectors:
 checks = {
     "card contains a full media area": 'class="card-media"' in template,
     "card has a separate bottom footer": 'class="card-footer"' in template,
-    "price is rendered in the footer": 'class="card-price"' in template,
+    "price is rendered in the footer": 'class="card-price"' in card,
     "the first action has matching styles": 'class="card-action card-action-secondary"' in template,
     "the conditional second action is inserted once": template.count("second+") == 1,
     "footer places both actions in one action row": 'class="card-actions"' in template,

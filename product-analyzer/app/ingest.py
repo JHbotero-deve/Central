@@ -2,6 +2,7 @@ from meli_oauth import get_meli_tokens, save_meli_tokens
 import os
 import json
 import re
+import time
 from urllib.parse import quote_plus
 import requests
 
@@ -12,6 +13,12 @@ MELI_SALE_PRICE = "https://api.mercadolibre.com/items/{id}/sale_price"
 MELI_OAUTH = "https://api.mercadolibre.com/oauth/token"
 MELI_PRODUCTS_SEARCH = "https://api.mercadolibre.com/products/search"
 MELI_PRODUCT = "https://api.mercadolibre.com/products/{id}"
+
+
+class MercadoLibreAccessDenied(RuntimeError):
+    """Error no recuperable durante el ciclo actual: Mercado Libre responde 403."""
+
+    fatal = True
 
 
 def _headers(include_auth=True):
@@ -26,12 +33,23 @@ def _headers(include_auth=True):
     return headers
 
 
+_REFRESH_RETRY_AFTER = 0.0
+
+
 def _refresh_access_token():
+    global _REFRESH_RETRY_AFTER
+    now = time.monotonic()
+    if now < _REFRESH_RETRY_AFTER:
+        return None
+
     _, refresh_token = get_meli_tokens()
     client_id = os.getenv("MELI_CLIENT_ID", "").strip()
     client_secret = os.getenv("MELI_CLIENT_SECRET", "").strip()
     if not (refresh_token and client_id and client_secret):
+        _REFRESH_RETRY_AFTER = now + 300
+        print("[Mercado Libre] renovación pausada: faltan el refresh token o las credenciales de cliente.")
         return None
+
     response = requests.post(MELI_OAUTH, data={
         "grant_type": "refresh_token",
         "client_id": client_id,
@@ -39,15 +57,30 @@ def _refresh_access_token():
         "refresh_token": refresh_token,
     }, timeout=20)
     if not response.ok:
-        print(f"[Mercado Libre] renovación de token: HTTP {response.status_code}")
+        try:
+            payload = response.json()
+        except ValueError:
+            payload = {}
+        error_code = str(payload.get("error") or payload.get("code") or "unknown")[:80]
+        _REFRESH_RETRY_AFTER = time.monotonic() + 300
+        print(
+            f"[Mercado Libre] renovación rechazada: HTTP {response.status_code}; "
+            f"código={error_code}; reintento en 300 s."
+        )
         return None
+
     payload = response.json()
     token = str(payload.get("access_token") or "").strip()
     new_refresh = str(payload.get("refresh_token") or "").strip()
     if token and new_refresh:
         save_meli_tokens(token, new_refresh, int(payload.get("expires_in") or 0))
+        _REFRESH_RETRY_AFTER = 0.0
         print("[Mercado Libre] access token renovado.")
-    return token or None
+        return token
+
+    _REFRESH_RETRY_AFTER = time.monotonic() + 300
+    print("[Mercado Libre] renovación sin los tokens esperados; reintento en 300 s.")
+    return None
 
 
 def _get(url, params=None, include_auth=True, retry_auth=True):
@@ -79,7 +112,12 @@ def _get(url, params=None, include_auth=True, retry_auth=True):
         except ValueError:
             reason = response.text[:180].strip()
         suffix = f": {reason}" if reason else ""
-        raise RuntimeError(f"Mercado Libre rechazó la consulta (403){suffix}")
+        resource = url.split("api.mercadolibre.com", 1)[-1].split("?", 1)[0]
+        request_id = response.headers.get("x-request-id") or response.headers.get("x-trace-id")
+        trace = f"; request_id={request_id}" if request_id else ""
+        raise MercadoLibreAccessDenied(
+            f"Mercado Libre bloqueó el recurso {resource} (403){suffix}{trace}"
+        )
     response.raise_for_status()
     return response.json()
 
@@ -204,6 +242,8 @@ def _catalog_search(query, limit=20):
         data = _get(MELI_PRODUCTS_SEARCH, {
             "status": "active", "site_id": "MCO", "q": query, "limit": min(limit, 20)
         }, include_auth=True)
+    except MercadoLibreAccessDenied:
+        raise
     except (RuntimeError, requests.RequestException) as exc:
         print(f"[Mercado Libre] catalog search '{query}' no disponible: {exc}")
         return []
@@ -241,34 +281,41 @@ def _catalog_search(query, limit=20):
 
 
 def fetch_mercadolibre(query, limit=20):
-    # Primero intentamos la API autenticada. La búsqueda pública puede devolver
-    # 403 desde Railway aunque el endpoint siga funcionando con OAuth.
+    # Si la búsqueda de publicaciones devuelve 403, validamos el token una vez.
+    # No repetimos consultas anónimas ni seguimos disparando búsquedas si el
+    # recurso o la aplicación están bloqueados.
     try:
         data = _get(MELI_SEARCH, {"q": query, "limit": min(limit, 50)}, include_auth=True)
         print(f"[Mercado Libre] API autenticada OK '{query}': {len(data.get('results') or [])} resultados")
-    except (RuntimeError, requests.RequestException) as exc:
-        if isinstance(exc, RuntimeError) and "403" not in str(exc):
-            raise
-        print(f"[Mercado Libre] API autenticada bloqueada para '{query}': {exc}")
-        catalog_products = []
+    except MercadoLibreAccessDenied as search_exc:
+        print(f"[Mercado Libre] búsqueda principal bloqueada '{query}': {search_exc}")
         try:
-            data = _get(
-                MELI_SEARCH,
-                {"q": query, "limit": min(limit, 50)},
-                include_auth=False,
-                retry_auth=False,
-            )
-            print(f"[Mercado Libre] API pública OK '{query}': {len(data.get('results') or [])} resultados")
-        except (RuntimeError, requests.RequestException) as public_exc:
-            print(f"[Mercado Libre] API pública no disponible '{query}': {public_exc}")
+            _get("https://api.mercadolibre.com/users/me", include_auth=True)
+        except MercadoLibreAccessDenied as identity_exc:
+            raise MercadoLibreAccessDenied(
+                "Mercado Libre también devuelve 403 en /users/me. La integración no puede consultar la API; "
+                "verifica el estado de la aplicación en DevCenter y sus restricciones. "
+                f"Diagnóstico: {identity_exc}"
+            ) from identity_exc
+        except (RuntimeError, requests.RequestException) as identity_exc:
+            raise RuntimeError(
+                f"No se pudo validar la autorización de Mercado Libre mediante /users/me: {identity_exc}"
+            ) from identity_exc
+
+        try:
             catalog_products = _catalog_search(query, limit)
+        except MercadoLibreAccessDenied as catalog_exc:
+            raise MercadoLibreAccessDenied(
+                "El token identifica al usuario, pero Mercado Libre también bloquea la búsqueda de catálogo. "
+                "Revisa el estado/permisos de la aplicación y la disponibilidad del recurso en DevCenter. "
+                f"Diagnóstico: {catalog_exc}"
+            ) from catalog_exc
         if catalog_products:
             print(f"[Mercado Libre] usando catálogo autenticado '{query}': {len(catalog_products)} productos")
             return catalog_products
-        print(f"[Mercado Libre] catálogo sin resultados; usando búsqueda web real '{query}'")
         data = _public_search(query, limit)
-    products = []
 
+    products = []
     public_web = data.get("_source") == "public_web"
     for item in data.get("results", []):
         item_id = item.get("id")
@@ -276,10 +323,18 @@ def fetch_mercadolibre(query, limit=20):
         if not item_id or not title:
             continue
 
-        if public_web:
-            detail, prices, sale = {}, [], {}
-        else:
-            detail = _details(item_id)
+        # La búsqueda ya entrega precio, miniatura, permalink y precio original.
+        # Consultar tres endpoints por cada artículo multiplicaba el tráfico sin necesidad.
+        needs_detail = not public_web and (
+            not item.get("permalink")
+            or not item.get("thumbnail")
+            or not item.get("price")
+            or not item.get("title")
+        )
+        detail = _details(item_id) if needs_detail and item_id else {}
+        prices = []
+        sale = {}
+        if not public_web and not (item.get("price") or detail.get("price")) and item_id:
             prices = _prices(item_id)
             sale = _sale_price(item_id)
 
@@ -288,6 +343,18 @@ def fetch_mercadolibre(query, limit=20):
             or detail.get("price")
             or item.get("price")
         )
+        previous_price = (
+            detail.get("original_price")
+            or item.get("original_price")
+            or detail.get("regular_price")
+            or item.get("regular_price")
+        )
+        try:
+            previous_price = float(previous_price) if previous_price is not None else None
+        except (TypeError, ValueError):
+            previous_price = None
+        if previous_price is not None and (price is None or previous_price <= float(price)):
+            previous_price = None
         currency = (
             sale.get("currency_id")
             or detail.get("currency_id")
@@ -337,6 +404,7 @@ def fetch_mercadolibre(query, limit=20):
             ).replace("-I.", "-O."),
             "product_url": detail.get("permalink") or item.get("permalink"),
             "price": float(price),
+            "previous_price": previous_price,
             "currency": currency,
             "rating": None,
             "reviews_count": 0,
