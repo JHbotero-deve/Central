@@ -5,6 +5,7 @@ from catalog_rules import discount_percentage
 from amazon_api import _previous_offer
 from ingest import fetch_mercadolibre
 from store_orders import _public_order_summary, create_store_order
+from tiktok_creator import _normalize
 
 
 class StoreOrderSecurityTests(unittest.TestCase):
@@ -64,6 +65,30 @@ class DiscountRuleTests(unittest.TestCase):
         details.assert_not_called()
         prices.assert_not_called()
         sale.assert_not_called()
+
+
+class TikTokShopCapsuleTests(unittest.TestCase):
+    def test_normalize_preserves_all_shop_images_and_affiliate_link(self):
+        product = {
+            "product_id": "shop-123",
+            "title": "Producto TikTok",
+            "price": {"sale_price": {"amount": "19.99", "currency": "USD"}},
+            "images": [
+                {"url": "https://cdn.example.com/a.jpg"},
+                {"url_list": ["https://cdn.example.com/b.jpg"]},
+                {"url": "https://cdn.example.com/a.jpg"},
+                {},
+            ],
+            "product_url": "https://shop.example.com/item/123",
+            "affiliate_url": "https://affiliate.example.com/item/123",
+        }
+        normalized = _normalize(product)
+        self.assertEqual(
+            normalized["gallery_urls"],
+            ["https://cdn.example.com/a.jpg", "https://cdn.example.com/b.jpg"],
+        )
+        self.assertEqual(normalized["image_url"], "https://cdn.example.com/a.jpg")
+        self.assertEqual(normalized["affiliate_url"], "https://affiliate.example.com/item/123")
 
 
 if __name__ == "__main__":
