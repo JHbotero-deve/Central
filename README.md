@@ -35,6 +35,21 @@ No se cargan productos de demostración ni catálogos de respaldo. Si una fuente
 
 Las credenciales y secretos se gestionan mediante variables de entorno de Railway y Vercel. La base de datos de producción es PostgreSQL de Railway.
 
+## Visualizador y auditoría local
+
+Desde la raíz del repositorio, ejecutar:
+
+```bash
+python scripts/visualizador_codigo.py
+```
+
+Se genera `visualizador-codigo.html`, un inventario navegable con búsqueda, categorías, número de líneas y tamaño por archivo. Para usarlo como control de calidad:
+
+```bash
+python scripts/visualizador_codigo.py --check
+```
+
+El mismo control corre en GitHub Actions. Comprueba sintaxis Python, JSON, IDs estáticos duplicados en las páginas públicas, archivos esenciales y residuos locales/legados. La CI añade validación JavaScript, pruebas de contrato, auditorías de catálogo y semillas, auditoría de dependencias y builds Docker. Las integraciones con servicios externos todavía requieren credenciales reales para pruebas de extremo a extremo.
 
 ## Herramientas de prueba
 

@@ -28,6 +28,8 @@ _backup_ui/
 node_modules/
 dist/
 .vercel/
+artifacts/
+visualizador-codigo.html
 
 # Docker y logs
 *.log

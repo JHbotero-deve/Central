@@ -20,6 +20,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+      - name: Audit repository and generate code visualizer
+        run: python scripts/visualizador_codigo.py --check --output /tmp/central-visualizador-codigo.html
       - name: Validate frontend JavaScript
         shell: bash
         run: |
