@@ -357,36 +357,38 @@ def _fallback_images(url: str) -> dict[str, Any]:
 
 def search_products(keywords: str, limit: int = 10) -> list[dict[str, Any]]:
     global _AUTH_FAILURE
-    if _AUTH_FAILURE:
-        return []
-    try:
-        data = _request(
-            "searchItems",
-            {
-                "keywords": keywords,
-                "searchIndex": "All",
-                "itemCount": min(max(limit, 1), 10),
-                "sortBy": "Relevance",
-                "resources": [
-                    "images.primary.large",
-                    "images.primary.medium",
-                    "images.primary.small",
-                    "itemInfo.title",
-                    "offersV2.listings.price",
-                    "offersV2.listings.savingBasis",
-                ],
-            },
-        )
-        items = ((data.get("searchResult") or {}).get("items") or [])
-        if items:
-            return items
-    except Exception as exc:
-        message = str(exc)
-        print(f"[amazon] Creators API no disponible para '{keywords}': {message}")
-        if "Amazon OAuth rechazó las credenciales" in message or "invalid_client" in message:
-            _AUTH_FAILURE = True
-            print("[amazon] partner no autorizado; se omiten nuevas solicitudes hasta corregir credenciales.", flush=True)
-            return []
+    if not _AUTH_FAILURE:
+        try:
+            data = _request(
+                "searchItems",
+                {
+                    "keywords": keywords,
+                    "searchIndex": "All",
+                    "itemCount": min(max(limit, 1), 10),
+                    "sortBy": "Relevance",
+                    "resources": [
+                        "images.primary.large",
+                        "images.primary.medium",
+                        "images.primary.small",
+                        "itemInfo.title",
+                        "offersV2.listings.price",
+                        "offersV2.listings.savingBasis",
+                    ],
+                },
+            )
+            items = ((data.get("searchResult") or {}).get("items") or [])
+            if items:
+                return items
+        except Exception as exc:
+            message = str(exc)
+            print(f"[amazon] Creators API no disponible para '{keywords}': {message}")
+            if (
+                "Amazon OAuth rechazó las credenciales" in message
+                or "invalid_client" in message
+                or "Faltan AMAZON_CREDENTIAL_ID" in message
+            ):
+                _AUTH_FAILURE = True
+                print("[amazon] API deshabilitada para este proceso; se continúa con búsqueda pública.", flush=True)
 
     html_results = _search_amazon_html(keywords, limit)
     if html_results:

@@ -117,6 +117,36 @@ def _reset_digest(email, code):
 
 
 def _send_reset_email(email, code):
+    subject = "Código para recuperar tu acceso a Central"
+    body = (
+        "Solicitaste recuperar la contraseña de Central.\n\n"
+        f"Tu código de verificación es: {code}\n\n"
+        "El código vence en 10 minutos y solo se puede utilizar una vez. "
+        "Si no solicitaste este cambio, ignora este mensaje.\n"
+    )
+
+    # Preferir Resend por HTTPS para evitar conexiones SMTP salientes que expiran en Railway.
+    resend_key = os.getenv("RESEND_API_KEY", "").strip()
+    resend_from = os.getenv("RESEND_FROM_EMAIL", "").strip()
+    if resend_key:
+        if not resend_from:
+            raise HTTPException(503, "Falta configurar RESEND_FROM_EMAIL con un remitente verificado en Resend")
+        try:
+            import requests
+            response = requests.post(
+                "https://api.resend.com/emails",
+                headers={"Authorization": f"Bearer {resend_key}", "Content-Type": "application/json"},
+                json={"from": resend_from, "to": [email], "subject": subject, "text": body},
+                timeout=12,
+            )
+            if not response.ok:
+                raise HTTPException(503, "Resend rechazó el envío. Revisa el remitente verificado y la configuración de Resend")
+            return
+        except HTTPException:
+            raise
+        except requests.RequestException as exc:
+            raise HTTPException(503, "No fue posible conectar con el servicio de correo. Inténtalo más tarde") from exc
+
     host = os.getenv("SMTP_HOST", "").strip()
     user = os.getenv("SMTP_USER", "").strip()
     password = os.getenv("SMTP_PASSWORD", "")
@@ -126,17 +156,12 @@ def _send_reset_email(email, code):
     except ValueError as exc:
         raise HTTPException(503, "El servicio de correo no está configurado correctamente") from exc
     if not host or not user or not password or not sender:
-        raise HTTPException(503, "El servicio de correo de recuperación no está configurado")
+        raise HTTPException(503, "Configura RESEND_API_KEY y RESEND_FROM_EMAIL, o las variables SMTP")
     message = EmailMessage()
-    message["Subject"] = "Código para recuperar tu acceso a Central"
+    message["Subject"] = subject
     message["From"] = sender
     message["To"] = email
-    message.set_content(
-        "Solicitaste recuperar la contraseña de Central.\n\n"
-        f"Tu código de verificación es: {code}\n\n"
-        "El código vence en 10 minutos y solo se puede utilizar una vez. "
-        "Si no solicitaste este cambio, ignora este mensaje.\n"
-    )
+    message.set_content(body)
     try:
         with smtplib.SMTP(host, port, timeout=15) as smtp:
             smtp.ehlo()
@@ -147,7 +172,6 @@ def _send_reset_email(email, code):
             smtp.send_message(message)
     except (OSError, smtplib.SMTPException) as exc:
         raise HTTPException(503, "No fue posible enviar el correo de recuperación. Inténtalo más tarde") from exc
-
 
 def is_authenticated(request: Request):
     try:
@@ -227,9 +251,11 @@ def login(data: Credentials, response: Response):
 @router.post("/password/forgot")
 def forgot_password(data: ResetRequest):
     email = data.email.strip().lower()
-    # Verifica el SMTP antes de consultar la cuenta para no revelar cuentas registradas.
-    if not all(os.getenv(k, "").strip() for k in ("SMTP_HOST", "SMTP_USER", "SMTP_PASSWORD")):
-        raise HTTPException(503, "El servicio de recuperación por correo no está configurado")
+    # Permite Resend por HTTPS o SMTP; no depende exclusivamente de las variables SMTP.
+    resend_ready = bool(os.getenv("RESEND_API_KEY", "").strip() and os.getenv("RESEND_FROM_EMAIL", "").strip())
+    smtp_ready = all(os.getenv(k, "").strip() for k in ("SMTP_HOST", "SMTP_USER", "SMTP_PASSWORD"))
+    if not resend_ready and not smtp_ready:
+        raise HTTPException(503, "Configura RESEND_API_KEY y RESEND_FROM_EMAIL, o las variables SMTP")
     record = _record()
     generic = {"ok": True, "message": "Si el correo corresponde a una cuenta, recibirás un código válido durante 10 minutos."}
     if not record or not hmac.compare_digest(email, record["email"].lower()):

@@ -56,4 +56,15 @@ check("_REFRESH_RETRY_AFTER" in INGEST and "time.monotonic()" in INGEST and "rei
 check('payload.get("error") or payload.get("code")' in INGEST and "código={error_code}" in INGEST,
       "el registro OAuth informa el código de error sin revelar tokens")
 
+
+AMAZON = (ROOT / "product-analyzer/app/amazon_api.py").read_text(encoding="utf-8-sig")
+TELEGRAM = (ROOT / "product-analyzer/app/telegram_alert.py").read_text(encoding="utf-8-sig")
+
+check("data = _public_search(query, limit)" in INGEST and "if not data.get(\"results\")" in INGEST,
+      "Mercado Libre cae a búsqueda pública cuando la API bloquea o no devuelve resultados")
+check("if not _AUTH_FAILURE:" in AMAZON and "se continúa con búsqueda pública" in AMAZON and "return _search_amazon_web(keywords, limit)" in AMAZON,
+      "Amazon conserva la búsqueda pública cuando faltan o se rechazan credenciales API")
+check("fetch_mercadolibre(term, limit=8)" in TELEGRAM and "upsert_product(conn, \"mercadolibre\", category, item)" in TELEGRAM,
+      "el comando /buscar descubre productos externos y los guarda en el catálogo")
+
 print("[PASS] Auditoría de contrato del catálogo completada.")
