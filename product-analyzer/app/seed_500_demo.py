@@ -213,6 +213,8 @@ def main():
         help="Elimina exclusivamente los productos external_id DEMO-500-*",
     )
     args = parser.parse_args()
+    if os.getenv("CENTRAL_ALLOW_DEMO_SEED", "").strip().lower() != "true":
+        parser.error("Operación protegida: define CENTRAL_ALLOW_DEMO_SEED=true solo en una base de pruebas.")
 
     conn = connect()
     try:

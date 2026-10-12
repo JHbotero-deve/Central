@@ -9,6 +9,12 @@ import secrets,datetime
 
 router=APIRouter(prefix="/store",tags=["store"])
 
+PUBLIC_ORDER_FIELDS = ("id", "reference", "total_amount", "currency", "status", "payment_status")
+
+def _public_order_summary(order):
+ """Devuelve solo campos que el comprador puede conocer; nunca costes ni márgenes."""
+ return {field: order[field] for field in PUBLIC_ORDER_FIELDS}
+
 def require_admin_key(x_admin_key: str | None = Header(default=None, alias="X-Admin-Key")):
  expected=os.getenv("MONETIZATION_ADMIN_KEY","").strip()
  if not expected:
@@ -29,8 +35,9 @@ def create_store_order(payload:StoreOrderPayload):
    cur.execute("""SELECT p.id,p.title,p.image_url,p.product_url,p.current_price,p.currency,p.stock,pl.name AS platform,
                         pc.id AS publication_id,pc.sale_price,pc.cost_price
                  FROM products p JOIN platforms pl ON pl.id=p.platform_id
-                 LEFT JOIN published_cards pc ON pc.product_id=p.id AND pc.is_published=TRUE
-                 WHERE p.id=%s AND p.is_active=TRUE""",(payload.product_id,))
+                 JOIN published_cards pc ON pc.product_id=p.id AND pc.is_published=TRUE
+                 WHERE p.id=%s AND p.is_active=TRUE AND p.is_blocked=FALSE
+                   AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW())""",(payload.product_id,))
    p=cur.fetchone()
    if not p: raise HTTPException(404,"Producto no encontrado")
    if payload.publication_id and p["publication_id"]!=payload.publication_id: raise HTTPException(409,"La publicación no corresponde al producto solicitado")
@@ -40,10 +47,10 @@ def create_store_order(payload:StoreOrderPayload):
    total=sale*payload.quantity;profit=(sale-cost)*payload.quantity;ref=f"REQ-{datetime.datetime.utcnow():%Y%m%d%H%M%S}-{payload.product_id}-{secrets.token_hex(4).upper()}"
    cur.execute("""INSERT INTO store_orders(reference,product_id,publication_id,customer_name,customer_email,customer_phone,quantity,unit_price,cost_unit_price,total_amount,estimated_profit,currency,status,payment_status,source,product_title_snapshot,product_image_snapshot,product_url_snapshot,platform_snapshot,notes)
                  VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'PENDING','PENDING','TIENDA',%s,%s,%s,%s,%s)
-                 RETURNING id,reference,total_amount,estimated_profit,currency,status,payment_status""",
+                 RETURNING id,reference,total_amount,currency,status,payment_status""",
                 (ref,payload.product_id,p["publication_id"],payload.customer_name.strip(),payload.customer_email.strip().lower(),payload.customer_phone,payload.quantity,sale,cost,total,profit,p["currency"],p["title"],p["image_url"],p["product_url"],p["platform"],payload.notes))
    out=cur.fetchone()
-  conn.commit();return out
+  conn.commit();return _public_order_summary(out)
  finally: conn.close()
 
 @router.get("/orders")

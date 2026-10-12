@@ -149,12 +149,12 @@ def upsert_product(conn, platform_name: str, category_name: str, product: dict):
             """
             INSERT INTO products (
                 platform_id, category_id, seller_id, external_id, title,
-                image_url, image_gallery, product_url, affiliate_url, current_price, currency, rating,
+                image_url, image_gallery, product_url, affiliate_url, current_price, previous_price, currency, rating,
                 reviews_count, sales_estimate, source_metadata,
                 catalog_batch_id, catalog_expires_at, is_blocked, updated_at
             )
             VALUES (
-                %s, %s, %s, %s, %s, %s, %s, %s,
+                %s, %s, %s, %s, %s, %s, %s, %s, %s,
                 %s, %s, %s, %s, %s, %s, %s, NOW(), NOW() + INTERVAL '48 hours', FALSE, NOW()
             )
             ON CONFLICT (platform_id, external_id) DO UPDATE SET
@@ -165,13 +165,16 @@ def upsert_product(conn, platform_name: str, category_name: str, product: dict):
                 image_gallery = CASE WHEN EXCLUDED.image_gallery <> '[]'::jsonb THEN EXCLUDED.image_gallery ELSE products.image_gallery END,
                 product_url = COALESCE(EXCLUDED.product_url, products.product_url),
                 affiliate_url = COALESCE(EXCLUDED.affiliate_url, products.affiliate_url),
-                previous_price = CASE
-                    WHEN EXCLUDED.current_price IS NOT NULL
-                     AND products.current_price IS NOT NULL
-                     AND EXCLUDED.current_price <> products.current_price
-                    THEN products.current_price
-                    ELSE products.previous_price
-                END,
+                previous_price = COALESCE(
+                    EXCLUDED.previous_price,
+                    CASE
+                        WHEN EXCLUDED.current_price IS NOT NULL
+                         AND products.current_price IS NOT NULL
+                         AND EXCLUDED.current_price <> products.current_price
+                        THEN products.current_price
+                        ELSE products.previous_price
+                    END
+                ),
                 current_price = COALESCE(EXCLUDED.current_price, products.current_price),
                 currency = COALESCE(EXCLUDED.currency, products.currency),
                 rating = COALESCE(EXCLUDED.rating, products.rating),
@@ -195,6 +198,7 @@ def upsert_product(conn, platform_name: str, category_name: str, product: dict):
                 product.get("product_url"),
                 _affiliate_url(product),
                 product.get("price"),
+                product.get("previous_price"),
                 product.get("currency") or "COP",
                 product.get("rating"),
                 product.get("reviews_count", 0),

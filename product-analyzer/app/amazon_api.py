@@ -357,40 +357,65 @@ def _fallback_images(url: str) -> dict[str, Any]:
 
 def search_products(keywords: str, limit: int = 10) -> list[dict[str, Any]]:
     global _AUTH_FAILURE
-    if _AUTH_FAILURE:
-        return []
-    try:
-        data = _request(
-            "searchItems",
-            {
-                "keywords": keywords,
-                "searchIndex": "All",
-                "itemCount": min(max(limit, 1), 10),
-                "sortBy": "Relevance",
-                "resources": [
-                    "images.primary.large",
-                    "images.primary.medium",
-                    "images.primary.small",
-                    "itemInfo.title",
-                    "offersV2.listings.price",
-                ],
-            },
-        )
-        items = ((data.get("searchResult") or {}).get("items") or [])
-        if items:
-            return items
-    except Exception as exc:
-        message = str(exc)
-        print(f"[amazon] Creators API no disponible para '{keywords}': {message}")
-        if "Amazon OAuth rechazó las credenciales" in message or "invalid_client" in message:
-            _AUTH_FAILURE = True
-            print("[amazon] partner no autorizado; se omiten nuevas solicitudes hasta corregir credenciales.", flush=True)
-            return []
+    if not _AUTH_FAILURE:
+        try:
+            data = _request(
+                "searchItems",
+                {
+                    "keywords": keywords,
+                    "searchIndex": "All",
+                    "itemCount": min(max(limit, 1), 10),
+                    "sortBy": "Relevance",
+                    "resources": [
+                        "images.primary.large",
+                        "images.primary.medium",
+                        "images.primary.small",
+                        "itemInfo.title",
+                        "offersV2.listings.price",
+                        "offersV2.listings.savingBasis",
+                    ],
+                },
+            )
+            items = ((data.get("searchResult") or {}).get("items") or [])
+            if items:
+                return items
+        except Exception as exc:
+            message = str(exc)
+            print(f"[amazon] Creators API no disponible para '{keywords}': {message}")
+            if (
+                "Amazon OAuth rechazó las credenciales" in message
+                or "invalid_client" in message
+                or "Faltan AMAZON_CREDENTIAL_ID" in message
+            ):
+                _AUTH_FAILURE = True
+                print("[amazon] API deshabilitada para este proceso; se continúa con búsqueda pública.", flush=True)
 
     html_results = _search_amazon_html(keywords, limit)
     if html_results:
         return html_results
     return _search_amazon_web(keywords, limit)
+
+
+def _previous_offer(item: dict[str, Any]) -> float | None:
+    """Lee precio de referencia solo si la respuesta oficial de Amazon lo proporciona."""
+    listings = ((item.get("offersV2") or {}).get("listings") or [])
+    if not listings:
+        return None
+    listing = listings[0] or {}
+    for key in ("savingBasis", "listPrice", "originalPrice"):
+        node = listing.get(key)
+        if isinstance(node, dict):
+            node = node.get("money") or node.get("price") or node
+            if isinstance(node, dict):
+                node = node.get("amount") or node.get("value")
+        try:
+            value = float(node)
+        except (TypeError, ValueError):
+            continue
+        current, _ = _offer(item)
+        if current is not None and value > current:
+            return value
+    return None
 
 
 def _map_item(
@@ -419,6 +444,7 @@ def _map_item(
         "gallery_urls": [image] if image else [],
         "product_url": str(url),
         "price": price,
+        "previous_price": _previous_offer(item),
         "currency": currency or "USD",
         "rating": None,
         "reviews_count": 0,

@@ -7,7 +7,7 @@
 .admin-card{background:var(--panel);border:1px solid var(--line);border-radius:18px;overflow:hidden;text-align:left;color:inherit;cursor:pointer;padding:0;font:inherit;transition:transform .15s ease,border-color .15s ease}
 .admin-card:hover{transform:translateY(-3px);border-color:var(--brand)}
 .admin-card:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
-.admin-card-media{aspect-ratio:4/3;display:grid;place-items:center;overflow:hidden;background:linear-gradient(160deg,#25171a,#0f0f12)}
+.admin-card-media{aspect-ratio:4/3;display:grid;place-items:center;overflow:hidden;background:#f8f7f3}
 .admin-card-media img{display:block;width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;object-position:center}
 .admin-card-media.plate img{background:#fff}
 .admin-card-noimg{font-size:12px;color:var(--muted)}
@@ -28,24 +28,45 @@
 .meli-result small{display:block;color:var(--muted);font-size:11px;margin-top:4px}
 .meli-search-note{font-size:11px;color:var(--muted);margin:4px 0 8px}
 
-body:not(.auth-ready) .sh-wrap{display:none!important}#panel{display:none}.central-auth{min-height:100vh;display:grid;place-items:center;padding:24px;background:var(--bg);color:var(--ink);font-family:var(--font)}.central-auth-card{width:min(100%,440px);padding:clamp(22px,5vw,34px);background:var(--panel);border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow)}.central-auth-brand{display:flex;align-items:center;gap:12px;margin-bottom:28px}.central-auth-brand img{width:48px;height:48px}.central-auth-brand strong{display:block;font:800 17px var(--display)}.central-auth-brand span,.central-auth-copy,.central-auth-note{color:var(--muted);font-size:13px}.central-auth-kicker{font-size:11px;font-weight:800;letter-spacing:.14em;color:var(--brand);margin:0}.central-auth-card h1{font:700 clamp(28px,7vw,36px)/1.1 var(--display);margin:10px 0}.central-auth-form{display:grid;gap:14px;margin-top:22px}.central-auth-form label{display:grid;gap:7px;font-size:12px;font-weight:700;color:var(--muted)}.central-auth-form input{width:100%;min-width:0;border:1px solid var(--line);border-radius:10px;padding:13px;background:var(--panel2);color:var(--ink);font:14px var(--font)}.central-auth-form input:focus-visible{outline:2px solid var(--brand);outline-offset:2px}.central-auth-submit{min-height:48px;border:0;border-radius:10px;background:var(--brand);color:white;font:700 14px var(--font);cursor:pointer}.central-auth-submit:disabled{opacity:.6;cursor:wait}.central-auth-message{font-size:13px;color:var(--danger);min-height:18px;margin:0}.central-auth-note{margin:18px 0 0}.admin-session-actions{display:flex;gap:8px;align-items:center}</style><script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+body:not(.auth-ready) .sh-wrap{display:none!important}#panel{display:none}.central-auth{min-height:100vh;display:grid;place-items:center;padding:24px;background:var(--bg);color:var(--ink);font-family:var(--font)}.central-auth-card{width:min(100%,440px);padding:clamp(22px,5vw,34px);background:var(--panel);border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow)}.central-auth-brand{display:flex;align-items:center;gap:12px;margin-bottom:28px}.central-auth-brand img{width:48px;height:48px}.central-auth-brand strong{display:block;font:800 17px var(--display)}.central-auth-brand span,.central-auth-copy,.central-auth-note{color:var(--muted);font-size:13px}.central-auth-kicker{font-size:11px;font-weight:800;letter-spacing:.14em;color:var(--brand);margin:0}.central-auth-card h1{font:700 clamp(28px,7vw,36px)/1.1 var(--display);margin:10px 0}.central-auth-form{display:grid;gap:14px;margin-top:22px}.central-auth-form label{display:grid;gap:7px;font-size:12px;font-weight:700;color:var(--muted)}.central-auth-form input{width:100%;min-width:0;border:1px solid var(--line);border-radius:10px;padding:13px;background:var(--panel2);color:var(--ink);font:14px var(--font)}.central-auth-form input:focus-visible{outline:2px solid var(--brand);outline-offset:2px}.central-auth-submit{min-height:48px;border:0;border-radius:10px;background:var(--brand);color:white;font:700 14px var(--font);cursor:pointer}.central-auth-submit:disabled{opacity:.6;cursor:wait}.central-auth-message{font-size:13px;color:var(--danger);min-height:18px;margin:0}.central-auth-note{margin:18px 0 0}.admin-session-actions{display:flex;gap:8px;align-items:center}
+.admin-card{background:#fffdf8!important;box-shadow:0 5px 20px rgba(35,39,32,.055)}
+.admin-card-media{background:#f8f7f3!important}
+.admin-card-body{background:#fffdf8}
+.admin-card-actions button{background:#fffdf8;color:#3d5639;border-color:#e4e2da}
+.admin-card-actions button:hover{background:#e8eee4;border-color:#dce5d7}
+#preview .sh-stage{background:linear-gradient(145deg,#fdfcf9,#f7f6f1);border-color:#e7e4dc}
+#preview .sh-stage img{filter:drop-shadow(0 10px 14px rgba(35,39,32,.12))}
+</style><script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
 </head>
 <body><main id="auth-screen" class="central-auth"><section class="central-auth-card">
 <div class="central-auth-brand"><img src="/central-icon.svg" alt=""><div><strong>CENTRAL</strong><span>Administración segura</span></div></div>
 <p class="central-auth-kicker">ACCESO PRIVADO</p><h1 id="auth-title">Iniciar sesión</h1><p class="central-auth-copy" id="auth-copy">Accede al panel administrativo de Central.</p>
 <form id="auth-form" class="central-auth-form">
 <label>Correo administrativo<input id="auth-email" type="email" autocomplete="username" required value="jorgebotero190@gmail.com"></label>
-<label id="setup-code-wrap" hidden>Código de configuración inicial<input id="auth-setup-code" type="password" autocomplete="one-time-code" minlength="24"></label>
-<label>Contraseña<input id="auth-password" type="password" autocomplete="current-password" minlength="12" required></label>
-<label id="confirm-wrap" hidden>Confirmar contraseña<input id="auth-confirm" type="password" autocomplete="new-password" minlength="12"></label>
+<label>Contraseña<input id="auth-password" type="password" autocomplete="current-password" required></label>
 <button class="central-auth-submit" id="auth-submit" type="submit">Entrar</button><p class="central-auth-message" id="auth-message" role="status" aria-live="polite"></p>
-</form><p class="central-auth-note" id="auth-note">Sesión segura en este dispositivo.</p>
+</form>
+<button class="central-auth-note" id="forgot-link" type="button" style="border:0;background:none;padding:0;cursor:pointer;color:var(--brand);font:inherit">¿Olvidaste tu contraseña?</button>
+<form id="forgot-form" class="central-auth-form" hidden>
+<label>Correo administrativo<input id="forgot-email" type="email" autocomplete="email" required maxlength="254"></label>
+<button class="central-auth-submit" id="forgot-submit" type="submit">Enviar código al correo</button>
+<p class="central-auth-message" id="forgot-message" role="status" aria-live="polite"></p>
+<button class="central-auth-note" id="back-login" type="button" style="border:0;background:none;padding:0;cursor:pointer;font:inherit">Volver al inicio de sesión</button>
+</form>
+<form id="reset-form" class="central-auth-form" hidden>
+<label>Código de 6 dígitos<input id="reset-code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required></label>
+<label>Nueva contraseña (mínimo 12 caracteres)<input id="reset-password" type="password" minlength="12" maxlength="256" autocomplete="new-password" required></label>
+<button class="central-auth-submit" id="reset-submit" type="submit">Guardar contraseña nueva</button>
+<p class="central-auth-message" id="reset-message" role="status" aria-live="polite"></p>
+<button class="central-auth-note" id="back-forgot" type="button" style="border:0;background:none;padding:0;cursor:pointer;font:inherit">Solicitar otro código</button>
+</form>
+<p class="central-auth-note" id="auth-note">Sesión segura en este dispositivo.</p>
 </section></main><div class="sh-wrap">
-<header class="sh-top"><a class="sh-logo" href="/vitrina">CENTRAL</a><div class="admin-session-actions"><a class="sh-pill" href="/vitrina">Ver vitrina</a><button class="sh-pill" id="logout" type="button">Cerrar sesión</button></div></header>
+<header class="sh-top"><a class="sh-logo" href="/">CENTRAL</a><div class="admin-session-actions"><a class="sh-pill" href="/tienda">Ver tienda</a><button class="sh-pill" id="logout" type="button">Cerrar sesión</button></div></header>
 
 <section id="panel"><div class="ed-grid">
  <aside class="ed-side">
-  <div class="ed-tabs"><button type="button" data-tab="mine">Productos</button><button type="button" data-tab="add" class="on">Agregar</button><button type="button" data-tab="theme">Tema</button></div>
+  <div class="ed-tabs"><button type="button" data-tab="mine">Productos</button><button type="button" data-tab="add" class="on">Agregar</button></div>
 
   <div class="ed-body" id="tab-mine" hidden><div class="ed-l">Productos</div><div class="sh-grid admin-cards" id="mine"></div></div>
 
@@ -75,7 +96,7 @@ body:not(.auth-ready) .sh-wrap{display:none!important}#panel{display:none}.centr
    <label class="ed-l">N° reseñas<input class="ed-in" id="reviews" inputmode="numeric" placeholder="0"></label>
    <div class="ed-l">Características (hasta 4)</div>
    <div class="ed-2"><input class="ed-in" id="feat1" placeholder="Característica 1"><input class="ed-in" id="feat2" placeholder="Característica 2"><input class="ed-in" id="feat3" placeholder="Característica 3"><input class="ed-in" id="feat4" placeholder="Característica 4"></div>
-   <div style="display:flex;justify-content:space-between"><span class="ed-l">Variantes de color *</span><button type="button" class="ed-x" id="addVar" style="color:var(--muted)">＋ Agregar</button></div>
+   <div style="display:flex;justify-content:space-between"><span class="ed-l">Imagen del producto * · variantes opcionales</span><button type="button" class="ed-x" id="addVar" style="color:var(--muted)">＋ Agregar</button></div>
    <div id="vars" style="display:flex;flex-direction:column;gap:10px"></div>
    <label class="ed-l" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" id="plate"> Marco claro para la imagen (útil si tiene fondo blanco)</label>
    <div class="ed-l">Links de compra</div>
@@ -83,36 +104,46 @@ body:not(.auth-ready) .sh-wrap{display:none!important}#panel{display:none}.centr
    <button class="ed-btn" id="save" type="button">Crear tarjeta</button><button class="ed-x" id="cancelEdit" type="button" hidden>Cancelar edición</button><div id="msg" class="ed-msg" hidden></div>
   </div>
 
-  <div class="ed-body" id="tab-theme" hidden><div class="ed-l">Fondo de la vitrina (se guarda en este navegador)</div><div class="ed-themes" id="themes"></div></div>
+  
  </aside>
  <main><div class="ed-l" style="margin-bottom:10px">VISTA PREVIA EN VIVO</div><div id="preview"></div></main>
 </div></section>
 </div>
 
 <script>
-(()=>{"use strict";const S=Shopr,$=id=>document.getElementById(id);S.applyTheme();
+(()=>{"use strict";const S=Shopr,$=id=>document.getElementById(id);
 const f=id=>$(id).value.trim();
 const num=v=>{v=String(v).trim().replace(",",".");return v===""||isNaN(Number(v))?null:Number(v)};
 let V=[{name:"",glow:0,img:""}];
 
 function show(el,k,t){el.hidden=false;el.className="ed-msg "+k;el.textContent=t}
-function gate(){renderVars();preview();loadMine();renderThemes()}
-function tab(n){["mine","add","theme"].forEach(x=>{$("tab-"+x).hidden=x!==n});document.querySelectorAll("[data-tab]").forEach(b=>b.classList.toggle("on",b.dataset.tab===n))}
+function gate(){renderVars();preview();loadMine()}
+function tab(n){["mine","add"].forEach(x=>{$("tab-"+x).hidden=x!==n});document.querySelectorAll("[data-tab]").forEach(b=>b.classList.toggle("on",b.dataset.tab===n))}
 
 function renderVars(){
-  $("vars").innerHTML=V.map((v,i)=>{const up=v.img.startsWith("data:")||v.img.startsWith("mongo://");return `<div class="ed-var" data-i="${i}">
-   <div class="ed-varh"><b>Variante ${i+1}</b>${V.length>1?`<button type="button" class="ed-x" data-del="${i}">Quitar</button>`:""}</div>
-   <input class="ed-in" data-f="name" placeholder="Nombre del color (Ej: Rojo Fuego)" value="${S.esc(v.name)}">
-   <div class="ed-row"><input class="ed-in" data-f="img" placeholder="URL pública de imagen o subir archivo" value="${up?"":S.esc(v.img)}"><label class="ed-up" title="Subir imagen">⬆<input type="file" accept="image/*" data-file hidden></label></div>
-   ${up?'<div class="ed-note">'+(v.img.startsWith("mongo://")?"Imagen guardada en Central ✓":"Imagen cargada ✓")+'</div>':""}
-   <div class="ed-glows">${S.GLOWS.map((g,gi)=>`<button type="button" class="ed-g ${gi===v.glow?"on":""}" data-g="${gi}" title="${g[0]}" style="background:${g[1]}"></button>`).join("")}</div></div>`}).join("");
+  $("vars").innerHTML=V.map((v,i)=>{
+    const stored=v.img.startsWith("data:")||v.img.startsWith("mongo://");
+    const imagePreview=v.img
+      ? '<div class="ed-image-ready"><img src="'+S.esc(S.imageSrc(v.img))+'" alt="Vista previa de la imagen" loading="lazy"><span>'+(v.img.startsWith("mongo://")?"Imagen guardada en Central":"Imagen preparada para guardar")+'</span></div>'
+      : '<div class="ed-image-empty">Primero sube una imagen real del producto.</div>';
+    return `<div class="ed-var" data-i="${i}">
+      <div class="ed-varh"><b>Variante ${i+1}</b>${V.length>1?`<button type="button" class="ed-x" data-del="${i}">Quitar</button>`:""}</div>
+      <input class="ed-in" data-f="name" placeholder="Nombre de la variante (opcional)" value="${S.esc(v.name)}">
+      <label class="ed-upload-primary">${v.img?"Reemplazar imagen":"Subir imagen del producto"}<input type="file" accept="image/*" data-file hidden></label>
+      ${imagePreview}
+      <details class="ed-image-url"><summary>Usar una URL de imagen existente (opcional)</summary>
+        <input class="ed-in" data-f="img" type="url" placeholder="https://…" value="${S.esc(stored?"":v.img)}">
+      </details>
+      <div class="ed-glows">${S.GLOWS.map((g,gi)=>`<button type="button" class="ed-g ${gi===v.glow?"on":""}" data-g="${gi}" title="${g[0]}" style="background:${g[1]}"></button>`).join("")}</div>
+    </div>`;
+  }).join("");
   $("addVar").hidden=V.length>=4;
 }
 function model(){return{id:"preview",title:f("title")||"Nombre del producto",brand:f("brand"),tag:f("tag"),cat:f("category"),desc:f("description"),
   price:num(f("price")),prev:num(f("prev")),currency:f("currency"),rating:num(f("rating"))||0,reviews:parseInt(f("reviews"),10)||0,
   features:[1,2,3,4].map(i=>f("feat"+i)).filter(Boolean),variants:V.map(v=>({...v})),
   links:{amazon:f("l_amz"),meli:f("l_meli"),wompi:f("l_wmp")},fallback:"",platform:f("productType"),plate:$("plate").checked}}
-function preview(){S.mountDetail($("preview"),model(),0)}
+function preview(){const m=model();S.mountDetail($("preview"),{...m,links:{},fallback:""},0)}
 
 function resize(file,max=700){return new Promise((res,rej)=>{const im=new Image(),u=URL.createObjectURL(file);
   im.onload=()=>{const s=Math.min(1,max/Math.max(im.width,im.height)),c=document.createElement("canvas");c.width=Math.round(im.width*s);c.height=Math.round(im.height*s);
@@ -166,7 +197,7 @@ let meliItems=[];
  function adminCardHtml(m){
   const v=m.variants[0]||{},src=S.imageSrc(v.img),own=m.platform==="personal";
   const img=src?'<img src="'+S.esc(src)+'" alt="'+S.esc(m.title)+'" loading="lazy" referrerpolicy="no-referrer" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span class="admin-card-noimg" hidden>Imagen no disponible</span>':'<span class="admin-card-noimg">Sin imagen</span>';
-  return '<div class="admin-card-wrap"><button type="button" class="admin-card" data-open="'+S.esc(m.id)+'" aria-label="Ver '+S.esc(m.title)+'"><div class="admin-card-media '+(m.plate?"plate":"")+'">'+img+'</div><div class="admin-card-body"><span class="admin-card-brand">'+S.esc(m.brand||m.cat)+'</span><span class="admin-card-title">'+S.esc(m.title)+'</span><span class="admin-card-price">'+S.money(m.price,m.currency)+'</span><div class="admin-card-meta"><span>'+S.esc(m.platform||m.cat)+'</span><span class="admin-card-status">Activo</span></div></div></button><div class="admin-card-actions">'+(own?'<button type="button" data-edit="'+S.esc(m.id)+'">Editar</button>':'')+'<button type="button" data-publish="'+S.esc(m.id)+'">Publicar</button><button type="button" data-delete="'+S.esc(m.id)+'">Eliminar</button></div></div>'
+  return '<div class="admin-card-wrap"><button type="button" class="admin-card" data-open="'+S.esc(m.id)+'" aria-label="Ver '+S.esc(m.title)+'"><div class="admin-card-media '+(m.plate?"plate":"")+'">'+img+'</div><div class="admin-card-body"><span class="admin-card-brand">'+S.esc(m.brand||m.cat)+'</span><span class="admin-card-title">'+S.esc(m.title)+'</span><span class="admin-card-price">'+S.money(m.price,m.currency)+'</span><div class="admin-card-meta"><span>'+S.esc(m.platform||m.cat)+'</span><span class="admin-card-status">Activo</span></div></div></button><div class="admin-card-actions">'+(own?'<button type="button" data-edit="'+S.esc(m.id)+'">Editar</button>':'')+'<button type="button" data-publish="'+S.esc(m.id)+'">Publicar en tienda</button><button type="button" data-delete="'+S.esc(m.id)+'">Eliminar</button></div></div>'
 }
 let editingId=null;
 function resetEditor(){
@@ -198,10 +229,6 @@ async function loadMine(){
   try{const d=await S.api("/products?limit=100");const l=Array.isArray(d)?d:(d.items||d.products||[]);mineModels=l.map(p=>S.fromApi(p));$("mine").innerHTML=mineModels.length?mineModels.map(adminCardHtml).join(""):'<div class="ed-note" style="color:var(--muted)">Aún no tienes productos.</div>';bindAdminCards()}
   catch(e){$("mine").innerHTML='<div class="ed-msg err">'+S.esc(e.message)+'</div>'}
 }
-function renderThemes(){const cur=S.theme()[0];
-  $("themes").innerHTML=S.THEMES.map((t,i)=>`<button type="button" class="ed-t ${t[0]===cur?"on":""}" data-t="${i}" style="background:${t[1]}">${t[0]}</button>`).join("");
-  $("themes").querySelectorAll("[data-t]").forEach(b=>b.addEventListener("click",()=>{S.setTheme(S.THEMES[+b.dataset.t]);renderThemes()}))}
- 
 $("save").addEventListener("click",async()=>{
   const m=model(),msg=$("msg");msg.hidden=true;
   if(f("title").length<2)return show(msg,"err","El nombre necesita al menos 2 caracteres");
@@ -234,13 +261,57 @@ $("save").addEventListener("click",async()=>{
   }catch(e){show(msg,"err",e.message)}finally{b.disabled=false}});
 $("cancelEdit").addEventListener("click",resetEditor);
 async function initAuth(){
- const screen=$("auth-screen"),form=$("auth-form"),msg=$("auth-message"),btn=$("auth-submit"),email=$("auth-email"),password=$("auth-password"),code=$("auth-setup-code"),confirmPassword=$("auth-confirm");
- let setupRequired=false;
- const say=(text,ok=false)=>{msg.textContent=text;msg.style.color=ok?"var(--brand)":"var(--danger)"};
- const mode=setup=>{setupRequired=setup;$("auth-title").textContent=setup?"Configurar cuenta administrativa":"Iniciar sesión";$("auth-copy").textContent=setup?"Crea una contraseña privada. Este paso solo se permite una vez.":"Accede al panel administrativo de Central.";$("setup-code-wrap").hidden=!setup;$("confirm-wrap").hidden=!setup;code.required=setup;confirmPassword.required=setup;password.autocomplete=setup?"new-password":"current-password";btn.textContent=setup?"Crear cuenta y entrar":"Entrar";$("auth-note").textContent=setup?"Contraseña única de al menos 12 caracteres.":"Sesión de siete días en este dispositivo."};
- const showPanel=()=>{document.body.classList.add("auth-ready");screen.hidden=true;$("panel").style.display="block";$("logout").addEventListener("click",async()=>{try{await S.api("/auth/logout",{method:"POST"})}finally{location.reload()}});gate()};
- try{const status=await S.api("/auth/status");if(status.authenticated){showPanel();return}mode(!!status.setupRequired)}catch{mode(false);say("No se pudo conectar con el servicio de autenticación.");btn.disabled=true;return}
- form.addEventListener("submit",async e=>{e.preventDefault();say("");btn.disabled=true;try{if(setupRequired){if(password.value.length<12)throw Error("Usa al menos 12 caracteres.");if(password.value!==confirmPassword.value)throw Error("Las contraseñas no coinciden.");await S.api("/auth/setup",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:email.value.trim(),setup_token:code.value,password:password.value})})}else{await S.api("/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:email.value.trim(),password:password.value})})}password.value="";confirmPassword.value="";code.value="";showPanel()}catch(err){say(err.message||"No fue posible autenticarte.")}finally{btn.disabled=false}});
+ const screen=$("auth-screen"),loginForm=$("auth-form"),loginMsg=$("auth-message"),loginBtn=$("auth-submit");
+ const email=$("auth-email"),password=$("auth-password"),forgotForm=$("forgot-form"),resetForm=$("reset-form");
+ const say=(id,text,ok=false)=>{const el=$(id);el.textContent=text;el.style.color=ok?"var(--brand)":"var(--danger)";};
+ const view=(name)=>{
+   loginForm.hidden=name!=="login";
+   $("forgot-link").hidden=name!=="login";
+   $("auth-note").hidden=name!=="login";
+   forgotForm.hidden=name!=="forgot";
+   resetForm.hidden=name!=="reset";
+   $("auth-title").textContent=name==="login"?"Iniciar sesión":name==="forgot"?"Recuperar contraseña":"Crear contraseña nueva";
+   $("auth-copy").textContent=name==="login"?"Accede al panel administrativo de Central.":name==="forgot"?"Te enviaremos un código temporal al correo de tu cuenta.":"Introduce el código recibido y elige una contraseña nueva.";
+   if(name==="forgot"){$("forgot-email").value=email.value.trim();}
+   if(name==="reset"){$("reset-code").focus();}
+ };
+ const showPanel=()=>{
+   document.body.classList.add("auth-ready");screen.hidden=true;$("panel").style.display="block";
+   $("logout").addEventListener("click",async()=>{try{await S.api("/auth/logout",{method:"POST"})}finally{location.reload()}});
+   gate();
+ };
+ $("forgot-link").addEventListener("click",()=>{say("forgot-message","");view("forgot");});
+ $("back-login").addEventListener("click",()=>view("login"));
+ $("back-forgot").addEventListener("click",()=>{say("forgot-message","");view("forgot");});
+ try{const status=await S.api("/auth/status");if(status.authenticated){showPanel();return}}
+ catch{say("auth-message","No se pudo conectar con el servicio de autenticación.");loginBtn.disabled=true;return}
+ loginForm.addEventListener("submit",async e=>{
+   e.preventDefault();say("auth-message","");loginBtn.disabled=true;
+   try{await S.api("/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:email.value.trim(),password:password.value})});password.value="";showPanel();}
+   catch(err){say("auth-message",err.message||"No fue posible autenticarte.");}
+   finally{loginBtn.disabled=false;}
+ });
+ forgotForm.addEventListener("submit",async e=>{
+   e.preventDefault();const btn=$("forgot-submit");btn.disabled=true;say("forgot-message","");
+   try{
+     const target=$("forgot-email").value.trim().toLowerCase();
+     await S.api("/auth/password/forgot",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:target})});
+     $("auth-email").value=target;
+     view("reset");
+     say("reset-message","Si el correo corresponde a la cuenta, recibirás un código válido durante 10 minutos.",true);
+   }catch(err){say("forgot-message",err.message||"No fue posible solicitar el código.");}
+   finally{btn.disabled=false;}
+ });
+ resetForm.addEventListener("submit",async e=>{
+   e.preventDefault();const btn=$("reset-submit");btn.disabled=true;say("reset-message","");
+   try{
+     const target=$("forgot-email").value.trim().toLowerCase();
+     await S.api("/auth/password/reset",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:target,code:$("reset-code").value.trim(),new_password:$("reset-password").value})});
+     $("reset-password").value="";showPanel();
+   }catch(err){say("reset-message",err.message||"No fue posible cambiar la contraseña.");}
+   finally{btn.disabled=false;}
+ });
 }
+
 initAuth();})();
 </script></body></html>

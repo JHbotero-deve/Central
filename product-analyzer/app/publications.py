@@ -62,7 +62,7 @@ def list_publications(
     conn = get_connection()
     try:
         with conn.cursor() as cur:
-            where = "" if include_unpublished else "AND pc.is_published = TRUE AND COALESCE(NULLIF(pc.image_url, ''), NULLIF(p.image_url, '')) IS NOT NULL AND COALESCE(NULLIF(pc.image_url, ''), NULLIF(p.image_url, '')) <> ''"
+            where = "" if include_unpublished else "AND pc.is_published = TRUE AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW()) AND COALESCE(pc.sale_price, p.current_price) > 0 AND COALESCE(NULLIF(pc.image_url, ''), NULLIF(p.image_url, ''), NULLIF(p.source_metadata->>'mongo_image_id', '')) IS NOT NULL AND COALESCE(NULLIF(pc.image_url, ''), NULLIF(p.image_url, ''), NULLIF(p.source_metadata->>'mongo_image_id', '')) <> ''"
             cur.execute(
                 f"""
                 SELECT pc.id, pc.product_id, pc.title, pc.subtitle, pc.price_display,
@@ -71,13 +71,17 @@ def list_publications(
                        pc.sale_price, pc.cost_price,
                        pc.profit_amount, pc.profit_margin_pct, pc.opportunity_score, pc.footer,
                        pc.accent, pc.is_published, pc.sort_order, pc.published_at,
-                       p.current_price, p.currency, p.image_gallery, p.affiliate_url, p.external_id, p.sku,
+                       p.current_price, p.previous_price,
+                       CASE WHEN p.previous_price > p.current_price AND p.current_price > 0
+                            THEN ROUND(((p.previous_price - p.current_price) / p.previous_price * 100)::numeric, 2)
+                            ELSE NULL END AS discount_pct,
+                       p.currency, p.image_gallery, p.affiliate_url, p.external_id, p.sku,
                        p.description, p.stock, p.rating, p.reviews_count, p.sales_estimate, p.source_metadata->>'mongo_image_id' AS image_mongo_id, pl.name AS platform, c.name AS category
                 FROM published_cards pc
                 JOIN products p ON p.id = pc.product_id
                 JOIN platforms pl ON pl.id = p.platform_id
                 LEFT JOIN categories c ON c.id = p.category_id
-                WHERE p.is_active = TRUE AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW()) {where}
+                WHERE p.is_active = TRUE AND p.is_blocked = FALSE AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW()) {where}
                 ORDER BY pc.sort_order ASC, pc.published_at DESC, pc.id ASC
                 LIMIT %s OFFSET %s
                 """,
@@ -116,7 +120,7 @@ def publish_card(payload: PublicationPayload, _: None = Depends(require_publicat
                 FROM products p
                 JOIN platforms pl ON pl.id = p.platform_id
                 LEFT JOIN product_scores s ON s.product_id = p.id
-                WHERE p.id = %s AND p.is_active = TRUE AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW())
+                WHERE p.id = %s AND p.is_active = TRUE AND p.is_blocked = FALSE AND p.current_price > 0 AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW())
                 """,
                 (payload.product_id,),
             )
@@ -207,7 +211,7 @@ def update_publication(publication_id: int, payload: PublicationPayload, _: None
                 JOIN products p ON p.id = pc.product_id
                 JOIN platforms pl ON pl.id = p.platform_id
                 LEFT JOIN product_scores s ON s.product_id = p.id
-                WHERE pc.id = %s AND p.is_active = TRUE AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW())
+                WHERE pc.id = %s AND p.is_active = TRUE AND p.is_blocked = FALSE AND p.current_price > 0 AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW())
                 """,
                 (publication_id,),
             )
