@@ -130,6 +130,25 @@ def _details(item_id):
         return {}
 
 
+def _description(item_id):
+    try:
+        data = _get(f"https://api.mercadolibre.com/items/{item_id}/description")
+        return str(data.get("plain_text") or data.get("text") or "").strip()[:5000] or None
+    except (requests.RequestException, RuntimeError) as exc:
+        print(f"[Mercado Libre] descripción {item_id}: {exc}")
+        return None
+
+
+def _seller_details(seller_id):
+    if not seller_id:
+        return {}
+    try:
+        return _get(f"https://api.mercadolibre.com/users/{seller_id}")
+    except (requests.RequestException, RuntimeError) as exc:
+        print(f"[Mercado Libre] vendedor {seller_id}: {exc}")
+        return {}
+
+
 def _prices(item_id):
     try:
         return _get(MELI_PRICES.format(id=item_id)).get("prices") or []
@@ -330,13 +349,9 @@ def fetch_mercadolibre(query, limit=20):
         # por cada producto si la búsqueda ya entrega los campos básicos. Solo pide
         # detalle cuando falta información imprescindible; pictures se aprovecha si
         # viene en el resultado o en ese detalle solicitado.
-        needs_detail = not public_web and (
-            not item.get("permalink")
-            or not item.get("thumbnail")
-            or not item.get("price")
-            or not item.get("title")
-        )
-        detail = _details(item_id) if needs_detail and item_id else {}
+        # El detalle oficial permite recuperar las fotos de la galería y los atributos;
+        # la búsqueda sola suele traer una miniatura y no la ficha completa.
+        detail = _details(item_id) if not public_web and item_id else {}
         prices = []
         sale = {}
         if not public_web and not (item.get("price") or detail.get("price")) and item_id:
@@ -380,6 +395,10 @@ def fetch_mercadolibre(query, limit=20):
             continue
 
         seller_id = detail.get("seller_id") or (item.get("seller") or {}).get("id")
+        seller = _seller_details(seller_id) if seller_id and not public_web else {}
+        seller_rep = seller.get("seller_reputation") or {}
+        seller_transactions = seller_rep.get("transactions") or {}
+        seller_ratings = seller_transactions.get("ratings") or {}
         metadata = {
             "search_result": item,
             "item": detail,
@@ -415,6 +434,8 @@ def fetch_mercadolibre(query, limit=20):
         products.append({
             "external_id": item_id,
             "title": title,
+            "description": _description(item_id) if not public_web else None,
+            "brand": next((a.get("value_name") for a in (detail.get("attributes") or []) if a.get("id") == "BRAND" and a.get("value_name")), None),
             "image_url": primary_image,
             "gallery_urls": gallery_urls,
             "product_url": detail.get("permalink") or item.get("permalink"),
@@ -426,8 +447,14 @@ def fetch_mercadolibre(query, limit=20):
             "sales_estimate": detail.get("sold_quantity") or item.get("sold_quantity"),
             "seller": {
                 "external_id": str(seller_id) if seller_id else None,
-                "name": None,
-                "reputation": None,
+                "name": seller.get("nickname") or seller.get("first_name") or None,
+                "reputation": seller_ratings.get("positive"),
+                "level": seller_rep.get("level_id"),
+                "power_seller_status": seller_rep.get("power_seller_status"),
+                "permalink": seller.get("permalink"),
+                "registration_date": seller.get("registration_date"),
+                "city": (seller.get("address") or {}).get("city"),
+                "state": (seller.get("address") or {}).get("state"),
             },
             "source_metadata": metadata,
         })
