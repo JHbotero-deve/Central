@@ -565,9 +565,11 @@ def _handle(token, chat_id, text):
             "<b>Radar de Producto</b>\n\n"
             "/productos — mostrar los 20 productos del catálogo\n"
             "/top — oportunidades con mayor score\n"
-            "/buscar producto — buscar en los datos modelados\n"
-            "/modelar — registrar y puntuar un producto\n"
-            "/agregar — importar un producto desde Amazon, Mercado Libre o AliExpress por URL\n"
+            "/buscar audífonos bluetooth — buscar en datos guardados y fuentes disponibles\n"
+            "/modelar URL — importar, registrar y puntuar un producto por enlace\n"
+            "/modelar plataforma|categoría|id|título|precio|url|rating|reseñas|ventas|imagen — modelado manual\n"
+            "/agregar URL — importar por enlace (Amazon, Mercado Libre o AliExpress)\n"
+            "/agregar categoría|URL|PRECIO|TÍTULO|IMAGEN_URL|MONEDA — importación manual\n"
             "/publicar ID — publicar un producto validado\n"
             "También puedes enviar una URL sola: Central la captura y la deja lista para publicar.\n"
             "/estado — estado del catálogo\n"
@@ -657,7 +659,12 @@ def _handle(token, chat_id, text):
         return True
 
     if command == "/agregar":
-        result, payload, score = _add_url(argument.strip())
+        raw_argument = argument.strip()
+        # El enlace directo es la vía recomendada; conserva el formato manual histórico.
+        if raw_argument.lower().startswith(("https://", "http://")):
+            _, message = _ingest_telegram_url(raw_argument, raw_argument)
+            return _send(token, chat_id, message)
+        result, payload, score = _add_url(raw_argument)
         if result is None:
             return _send(token, chat_id, f"<b>Error de importación</b>\n{html.escape(str(payload))}")
         score_text = f"Score: {float(score):.1f}/100" if score is not None else "Score: pendiente (sin precio)"
@@ -671,7 +678,11 @@ def _handle(token, chat_id, text):
         return _send(token, chat_id, message)
 
     if command == "/modelar":
-        result, error = _model_product(argument.strip())
+        raw_argument = argument.strip()
+        if raw_argument.lower().startswith(("https://", "http://")):
+            _, message = _ingest_telegram_url(raw_argument, raw_argument)
+            return _send(token, chat_id, message)
+        result, error = _model_product(raw_argument)
         if result is None:
             return _send(token, chat_id, f"<b>Error de modelado</b>\n{html.escape(str(error))}")
         return _send(token, chat_id, f"<b>Producto modelado</b>\nID: {result}\nOportunidad: {float(error):.1f}/100")
