@@ -297,8 +297,8 @@ async function initAuth(){
      const target=$("forgot-email").value.trim().toLowerCase();
      await S.api("/auth/password/forgot",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:target})});
      $("auth-email").value=target;
-     say("forgot-message","Si el correo corresponde a la cuenta, recibirás un código válido durante 10 minutos.",true);
      view("reset");
+     say("reset-message","Si el correo corresponde a la cuenta, recibirás un código válido durante 10 minutos.",true);
    }catch(err){say("forgot-message",err.message||"No fue posible solicitar el código.");}
    finally{btn.disabled=false;}
  });
