@@ -652,3 +652,17 @@ def fetch_amazon_products(
                 break
 
     return results
+
+
+def search_amazon_products(keywords: str, limit: int = 3, category: str = "otros") -> list[dict[str, Any]]:
+    """Return normalized real Amazon results for interactive product discovery."""
+    results: list[dict[str, Any]] = []
+    for item in search_products(keywords, min(max(int(limit), 1), 10)):
+        product = _map_item(item, category, allow_missing_image=True)
+        if not product:
+            continue
+        results.append(product)
+        if len(results) >= limit:
+            break
+    print(f"[amazon] búsqueda interactiva '{keywords}': {len(results)} productos", flush=True)
+    return results
