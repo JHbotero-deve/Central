@@ -64,7 +64,10 @@ check("data = _public_search(query, limit)" in INGEST and "if not data.get(\"res
       "Mercado Libre cae a búsqueda pública cuando la API bloquea o no devuelve resultados")
 check("if not _AUTH_FAILURE:" in AMAZON and "se continúa con búsqueda pública" in AMAZON and "return _search_amazon_web(keywords, limit)" in AMAZON,
       "Amazon conserva la búsqueda pública cuando faltan o se rechazan credenciales API")
-check("fetch_mercadolibre(term, limit=8)" in TELEGRAM and "upsert_product(conn, \"mercadolibre\", category, item)" in TELEGRAM,
-      "el comando /buscar descubre productos externos y los guarda en el catálogo")
+SEARCH = (ROOT / "product-analyzer/app/product_search.py").read_text(encoding="utf-8-sig")
+check("search_external_products(term, limit=8)" in TELEGRAM and "upsert_product(conn, platform, category, item)" in TELEGRAM,
+      "el comando /buscar consulta proveedores externos y persiste productos verificados")
+check("fetch_mercadolibre(term, limit=per_source)" in SEARCH and "search_amazon_products(term, limit=per_source" in SEARCH and "search_aliexpress_products(term, limit=per_source)" in SEARCH,
+      "la búsqueda externa consulta Mercado Libre, Amazon y AliExpress de forma independiente")
 
 print("[PASS] Auditoría de contrato del catálogo completada.")

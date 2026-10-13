@@ -61,6 +61,7 @@ jobs:
           python -m compileall -q product-analyzer/app
           python -m pip install --disable-pip-version-check --no-cache-dir -r product-analyzer/app/requirements.txt
           python -m unittest discover -s product-analyzer/app -p 'test_aliexpress_oauth.py'
+          python -m unittest discover -s product-analyzer/app -p 'test_product_search.py'
           python -m unittest discover -s product-analyzer/app -p 'test_catalog_contract.py'
           python scripts/audit_catalog_contract.py
           python -m pip install --disable-pip-version-check --no-cache-dir pip-audit
