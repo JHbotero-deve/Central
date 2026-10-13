@@ -195,7 +195,7 @@ def _catalog_products(limit=20, offset=0):
                 WHERE p.is_active = TRUE
                   AND p.is_blocked = FALSE
                   AND pl.name IN ('personal', 'mercadolibre', 'amazon', 'aliexpress')
-                ORDER BY p.id ASC
+                ORDER BY p.updated_at DESC NULLS LAST, p.id DESC
                 LIMIT %s OFFSET %s
                 """,
                 (limit, offset),
@@ -557,7 +557,8 @@ def _model_product(argument):
 
 
 def _handle(token, chat_id, text):
-    command, _, argument = text.partition(" ")
+    command_line = (text or "").splitlines()[0].strip() if (text or "").strip() else ""
+    command, _, argument = command_line.partition(" ")
     command = command.lower().strip()
 
     if command in ("/start", "/help"):
@@ -826,7 +827,11 @@ def run_bot():
                     if chat_id is None or not _allowed_chat(chat_id):
                         continue
                     if text.startswith("/"):
-                        _handle(token, chat_id, text)
+                        try:
+                            _handle(token, chat_id, text)
+                        except Exception as exc:
+                            print(f"[telegram-bot] comando {text.split()[0][:40]} falló: {type(exc).__name__}")
+                            _send(token, chat_id, "No pude completar el comando por un error interno. El servicio sigue activo; inténtalo de nuevo en unos minutos.")
                         continue
                     urls = _extract_urls(text)[:3]
                     if urls:
