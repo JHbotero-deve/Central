@@ -195,7 +195,7 @@ def _catalog_products(limit=20, offset=0):
                 WHERE p.is_active = TRUE
                   AND p.is_blocked = FALSE
                   AND pl.name IN ('personal', 'mercadolibre', 'amazon', 'aliexpress')
-                ORDER BY p.id ASC
+                ORDER BY p.updated_at DESC NULLS LAST, p.id DESC
                 LIMIT %s OFFSET %s
                 """,
                 (limit, offset),
@@ -292,7 +292,9 @@ def _add_url(argument):
 
 
 def _extract_urls(text):
-    return list(dict.fromkeys(re.findall(r"https?://[^\s<>]+", text or "")))
+    urls = re.findall(r"https?://[^\s<>]+", text or "")
+    cleaned = (url.rstrip(".,;:!?)\\]}") for url in urls)
+    return list(dict.fromkeys(url for url in cleaned if url))
 
 
 def _category_from_text(text):
@@ -312,14 +314,19 @@ def _category_from_text(text):
 
 
 def _context_title(context):
-    """Extrae una línea candidata de título sin inventar datos desde la URL."""
+    """Extrae el título compartido, quitando texto promocional y precio."""
     skipped = (
         "mejores recomendaciones", "productos en oferta", "ahora precio",
         "precio:", "precio actual", "haz clic", "clic y compra", "compra:",
         "enlace:", "link:", "oferta del día", "oferta del dia",
     )
     for line in (context or "").splitlines():
-        value = re.sub(r"https?://[^\s<>]+", "", line.strip(" \t•-"), flags=re.I).strip(" \t•-:|")
+        value = re.sub(r"https?://[^\s<>]+", "", line.strip(" \t•-"), flags=re.I)
+        value = re.sub(r"(?i)^/?agregar\s+", "", value).strip(" \t•-:|")
+        value = re.sub(r"(?i)^mira lo que encontré[!,:\s-]*", "", value)
+        value = re.sub(r"(?i)\s*(?:[-–—]\s*)?\$\s*[0-9][0-9.,]*\s*(?:COP|USD|EUR)?", "", value)
+        value = re.sub(r"(?i)\s*(?:en Mercado Libre|en Amazon|en TikTok Shop)?\.?\s*(?:Entra aquí|Ver aquí|Compra aquí)\s*:?\s*$", "", value)
+        value = re.sub(r"\s+", " ", value).strip(" \t•-:|.")
         if len(value) < 5 or len(value) > 500:
             continue
         lowered = value.lower()
@@ -557,7 +564,8 @@ def _model_product(argument):
 
 
 def _handle(token, chat_id, text):
-    command, _, argument = text.partition(" ")
+    command_line = (text or "").splitlines()[0].strip() if (text or "").strip() else ""
+    command, _, argument = command_line.partition(" ")
     command = command.lower().strip()
 
     if command in ("/start", "/help"):
@@ -672,6 +680,16 @@ def _handle(token, chat_id, text):
         return True
 
     if command == "/agregar":
+        full_text = text or ""
+        urls = _extract_urls(full_text)
+        if "|" not in argument and urls:
+            url = urls[0]
+            context = re.sub(r"(?m)^\s*/agregar\b", "", full_text, count=1).strip()
+            result, payload = _ingest_telegram_url(url, context)
+            if result is None:
+                return _send(token, chat_id, f"<b>Error de importación</b>\n{html.escape(str(payload))}")
+            return _send(token, chat_id, payload)
+
         result, payload, score = _add_url(argument.strip())
         if result is None:
             return _send(token, chat_id, f"<b>Error de importación</b>\n{html.escape(str(payload))}")
@@ -826,7 +844,11 @@ def run_bot():
                     if chat_id is None or not _allowed_chat(chat_id):
                         continue
                     if text.startswith("/"):
-                        _handle(token, chat_id, text)
+                        try:
+                            _handle(token, chat_id, text)
+                        except Exception as exc:
+                            print(f"[telegram-bot] comando {text.split()[0][:40]} falló: {type(exc).__name__}")
+                            _send(token, chat_id, "No pude completar el comando por un error interno. El servicio sigue activo; inténtalo de nuevo en unos minutos.")
                         continue
                     urls = _extract_urls(text)[:3]
                     if urls:

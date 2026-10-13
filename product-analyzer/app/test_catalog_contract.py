@@ -124,3 +124,19 @@ class TikTokShopCapsuleTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+
+class CatalogPublicationPolicyTests(unittest.TestCase):
+    def test_auto_publication_policy_uses_score_and_card_limit(self):
+        from api import _publish_external_product
+        source = inspect.getsource(_publish_external_product)
+        self.assertIn("CATALOG_MIN_AUTO_PUBLISH_SCORE", source)
+        self.assertIn("CATALOG_MAX_PUBLISHED_CARDS", source)
+        self.assertIn("CATALOG_EXPIRY_HIGH_SCORE_HOURS", source)
+        self.assertIn("CATALOG_EXPIRY_LOW_SCORE_HOURS", source)
+
+    def test_expiry_waits_for_a_successful_complete_provider_sync(self):
+        source = inspect.getsource(_sync_store_catalog)
+        self.assertIn("if meli_sync_available and meli_sync_complete:", source)
+        self.assertIn("meli_sync_complete = False", source)
