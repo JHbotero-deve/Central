@@ -260,10 +260,6 @@ def _sync_store_catalog():
     errors = []
     auto_published = []
     expired_count = 0
-    # La caducidad requiere una sincronización completa y resultados válidos.
-    # Un 403, un error de red o una búsqueda vacía no retira productos publicados.
-    meli_sync_available = False
-    meli_sync_complete = True
     try:
         with conn.cursor() as cur:
             cur.execute("""
@@ -306,8 +302,6 @@ def _sync_store_catalog():
                     break
                 try:
                     products = fetch_mercadolibre(query, limit=50)
-                    if products:
-                        meli_sync_available = True
                     for product in products:
                         if len(meli_imported) >= meli_target:
                             break
@@ -366,7 +360,6 @@ def _sync_store_catalog():
                             errors.append(f"Mercado Libre {external_id}: {exc}")
                 except Exception as exc:
                     conn.rollback()
-                    meli_sync_complete = False
                     errors.append(f"Mercado Libre '{query}': {exc}")
                     if isinstance(exc, MercadoLibreAccessDenied):
                         print({"event": "mercadolibre_access_blocked", "query": query, "error": str(exc)}, flush=True)
@@ -374,43 +367,45 @@ def _sync_store_catalog():
 
         except Exception as exc:
             conn.rollback()
-            meli_sync_complete = False
             errors.append(f"Mercado Libre: {exc}")
 
-        # La caducidad automática aplica solo al catálogo de búsqueda de Mercado Libre
-        # y únicamente si el proveedor entregó productos en esta ejecución. Los fallos
-        # del proveedor nunca deben retirar tarjetas válidas ni productos importados por URL.
-        if meli_sync_available and meli_sync_complete:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    UPDATE products
-                    SET is_active = FALSE, updated_at = NOW()
-                    WHERE is_active = TRUE
-                      AND catalog_expires_at IS NOT NULL
-                      AND catalog_expires_at <= NOW()
-                      AND COALESCE(source_metadata->>'import_method', '') <> 'product_url'
-                      AND EXISTS (
-                          SELECT 1 FROM platforms pl
-                          WHERE pl.id = products.platform_id
-                            AND pl.name = 'mercadolibre'
-                      )
-                """)
-                expired_count = cur.rowcount
-                cur.execute("""
-                    UPDATE published_cards pc
-                    SET is_published = FALSE, updated_at = NOW()
-                    FROM products p
-                    JOIN platforms pl ON pl.id = p.platform_id
-                    WHERE pc.product_id = p.id
-                      AND pc.is_published = TRUE
-                      AND p.is_active = FALSE
-                      AND p.catalog_expires_at IS NOT NULL
-                      AND p.catalog_expires_at <= NOW()
-                      AND pl.name = 'mercadolibre'
-                """)
-            conn.commit()
-        if expired_count:
-            print({"event": "catalog_expired_after_48h", "count": expired_count}, flush=True)
+        # La caducidad es independiente de la disponibilidad del proveedor.
+        # Solo afecta productos de catálogo de Mercado Libre; las importaciones
+        # manuales por URL conservan su ciclo de vida propio.
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE products
+                SET is_active = FALSE, updated_at = NOW()
+                WHERE is_active = TRUE
+                  AND catalog_expires_at IS NOT NULL
+                  AND catalog_expires_at <= NOW()
+                  AND COALESCE(source_metadata->>'import_method', '') <> 'product_url'
+                  AND EXISTS (
+                      SELECT 1 FROM platforms pl
+                      WHERE pl.id = products.platform_id
+                        AND pl.name = 'mercadolibre'
+                  )
+            """)
+            expired_count = cur.rowcount
+            cur.execute("""
+                UPDATE published_cards pc
+                SET is_published = FALSE, updated_at = NOW()
+                FROM products p
+                JOIN platforms pl ON pl.id = p.platform_id
+                WHERE pc.product_id = p.id
+                  AND pc.is_published = TRUE
+                  AND p.is_active = FALSE
+                  AND p.catalog_expires_at IS NOT NULL
+                  AND p.catalog_expires_at <= NOW()
+                  AND pl.name = 'mercadolibre'
+            """)
+            unpublished_count = cur.rowcount
+        conn.commit()
+        print({
+            "event": "catalog_expiration_sweep",
+            "products_deactivated": expired_count,
+            "cards_unpublished": unpublished_count,
+        }, flush=True)
 
 
         if not amazon_imported and not meli_imported and not meli_refreshed:
