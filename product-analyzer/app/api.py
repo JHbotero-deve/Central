@@ -402,8 +402,8 @@ def _sync_store_catalog():
             unpublished_count = cur.rowcount
         conn.commit()
         print({
-            "event": "catalog_expiration_sweep",
-            "products_deactivated": expired_count,
+            "event": "catalog_expired_after_48h",
+            "count": expired_count,
             "cards_unpublished": unpublished_count,
         }, flush=True)
 
