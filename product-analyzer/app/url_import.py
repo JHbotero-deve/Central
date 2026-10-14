@@ -7,6 +7,8 @@ from urllib.parse import urlparse
 
 import requests
 
+from amazon_api import creators_api_configured, fetch_amazon_product_by_asin
+
 AMAZON_HOST_RE = re.compile(r"(^|\.)amazon\.[a-z.]+$", re.I)
 MELI_HOST_RE = re.compile(r"(^|\.)(mercadolibre|mercadolivre)\.[a-z.]+$", re.I)
 TIKTOK_HOST_RE = re.compile(r"(^|\.)tiktok(?:shop)?\.com$", re.I)
@@ -198,21 +200,61 @@ def import_url(
     url = url.strip()
     _public_url(url)
     platform = detect_platform(url)
-    try:
-        metadata = _metadata(url)
-    except requests.RequestException as exc:
-        # Algunas tiendas bloquean lectura automática. Solo se admite salida manual
-        # cuando el usuario aportó título, precio e imagen real; no se inventan datos.
-        enough_manual_data = bool(title and price is not None and (image_url or not require_image))
-        if not enough_manual_data:
-            if platform == "aliexpress":
-                raise ValueError("AliExpress no entregó los metadatos. Completa nombre y precio; añade una imagen real para publicar.") from exc
-            raise
-        metadata = {
-            "resolved_url": url,
-            "gallery_urls": [],
-            "metadata_source": "manual",
-        }
+    asin = _asin(url) if platform == "amazon" else None
+    if platform == "amazon" and asin and creators_api_configured():
+        try:
+            amazon_product = fetch_amazon_product_by_asin(asin, category)
+            if amazon_product:
+                metadata = {
+                    "resolved_url": amazon_product["product_url"],
+                    "title": amazon_product["title"],
+                    "description": amazon_product.get("description"),
+                    "sku": asin,
+                    "brand": amazon_product.get("brand"),
+                    "price": amazon_product["price"],
+                    "currency": amazon_product["currency"],
+                    "image_url": amazon_product.get("image_url"),
+                    "gallery_urls": amazon_product.get("gallery_urls") or [],
+                    "rating": amazon_product.get("rating"),
+                    "reviews_count": amazon_product.get("reviews_count"),
+                    "seller": (amazon_product.get("seller") or {}).get("name"),
+                    "metadata_source": "amazon_creators_api",
+                }
+            else:
+                raise ValueError(f"Amazon Creators API no encontró una oferta disponible para el ASIN {asin}.")
+        except (requests.RequestException, RuntimeError, ValueError) as exc:
+            enough_manual_data = bool(title and price is not None and (image_url or not require_image))
+            if not enough_manual_data:
+                raise ValueError(
+                    f"No se pudo importar el ASIN {asin} con Amazon Creators API: {str(exc)[:240]}. "
+                    "Verifica el marketplace y las credenciales, o envía nombre, precio e imagen real."
+                ) from exc
+            metadata = {
+                "resolved_url": url,
+                "gallery_urls": [],
+                "metadata_source": "manual",
+            }
+    else:
+        try:
+            metadata = _metadata(url)
+        except requests.RequestException as exc:
+            # Algunas tiendas bloquean lectura automática. Solo se admite salida manual
+            # cuando el usuario aportó título, precio e imagen real; no se inventan datos.
+            enough_manual_data = bool(title and price is not None and (image_url or not require_image))
+            if not enough_manual_data:
+                if platform == "aliexpress":
+                    raise ValueError("AliExpress no entregó los metadatos. Completa nombre y precio; añade una imagen real para publicar.") from exc
+                if platform == "amazon" and getattr(exc.response, "status_code", None) == 503:
+                    raise ValueError(
+                        "Amazon bloqueó la lectura automática de esa página (HTTP 503). "
+                        "Configura el acceso a Creators API o envía /agregar categoría|URL|PRECIO|TÍTULO|IMAGEN_URL|MONEDA."
+                    ) from exc
+                raise
+            metadata = {
+                "resolved_url": url,
+                "gallery_urls": [],
+                "metadata_source": "manual",
+            }
     resolved_url = metadata.get("resolved_url") or url
     external_id = _asin(resolved_url) if platform == "amazon" else None
     if not external_id:

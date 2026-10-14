@@ -9,7 +9,13 @@ from api import _sync_store_catalog
 from url_import import import_url
 
 from catalog_rules import discount_percentage
-from amazon_api import _access_token, _previous_offer, search_amazon_products, search_products
+from amazon_api import (
+    _access_token,
+    _previous_offer,
+    fetch_amazon_product_by_asin,
+    search_amazon_products,
+    search_products,
+)
 from ingest import fetch_mercadolibre
 from store_orders import _public_order_summary, create_store_order
 from tiktok_creator import _normalize
@@ -43,6 +49,27 @@ class AmazonAffiliateUrlTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "AMAZON_CREDENTIAL_VERSION"):
                 _access_token()
         post.assert_not_called()
+
+    def test_getitems_uses_the_asin_and_current_offer_resources(self):
+        item = {
+            "asin": "B0HJB69GJL",
+            "detailPageURL": "https://www.amazon.com/dp/B0HJB69GJL",
+            "itemInfo": {"title": {"displayValue": "Auriculares"}},
+            "offersV2": {"listings": [{
+                "price": {"amount": 199.99, "currency": "USD"},
+            }]},
+        }
+        with patch(
+            "amazon_api._request",
+            return_value={"itemsResult": {"items": [item]}},
+        ) as api_request:
+            product = fetch_amazon_product_by_asin("b0hjb69gjl", "electronica")
+
+        self.assertEqual(api_request.call_args.args[0], "getItems")
+        self.assertEqual(api_request.call_args.args[1]["itemIds"], ["B0HJB69GJL"])
+        self.assertEqual(api_request.call_args.args[1]["itemIdType"], "ASIN")
+        self.assertIn("offersV2.listings.price", api_request.call_args.args[1]["resources"])
+        self.assertEqual(product["price"], 199.99)
 
     def test_catalog_sync_searches_amazon_only_with_official_partner_credentials(self):
         source = inspect.getsource(_sync_store_catalog)
@@ -132,6 +159,46 @@ class AmazonAffiliateUrlTests(unittest.TestCase):
         self.assertEqual(product["affiliate_url"], affiliate_url)
         self.assertEqual(product["price"], 129.99)
         self.assertEqual(product["image_url"], "https://images.example.com/audifonos.jpg")
+
+    def test_amazon_url_import_uses_creators_api_asin_lookup(self):
+        url = "https://www.amazon.com/-/es/product/dp/B0HJB69GJL?tag=partner-20"
+        api_product = {
+            "product_url": "https://www.amazon.com/dp/B0HJB69GJL?tag=partner-20",
+            "title": "Auriculares inalámbricos",
+            "description": "Producto devuelto por la API",
+            "brand": "Amazon Brand",
+            "price": 199.99,
+            "currency": "USD",
+            "image_url": "https://images.example.com/airpods.jpg",
+            "gallery_urls": ["https://images.example.com/airpods.jpg"],
+            "rating": None,
+            "reviews_count": 0,
+            "seller": {"name": "Amazon"},
+        }
+        with patch("url_import._public_url"), patch(
+            "url_import.creators_api_configured", return_value=True
+        ), patch("url_import.fetch_amazon_product_by_asin", return_value=api_product) as lookup, patch(
+            "url_import._metadata"
+        ) as scraper:
+            product = import_url(url, "electronica")
+
+        lookup.assert_called_once_with("B0HJB69GJL", "electronica")
+        scraper.assert_not_called()
+        self.assertEqual(product["external_id"], "B0HJB69GJL")
+        self.assertEqual(product["title"], "Auriculares inalámbricos")
+        self.assertEqual(product["price"], 199.99)
+        self.assertEqual(product["affiliate_url"], url)
+        self.assertEqual(product["source_metadata"]["metadata_source"], "amazon_creators_api")
+
+    def test_amazon_503_without_creators_api_returns_actionable_import_error(self):
+        response = requests.Response()
+        response.status_code = 503
+        error = requests.HTTPError("503 Server Error", response=response)
+        with patch("url_import._public_url"), patch(
+            "url_import.creators_api_configured", return_value=False
+        ), patch("url_import._metadata", side_effect=error):
+            with self.assertRaisesRegex(ValueError, "Amazon bloqueó la lectura automática"):
+                import_url("https://www.amazon.com/dp/B0HJB69GJL", "electronica")
 
     def test_import_preserves_manual_aliexpress_affiliate_url_when_store_blocks_reading(self):
         affiliate_url = "https://s.click.aliexpress.com/e/_example"

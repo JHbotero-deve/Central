@@ -18,13 +18,17 @@ _TOKEN_VERSION = ""
 _AUTH_FAILURE = False
 
 
+def creators_api_configured() -> bool:
+    return bool(CREDENTIAL_ID and CREDENTIAL_SECRET and PARTNER_TAG)
+
+
 def _access_token() -> str:
     global _TOKEN, _TOKEN_EXPIRES_AT, _TOKEN_VERSION
 
     if _TOKEN and time.time() < _TOKEN_EXPIRES_AT - 120:
         return _TOKEN
 
-    if not CREDENTIAL_ID or not CREDENTIAL_SECRET or not PARTNER_TAG:
+    if not creators_api_configured():
         raise RuntimeError("Faltan AMAZON_CREDENTIAL_ID, AMAZON_CREDENTIAL_SECRET o AMAZON_PARTNER_TAG")
 
     configs = {
@@ -529,6 +533,39 @@ def _map_item(
             "keywords": category,
         },
     }
+
+
+def fetch_amazon_product_by_asin(asin: str, category: str = "otros") -> dict[str, Any] | None:
+    """Look up a user-supplied Amazon product URL through the official Creators API."""
+    asin = asin.strip().upper()
+    if not re.fullmatch(r"[A-Z0-9]{10}", asin):
+        raise ValueError("El ASIN de Amazon no tiene un formato válido.")
+
+    data = _request(
+        "getItems",
+        {
+            "itemIds": [asin],
+            "itemIdType": "ASIN",
+            "resources": [
+                "images.primary.large",
+                "images.primary.medium",
+                "images.primary.small",
+                "images.variants.large",
+                "itemInfo.title",
+                "itemInfo.byLineInfo",
+                "itemInfo.features",
+                "offersV2.listings.price",
+                "offersV2.listings.savingBasis",
+                "offersV2.listings.merchantInfo",
+            ],
+        },
+    )
+    items = ((data.get("itemsResult") or {}).get("items") or [])
+    for item in items:
+        product = _map_item(item, category, allow_missing_image=True)
+        if product and product["external_id"] == asin:
+            return product
+    return None
 
 
 def _map_fallback_item(
