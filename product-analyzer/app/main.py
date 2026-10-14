@@ -15,6 +15,11 @@ def _error_detail(exc: Exception):
 
 
 async def sync_catalog_loop():
+    enabled = os.getenv("CATALOG_AUTO_SYNC_ENABLED", "false").strip().lower() in {"1", "true", "yes"}
+    if not enabled:
+        print({"event": "catalog_auto_sync_disabled", "trigger": "Telegram /inyectar"}, flush=True)
+        await asyncio.Event().wait()
+        return
     interval = max(300, int(os.getenv("CATALOG_SYNC_INTERVAL_SECONDS", "7200")))
     print({"event": "catalog_worker_started", "interval_seconds": interval}, flush=True)
     while True:

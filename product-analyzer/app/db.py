@@ -165,7 +165,7 @@ def upsert_product(conn, platform_name: str, category_name: str, product: dict):
                 %s, %s, %s, %s, %s, %s, %s, %s, %s,
                 %s, %s, %s, %s, %s, %s, %s, %s, NOW(),
                 CASE WHEN COALESCE(%s::jsonb->>'import_method', '') = 'product_url'
-                     THEN NULL ELSE NOW() + INTERVAL '48 hours' END,
+                     THEN NULL ELSE NOW() + INTERVAL '7 days' END,
                 FALSE, NOW()
             )
             ON CONFLICT (platform_id, external_id) DO UPDATE SET
@@ -197,7 +197,7 @@ def upsert_product(conn, platform_name: str, category_name: str, product: dict):
                 catalog_expires_at = CASE
                     WHEN COALESCE(EXCLUDED.source_metadata->>'import_method', '') = 'product_url'
                     THEN NULL
-                    ELSE NOW() + INTERVAL '48 hours'
+                    ELSE NOW() + INTERVAL '7 days'
                 END,
                 is_active = CASE WHEN products.is_blocked THEN FALSE ELSE TRUE END,
                 updated_at = NOW()

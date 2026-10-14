@@ -17,10 +17,12 @@ from wompi import create_cart_checkout, create_product_checkout
 
 
 class AmazonAffiliateUrlTests(unittest.TestCase):
-    def test_scheduled_catalog_does_not_call_amazon_product_api(self):
+    def test_catalog_sync_searches_amazon_only_with_official_partner_credentials(self):
         source = inspect.getsource(_sync_store_catalog)
-        self.assertNotIn("fetch_amazon_products", source)
-        self.assertIn("affiliate_url_only", source) if "affiliate_url_only" in source else None
+        self.assertIn("search_amazon_products", source)
+        self.assertIn("AMAZON_CREDENTIAL_ID", source)
+        self.assertIn("AMAZON_PARTNER_TAG", source)
+
 
     def test_import_preserves_supplied_amazon_affiliate_url_and_manual_real_data(self):
         affiliate_url = "https://www.amazon.com/dp/B0ABCDEF12?tag=partner-20"
@@ -79,7 +81,8 @@ class TelegramCatalogContractTests(unittest.TestCase):
                 self.assertIn("p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW()", functions[name])
         self.assertIn("'tiktok'", functions["_catalog_products"])
         self.assertIn("Publicar:", functions["_format_product"])
-        self.assertIn("saved_product_id", functions["_handle"])
+        self.assertIn("products = _search_products(term)", functions["_handle"])
+        self.assertNotIn("search_external_products", functions["_handle"])
 
     def test_telegram_status_counts_only_active_unexpired_products(self):
         path = Path(__file__).with_name("telegram_alert.py")
@@ -98,6 +101,22 @@ class TelegramCatalogContractTests(unittest.TestCase):
     def test_telegram_help_lists_url_import_for_all_supported_platforms(self):
         source = Path(__file__).with_name("telegram_alert.py").read_text(encoding="utf-8")
         self.assertIn("Amazon, Mercado Libre, TikTok Shop o AliExpress por URL", source)
+        self.assertIn("/inyectar", source)
+
+    def test_store_search_uses_only_central_publications(self):
+        source = (Path(__file__).resolve().parents[1] / "frontend" / "tienda.html").read_text(encoding="utf-8")
+        self.assertIn('API+"/publications?limit="+pageSize+"&offset="+offset', source)
+        self.assertIn('data-mode="discount">🔥 40%+ descuento', source)
+        self.assertIn("discountPercent(p)>=40", source)
+        self.assertIn("verified_discount_pct", source)
+        self.assertNotIn("meta.promotion_discount_pct", source)
+
+    def test_store_discount_badge_requires_verified_ingestion_metadata(self):
+        from publications import list_publications
+
+        source = inspect.getsource(list_publications)
+        self.assertIn("p.source_metadata->>'catalog_ingestion' = 'verified_discount_search'", source)
+        self.assertIn("AS verified_discount_pct", source)
 
     def test_telegram_publication_rejects_invalid_or_expired_products(self):
         source = Path(__file__).with_name("telegram_alert.py").read_text(encoding="utf-8")
@@ -270,12 +289,13 @@ class CatalogPublicationPolicyTests(unittest.TestCase):
     def test_auto_publication_policy_uses_score_and_card_limit(self):
         from api import _publish_external_product
         source = inspect.getsource(_publish_external_product)
-        self.assertIn("CATALOG_MIN_AUTO_PUBLISH_SCORE", source)
+        self.assertIn('CATALOG_MIN_DISCOUNT_PCT", "40"', source)
         self.assertIn("CATALOG_MAX_PUBLISHED_CARDS", source)
-        self.assertIn("CATALOG_EXPIRY_HIGH_SCORE_HOURS", source)
-        self.assertIn("CATALOG_EXPIRY_LOW_SCORE_HOURS", source)
+        self.assertIn('CATALOG_EXPIRY_DAYS", "7"', source)
 
     def test_expiry_waits_for_a_successful_complete_provider_sync(self):
         source = inspect.getsource(_sync_store_catalog)
-        self.assertIn("if meli_sync_available and meli_sync_complete:", source)
-        self.assertIn("meli_sync_complete = False", source)
+        self.assertIn('"CATALOG_SYNC_MAX_PRODUCTS", "200"', source)
+        self.assertIn('"CATALOG_MIN_DISCOUNT_PCT", "40"', source)
+        self.assertIn("catalog_expires_at<=NOW()", source)
+        self.assertIn("pg_try_advisory_lock", source)

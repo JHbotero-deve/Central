@@ -5,21 +5,23 @@
 - Frontend estático en Vercel desde `product-analyzer/frontend`.
 - API, worker y bot en Railway desde `product-analyzer/app`.
 - PostgreSQL de Railway como persistencia única.
-- Mercado Libre como fuente de sincronización del Worker; Amazon, AliExpress y TikTok Shop se importan por URL. Cada integración funciona con sus propias credenciales y permisos.
+- Mercado Libre y Amazon como fuentes de ofertas verificadas por orden explícita; AliExpress y TikTok Shop se importan por URL hasta habilitar sus APIs de precios/afiliados.
 - Telegram para consultas y alertas.
 - Wompi para pagos de productos propios.
 
 ## Flujo
 
-Mercado Libre → Worker al arrancar y cada 2 horas → PostgreSQL → puntuación → API → Vercel.
+Telegram `/inyectar` → búsquedas reales de Mercado Libre y Amazon → verificación de precio actual y original (mínimo 40%) → PostgreSQL → publicaciones con caducidad a 7 días → API → Vercel. La ingesta automática del Worker queda apagada por defecto para que no busque fuentes externas sin una orden explícita; se puede habilitar con `CATALOG_AUTO_SYNC_ENABLED=true`.
 
-Amazon, AliExpress y TikTok Shop se agregan por URL desde el bot de Telegram con `/agregar categoría|URL`. Si la tienda bloquea la lectura automática, completa los datos reales: `/agregar categoría|URL|PRECIO|TÍTULO|IMAGEN_URL|MONEDA`. Estos proveedores no forman parte de la sincronización automática del Worker.
+AliExpress y TikTok Shop se agregan por URL desde el bot de Telegram con `/agregar categoría|URL`. Si la tienda bloquea la lectura automática, completa los datos reales: `/agregar categoría|URL|PRECIO|TÍTULO|IMAGEN_URL|MONEDA`. Amazon también admite importación por URL; las ofertas Amazon solo entran en `/inyectar` cuando Creators API devuelve precio actual y precio de referencia.
+
+`/buscar término` consulta exclusivamente el catálogo ya guardado en Central; no llama a tiendas externas. `/inyectar` inicia explícitamente una búsqueda/importación de hasta 200 ofertas reales por ciclo, publica solo ofertas con precio de referencia verificable y descuento mínimo del 40%, y limita su vigencia automática a 7 días. El lote puede ser menor de 200 si los proveedores no entregan suficientes ofertas verificables. AliExpress no se añade como oferta automática hasta contar con acceso autorizado a su API afiliada y un precio original verificable; el OAuth de Open Platform por sí solo no comprueba descuentos ni elegibilidad Prime en Amazon.
 
 PostgreSQL es el origen de verdad para productos y publicaciones. MongoDB se usa para imágenes y auditoría, no para almacenar el catálogo.
 
 ## Publicación
 
-Central ingresa y analiza productos. El usuario decide qué tarjetas se publican. La tienda solo muestra publicaciones activas almacenadas en PostgreSQL.
+Central ingresa y analiza productos. `/inyectar` publica automáticamente ofertas externas que superan la verificación del 40%; otros productos requieren publicación manual. La tienda solo muestra publicaciones activas almacenadas en PostgreSQL.
 
 ## Rutas
 

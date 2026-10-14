@@ -75,6 +75,10 @@ def list_publications(
                        CASE WHEN p.previous_price > p.current_price AND p.current_price > 0
                             THEN ROUND(((p.previous_price - p.current_price) / p.previous_price * 100)::numeric, 2)
                             ELSE NULL END AS discount_pct,
+                       CASE WHEN p.source_metadata->>'catalog_ingestion' = 'verified_discount_search'
+                                  AND p.previous_price > p.current_price AND p.current_price > 0
+                            THEN ROUND(((p.previous_price - p.current_price) / p.previous_price * 100)::numeric, 2)
+                            ELSE NULL END AS verified_discount_pct,
                        p.currency, p.image_gallery, p.affiliate_url, p.external_id, p.sku,
                        p.description, p.stock, p.rating, p.reviews_count, p.sales_estimate, p.source_metadata->>'mongo_image_id' AS image_mongo_id, pl.name AS platform, c.name AS category
                 FROM published_cards pc

@@ -7,13 +7,13 @@ Documento operativo para levantar Central cuando haya presupuesto (Railway Hobby
 | Servicio Railway | Rol | Start Command recomendado |
 |------------------|-----|---------------------------|
 | **API** (ej. `gracious-renewal`) | API FastAPI + rutas de publicaciones, OAuth, comercio | `uvicorn api:app --host 0.0.0.0 --port $PORT` |
-| **Worker** (necesario para ingesta automática) | Sincronización al arrancar y cada 2 h | `uvicorn main:app --host 0.0.0.0 --port $PORT` |
+| **Worker** (`central-worker`) | Health y, opcionalmente, sincronización programada | `uvicorn main:app --host 0.0.0.0 --port $PORT` |
 | **central-telegram** | Bot de Telegram (polling) | `python telegram_alert.py` |
 | **PostgreSQL** | Base de datos | Gestionado por Railway |
 | **Vercel** | Frontend público y panel | Automático desde `product-analyzer/frontend` |
 
 > El bot de Telegram **debe** ser un servicio separado (o un proceso dedicado). Los Dockerfiles actuales arrancan solo la API (`uvicorn`). Si el servicio `central-telegram` usa el mismo Dockerfile, sobrescribe el **Start Command** en Railway.
-> API y Worker deben compartir `DATABASE_URL` y `MELI_TOKEN_ENCRYPTION_KEY`: OAuth guarda los tokens cifrados en PostgreSQL y el Worker necesita esa misma clave para leerlos. Telegram también necesita el mismo `DATABASE_URL`.
+> API y Worker deben compartir `DATABASE_URL` y `MELI_TOKEN_ENCRYPTION_KEY` si se activa la ingesta programada. Telegram también necesita la misma base de datos y las credenciales de proveedores que use `/inyectar`, porque el comando ejecuta la ingesta en el servicio del bot.
 
 ---
 
@@ -41,6 +41,11 @@ Documento operativo para levantar Central cuando haya presupuesto (Railway Hobby
 | `MELI_TOKEN_ENCRYPTION_KEY` | Clave Fernet para tokens Melí |
 | `MELI_REDIRECT_URI` | `https://gracious-renewal-production-76df.up.railway.app/api/v1/meli/oauth/callback`; debe coincidir con la URI de la aplicación |
 | `CATALOG_SYNC_INTERVAL_SECONDS` | Intervalo del Worker en segundos (por defecto 7200) |
+| `CATALOG_AUTO_SYNC_ENABLED` | Ingresa automáticamente en segundo plano; por defecto `false`, por lo que se requiere `/inyectar` |
+| `CATALOG_SYNC_MAX_PRODUCTS` | Máximo combinado por ciclo, limitado en código a 200 |
+| `CATALOG_MIN_DISCOUNT_PCT` | Descuento mínimo verificable (por defecto 40) |
+| `CATALOG_EXPIRY_DAYS` | Vigencia del catálogo automático en días (por defecto 7) |
+| `AMAZON_CREDENTIAL_ID`, `AMAZON_CREDENTIAL_SECRET`, `AMAZON_PARTNER_TAG` | Credenciales/identificador de Creators API; necesarias para comprobar precios originales |
 | `ALIEXPRESS_APP_KEY` | AliExpress Open Platform |
 | `ALIEXPRESS_APP_SECRET` | AliExpress Open Platform |
 | `ALIEXPRESS_CALLBACK_URL` | Por defecto: `https://central-7ykr.vercel.app/api/v1/aliexpress/oauth/callback` |
@@ -62,6 +67,9 @@ Documento operativo para levantar Central cuando haya presupuesto (Railway Hobby
 |----------|-------------|
 | `CENTRAL_API_BASE` | URL de la API (proxy de imágenes `mongo://`) |
 | `TELEGRAM_POLL_INTERVAL` | Segundos entre polls (por defecto 3) |
+| `MELI_CLIENT_ID`, `MELI_CLIENT_SECRET`, `MELI_TOKEN_ENCRYPTION_KEY` | Necesarias para consultar/renovar Mercado Libre desde `/inyectar` |
+| `AMAZON_CREDENTIAL_ID`, `AMAZON_CREDENTIAL_SECRET`, `AMAZON_PARTNER_TAG` | Necesarias para consultar Amazon y verificar precios de referencia |
+| `CATALOG_SYNC_MAX_PRODUCTS`, `CATALOG_MIN_DISCOUNT_PCT`, `CATALOG_EXPIRY_DAYS` | Opcionales; defaults: 200, 40 y 7 |
 
 ### 3. Vercel (frontend)
 
@@ -116,6 +124,12 @@ En Railway: **Settings → Deploy → Start Command** y pegar el comando (no dep
      TELEGRAM_CHAT_ID=6008260829
      DATABASE_URL=<misma_que_API>
      CENTRAL_API_BASE=<url_de_la_API>
+     MELI_CLIENT_ID=<id_oauth>
+     MELI_CLIENT_SECRET=<secreto_oauth>
+     MELI_TOKEN_ENCRYPTION_KEY=<misma_clave_que_API>
+     AMAZON_CREDENTIAL_ID=<creators_api_id>
+     AMAZON_CREDENTIAL_SECRET=<creators_api_secret>
+     AMAZON_PARTNER_TAG=<tag_de_afiliado>
      ```
    - Start Command: `python telegram_alert.py`
    - Deploy.
@@ -147,7 +161,7 @@ En Railway: **Settings → Deploy → Start Command** y pegar el comando (no dep
 | `/publicar ID` | Tarjeta publicada |
 | `/tienda` en Vercel | Tarjetas visibles |
 
-El Worker debe registrar `catalog_worker_started` al arrancar y `catalog_sync` al completar la ejecución. `/estado` solo consulta PostgreSQL; no inicia una búsqueda. `/top` y `/productos` muestran el ID y el comando `/publicar ID` para poder continuar el flujo. Si Mercado Libre devuelve `403` o `429`, revisar permisos OAuth y esperar el límite antes de reintentar. Amazon, AliExpress y TikTok Shop se incorporan manualmente desde Telegram mediante `/agregar categoría|URL`; el Worker automático de este proyecto sincroniza Mercado Libre.
+Con `CATALOG_AUTO_SYNC_ENABLED=false` (predeterminado), el Worker registra `catalog_auto_sync_disabled` y no busca productos externamente. `/estado` solo consulta PostgreSQL; no inicia una búsqueda. `/buscar término` consulta solo los productos persistidos en Central. `/inyectar` solicita explícitamente una ingesta en segundo plano de hasta 200 ofertas por ciclo. Solo se importan y publican productos con imagen/enlace reales, precio actual y precio original verificables, descuento mínimo del 40% y vigencia de 7 días. Los lotes pueden tener menos de 200 productos. `/top` y `/productos` muestran los datos ya guardados. Si Mercado Libre devuelve `403` o `429`, revisar permisos OAuth y esperar el límite antes de reintentar. Amazon requiere Creators API/Partner Tag para verificar precio actual y de referencia; la elegibilidad Prime no se infiere. AliExpress se mantiene en importación por URL hasta tener API afiliada autorizada que entregue ambos precios. TikTok Shop también se incorpora mediante URL. Para volver a la ejecución programada, habilitar `CATALOG_AUTO_SYNC_ENABLED=true`.
 
 ---
 

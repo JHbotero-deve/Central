@@ -19,6 +19,7 @@ from mongo_store import store_product_image
 
 from analysis import score_product
 from ingest import MercadoLibreAccessDenied, fetch_mercadolibre
+from amazon_api import search_amazon_products
 from db import get_connection, upsert_product, _affiliate_url
 from catalog_rules import discount_percentage
 from monetization import router as monetization_router
@@ -197,7 +198,7 @@ def health():
 def _publish_external_product(conn, product_id, product, platform_label):
     """Publica solo ofertas con descuento real >= umbral y enlace monetizable verificable."""
     discount_pct = discount_percentage(product.get("price"), product.get("previous_price"))
-    threshold = float(os.getenv("CATALOG_MIN_DISCOUNT_PCT", "50"))
+    threshold = float(os.getenv("CATALOG_MIN_DISCOUNT_PCT", "40"))
     if discount_pct is None or discount_pct < threshold:
         return False
     current_price = float(product.get("price") or 0)
@@ -232,19 +233,15 @@ def _publish_external_product(conn, product_id, product, platform_label):
     currency = stored.get("currency") or product.get("currency") or "COP"
     price_display = f"{price:,.2f} {currency}"
     score = max(float(product.get("_score") or stored.get("opportunity_score") or 0), discount_pct)
-    min_score = float(os.getenv("CATALOG_MIN_AUTO_PUBLISH_SCORE", "75"))
-    high_score_hours = max(1, int(os.getenv("CATALOG_EXPIRY_HIGH_SCORE_HOURS", "48")))
-    low_score_hours = max(1, int(os.getenv("CATALOG_EXPIRY_LOW_SCORE_HOURS", "24")))
+    expiry_days = max(1, min(int(os.getenv("CATALOG_EXPIRY_DAYS", "7")), 30))
     with conn.cursor() as cur:
         # Las importaciones manuales por URL conservan su ciclo de vida propio.
         cur.execute("""
             UPDATE products
-            SET catalog_expires_at = NOW() + (%s * INTERVAL '1 hour')
+            SET catalog_expires_at = NOW() + (%s * INTERVAL '1 day')
             WHERE id = %s AND COALESCE(source_metadata->>'import_method', '') <> 'product_url'
-        """, (high_score_hours if score >= min_score else low_score_hours, product_id))
-        if score < min_score:
-            return False
-        max_cards = max(1, int(os.getenv("CATALOG_MAX_PUBLISHED_CARDS", "350")))
+        """, (expiry_days, product_id))
+        max_cards = max(1, int(os.getenv("CATALOG_MAX_PUBLISHED_CARDS", "550")))
         cur.execute("""
             SELECT EXISTS (
                 SELECT 1 FROM published_cards
@@ -284,216 +281,219 @@ def _publish_external_product(conn, product_id, product, platform_label):
     return True
 
 def _sync_store_catalog():
-    """Importa, puntúa y publica ofertas verificadas; rota caducados solo si hay reemplazos."""
+    """Ingesta hasta 200 ofertas reales verificadas y expira el lote a los siete días."""
     conn = get_connection()
-    amazon_imported = []  # Amazon se importa por URL afiliada, no mediante búsqueda API.
-    meli_imported = []
-    meli_refreshed = []
-    meli_refreshed_keys = set()
+    target = max(1, min(int(os.getenv("CATALOG_SYNC_MAX_PRODUCTS", "200")), 200))
+    threshold = float(os.getenv("CATALOG_MIN_DISCOUNT_PCT", "40"))
+    expiry_days = max(1, min(int(os.getenv("CATALOG_EXPIRY_DAYS", "7")), 30))
     errors = []
+    rejected = {"missing_reference_price": 0, "below_discount_threshold": 0, "missing_image_or_url": 0}
+    candidates = {}
+    imported = {"mercadolibre": [], "amazon": [], "aliexpress": []}
     auto_published = []
     expired_count = 0
-    # No retirar publicaciones si Mercado Libre falla o no entrega resultados.
-    meli_sync_available = False
-    meli_sync_complete = True
+    card_unpublished_count = 0
+    locked = False
+    queries = (
+        ("electronica", "audifonos bluetooth"), ("electronica", "smartwatch"),
+        ("electronica", "mouse gamer"), ("electronica", "teclado mecanico"),
+        ("accesorios", "cargador usb c"), ("accesorios", "power bank"),
+        ("electronica", "camara seguridad wifi"), ("electronica", "parlante bluetooth"),
+        ("electronica", "monitor 4k"), ("electronica", "webcam"),
+        ("electronica", "ssd 1tb"), ("electronica", "tablet android"),
+        ("hogar", "cafetera"), ("hogar", "freidora aire"),
+        ("hogar", "aspiradora robot"), ("hogar", "silla ergonomica"),
+        ("accesorios", "mochila portatil"), ("electronica", "microfono usb"),
+        ("electronica", "control videojuegos"), ("hogar", "lampara led"),
+    )
+    providers = (
+        ("mercadolibre", "Mercado Libre"),
+        ("amazon", "Amazon"),
+        ("aliexpress", "AliExpress"),
+    )
     try:
         with conn.cursor() as cur:
-            cur.execute("""
-                SELECT p.external_id, p.title, p.product_url, pl.name AS platform
-                FROM products p
-                JOIN platforms pl ON pl.id = p.platform_id
-                WHERE p.is_active = TRUE AND pl.name IN ('amazon', 'mercadolibre')
-            """)
-            existing_rows = cur.fetchall()
-            existing = {(str(row["platform"]).lower(), str(row["external_id"]).upper()) for row in existing_rows}
-            meli_seen_titles = {
-                " ".join(str(row.get("title") or "").lower().split())
-                for row in existing_rows if str(row.get("platform") or "").lower() == "mercadolibre"
-            }
-            meli_seen_urls = {
-                str(row.get("product_url") or "").split("?")[0].rstrip("/").lower()
-                for row in existing_rows
-                if str(row.get("platform") or "").lower() == "mercadolibre" and row.get("product_url")
-            }
-        # Amazon: no ejecutar Creators API ni scraping de catálogo. La cuenta usa enlaces
-        # de afiliado aportados por el usuario; import_url valida los metadatos y permite
-        # completar manualmente título, precio e imagen cuando la tienda bloquea lectura.
-        amazon_imported = []
-        # Meta por sincronización: hasta 100 productos nuevos y únicos de Mercado Libre.
-        # Se usan búsquedas variadas para evitar repetir los mismos resultados de una sola consulta.
-        meli_queries = (
-            "audifonos bluetooth", "smartwatch", "mouse gamer", "lampara led",
-            "soporte celular", "teclado mecanico", "parlante bluetooth", "cargador usb c",
-            "camara seguridad wifi", "disco ssd", "memoria ram", "silla ergonomica",
-            "mochila portatil", "audifonos gamer", "monitor gamer", "router wifi",
-            "freidora aire", "cafetera", "licuadora", "aspiradora robot",
-            "power bank", "reloj inteligente", "webcam full hd", "microfono usb",
-            "control videojuegos", "impresora", "proyector", "tablet android",
-            "organizador escritorio", "luz led escritorio",
-        )
-        meli_target = 300
-        try:
-            for query in meli_queries:
-                if len(meli_imported) >= meli_target:
+            cur.execute("SELECT pg_try_advisory_lock(734218906)")
+            locked = bool(cur.fetchone()["pg_try_advisory_lock"])
+        if not locked:
+            return {"status": "already_running", "message": "Ya hay una ingesta de catálogo en curso."}
+
+        for platform, label in providers:
+            if platform == "amazon" and not all(
+                os.getenv(name, "").strip()
+                for name in ("AMAZON_CREDENTIAL_ID", "AMAZON_CREDENTIAL_SECRET", "AMAZON_PARTNER_TAG")
+            ):
+                errors.append("Amazon: falta configurar acceso Creators API/Partner Tag.")
+                continue
+            if platform == "aliexpress":
+                errors.append(
+                    "AliExpress: no se importa como oferta hasta disponer del precio original "
+                    "verificado por API afiliada; OAuth por sí solo no lo acredita."
+                )
+                continue
+
+            source_count = 0
+            for category, query in queries:
+                if source_count >= target:
                     break
                 try:
-                    products = fetch_mercadolibre(query, limit=50)
-                    if products:
-                        meli_sync_available = True
-                    for product in products:
-                        if len(meli_imported) >= meli_target:
-                            break
-                        external_id = str(product.get("external_id") or "").strip()
-                        key = ("mercadolibre", external_id.upper())
-                        title_key = " ".join(str(product.get("title") or "").lower().split())
-                        product_url = str(product.get("product_url") or "").split("?")[0].rstrip("/").lower()
-                        if not external_id or not title_key:
-                            continue
-                        if key in existing:
-                            if key in meli_refreshed_keys:
-                                continue
-                            try:
-                                product_id = upsert_product(conn, "mercadolibre", "accesorios", product)
-                                if _publish_external_product(conn, product_id, product, "Mercado Libre"):
-                                    auto_published.append({"id": product_id, "title": product["title"], "discount_pct": round((float(product.get("previous_price") or 0) - float(product.get("price") or 0)) / float(product.get("previous_price") or 1) * 100, 2)})
-                                conn.commit()
-                                meli_refreshed_keys.add(key)
-                                meli_refreshed.append({
-                                    "id": product_id,
-                                    "item_id": external_id,
-                                    "title": product["title"],
-                                })
-                            except Exception as exc:
-                                conn.rollback()
-                                errors.append(f"Mercado Libre {external_id}: {exc}")
-                            continue
-                        if title_key in meli_seen_titles or (product_url and product_url in meli_seen_urls):
-                            continue
-                        try:
-                            product_id = upsert_product(conn, "mercadolibre", "accesorios", product)
-                            with conn.cursor() as cur:
-                                cur.execute("""
-                                    SELECT AVG(p.current_price) AS avg_price
-                                    FROM products p
-                                    JOIN categories c ON c.id = p.category_id
-                                    WHERE p.is_active = TRUE AND c.name = %s
-                                      AND p.currency = %s AND p.current_price IS NOT NULL
-                                """, ("accesorios", product.get("currency") or "COP"))
-                                average = cur.fetchone()["avg_price"]
-                            product["_score"] = score_product(conn, product_id, float(average or 0))
-                            if _publish_external_product(conn, product_id, product, "Mercado Libre"):
-                                auto_published.append({"id": product_id, "title": product["title"], "discount_pct": round((float(product.get("previous_price") or 0) - float(product.get("price") or 0)) / float(product.get("previous_price") or 1) * 100, 2)})
-                            conn.commit()
-                            existing.add(key)
-                            meli_seen_titles.add(title_key)
-                            if product_url:
-                                meli_seen_urls.add(product_url)
-                            meli_imported.append({
-                                "id": product_id,
-                                "item_id": external_id,
-                                "title": product["title"],
-                            })
-                        except Exception as exc:
-                            conn.rollback()
-                            errors.append(f"Mercado Libre {external_id}: {exc}")
+                    if platform == "mercadolibre":
+                        found = fetch_mercadolibre(query, limit=10)
+                    else:
+                        found = search_amazon_products(query, limit=10, category=category)
                 except Exception as exc:
-                    conn.rollback()
-                    meli_sync_complete = False
-                    errors.append(f"Mercado Libre '{query}': {exc}")
-                    if isinstance(exc, MercadoLibreAccessDenied) or getattr(exc, "fatal", False):
+                    errors.append(f"{label} '{query}': {type(exc).__name__}: {str(exc)[:180]}")
+                    if platform == "mercadolibre" and (
+                        isinstance(exc, MercadoLibreAccessDenied) or getattr(exc, "fatal", False)
+                    ):
                         print({"event": "mercadolibre_sync_stopped", "query": query, "error": str(exc)}, flush=True)
                         break
+                    continue
 
-        except Exception as exc:
-            conn.rollback()
-            meli_sync_complete = False
-            errors.append(f"Mercado Libre: {exc}")
+                for item in found or []:
+                    external_id = str(item.get("external_id") or "").strip()
+                    title = str(item.get("title") or "").strip()
+                    try:
+                        current_price = float(item.get("price") or 0)
+                        reference_price = float(item.get("previous_price") or 0)
+                    except (TypeError, ValueError):
+                        current_price, reference_price = 0, 0
+                    if not external_id or not title or current_price <= 0:
+                        continue
+                    discount_pct = discount_percentage(current_price, reference_price)
+                    if discount_pct is None:
+                        rejected["missing_reference_price"] += 1
+                        continue
+                    if discount_pct < threshold:
+                        rejected["below_discount_threshold"] += 1
+                        continue
+                    image_url = str(item.get("image_url") or "").strip()
+                    product_url = str(item.get("product_url") or "").strip()
+                    affiliate_url = str(item.get("affiliate_url") or _affiliate_url(item) or "").strip()
+                    if not image_url.startswith(("https://", "http://")) or not product_url.startswith(("https://", "http://")) or not affiliate_url.startswith(("https://", "http://")):
+                        rejected["missing_image_or_url"] += 1
+                        continue
+                    key = (platform, external_id.upper())
+                    if key in candidates:
+                        continue
+                    normalized = dict(item)
+                    normalized.update({
+                        "platform": platform,
+                        "price": current_price,
+                        "previous_price": reference_price,
+                        "source_metadata": {
+                            **(item.get("source_metadata") or {}),
+                            "catalog_ingestion": "verified_discount_search",
+                            "verified_discount_pct": discount_pct,
+                            "reference_price_source": (
+                                "mercadolibre_api" if platform == "mercadolibre" else "amazon_creators_api"
+                            ),
+                        },
+                    })
+                    candidates[key] = {
+                        "platform": platform,
+                        "label": label,
+                        "category": category,
+                        "product": normalized,
+                        "discount_pct": discount_pct,
+                    }
+                    source_count += 1
+        best_deals = sorted(
+            candidates.values(),
+            key=lambda item: item["discount_pct"],
+            reverse=True,
+        )[:target]
+        for deal in best_deals:
+            product = deal["product"]
+            try:
+                product_id = upsert_product(conn, deal["platform"], deal["category"], product)
+                product["_score"] = deal["discount_pct"]
+                published = _publish_external_product(conn, product_id, product, deal["label"])
+                conn.commit()
+                imported[deal["platform"]].append({
+                    "id": product_id,
+                    "title": product["title"],
+                    "discount_pct": deal["discount_pct"],
+                })
+                if published:
+                    auto_published.append({
+                        "id": product_id,
+                        "title": product["title"],
+                        "platform": deal["platform"],
+                        "discount_pct": deal["discount_pct"],
+                    })
+            except Exception as exc:
+                conn.rollback()
+                errors.append(
+                    f"{deal['platform']} {product.get('external_id')}: "
+                    f"{type(exc).__name__}: {str(exc)[:180]}"
+                )
 
-        # La caducidad solo corre tras una sincronización válida y completa.
-        # Un 403, un error de red o una búsqueda vacía nunca retira publicaciones.
-        if meli_sync_available and meli_sync_complete:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    UPDATE products
-                    SET is_active = FALSE, updated_at = NOW()
-                    WHERE is_active = TRUE
-                      AND catalog_expires_at IS NOT NULL
-                      AND catalog_expires_at <= NOW()
-                      AND COALESCE(source_metadata->>'import_method', '') <> 'product_url'
-                      AND EXISTS (
-                          SELECT 1 FROM platforms pl
-                          WHERE pl.id = products.platform_id
-                            AND pl.name = 'mercadolibre'
-                      )
-                """)
-                expired_count = cur.rowcount
-                cur.execute("""
-                    UPDATE published_cards pc
-                    SET is_published = FALSE, updated_at = NOW()
-                    FROM products p
-                    JOIN platforms pl ON pl.id = p.platform_id
-                    WHERE pc.product_id = p.id
-                      AND pc.is_published = TRUE
-                      AND p.is_active = FALSE
-                      AND p.catalog_expires_at IS NOT NULL
-                      AND p.catalog_expires_at <= NOW()
-                      AND pl.name = 'mercadolibre'
-                """)
-                unpublished_count = cur.rowcount
-            conn.commit()
-            print({
-                "event": "catalog_expired_after_48h",
-                "count": expired_count,
-                "cards_unpublished": unpublished_count,
-            }, flush=True)
-
-
-        if not amazon_imported and not meli_imported and not meli_refreshed:
-            raise HTTPException(status_code=502, detail={
-                "message": "No se importaron productos nuevos ni se renovaron productos existentes.",
-                "errors": errors[:10],
-                "published": len(auto_published),
-                "expired_deactivated": expired_count,
-            })
-        amazon_ids = {p["id"] for p in amazon_imported}
-        meli_ids = {p["id"] for p in meli_imported + meli_refreshed}
-        return {
-            "amazon": {"mode": "affiliate_url_only", "imported": len(amazon_imported), "published": sum(1 for item in auto_published if item["id"] in amazon_ids), "products": amazon_imported},
-            "mercadolibre": {
-                "imported": len(meli_imported),
-                "refreshed": len(meli_refreshed),
-                "published": sum(1 for item in auto_published if item["id"] in meli_ids),
-                "products": meli_imported,
-                "refreshed_products": meli_refreshed,
-            },
-            "total_published": len(auto_published),
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE products
+                SET is_active=FALSE, updated_at=NOW()
+                WHERE is_active=TRUE
+                  AND catalog_expires_at IS NOT NULL
+                  AND catalog_expires_at<=NOW()
+                  AND COALESCE(source_metadata->>'import_method','') <> 'product_url'
+            """)
+            expired_count = cur.rowcount
+            cur.execute("""
+                UPDATE published_cards pc
+                SET is_published=FALSE, updated_at=NOW()
+                FROM products p
+                WHERE pc.product_id=p.id
+                  AND pc.is_published=TRUE
+                  AND p.is_active=FALSE
+                  AND p.catalog_expires_at IS NOT NULL
+                  AND p.catalog_expires_at<=NOW()
+            """)
+            card_unpublished_count = cur.rowcount
+        conn.commit()
+        result = {
+            "status": "complete",
+            "limit": target,
+            "eligible_candidates": len(candidates),
+            "imported": {platform: len(items) for platform, items in imported.items()},
+            "published": len(auto_published),
             "published_products": auto_published,
             "expired_deactivated": expired_count,
-            "discount_threshold_pct": float(os.getenv("CATALOG_MIN_DISCOUNT_PCT", "50")),
-            "errors": errors[:10],
+            "cards_unpublished": card_unpublished_count,
+            "discount_threshold_pct": threshold,
+            "expiry_days": expiry_days,
+            "rejected": rejected,
+            "errors": errors[:20],
         }
+        print({"event": "catalog_ingestion_complete", **{k: v for k, v in result.items() if k != "published_products"}}, flush=True)
+        return result
     finally:
+        if locked:
+            try:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT pg_advisory_unlock(734218906)")
+                conn.commit()
+            except Exception as exc:
+                print({"event": "catalog_advisory_unlock_failed", "error": type(exc).__name__}, flush=True)
         conn.close()
 
 
 @core_router.post("/store/sync")
 def sync_store_catalog(_: dict = Depends(require_admin)):
-    """Importa productos reales al catálogo; las tarjetas se publican únicamente desde Studio."""
+    """Ingresa y publica ofertas verificadas de los proveedores disponibles."""
     return _sync_store_catalog()
 
 
 @core_router.post("/amazon/sync")
 def sync_amazon_store(limit: int = Query(20, ge=1, le=20), _: dict = Depends(require_admin)):
-    """Informa del modo de importación Amazon sin ejecutar la sincronización de otros proveedores."""
-    # Amazon se importa por URL afiliada; no se debe llamar al Worker de Mercado Libre
-    # desde este endpoint porque un 403 de otro proveedor no tiene relación con Amazon.
+    """Compatibilidad heredada: dirigir la ingesta de ofertas al sincronizador común."""
     return {
-        "mode": "affiliate_url_only",
+        "mode": "verified_catalog_injection",
         "imported": 0,
         "published": 0,
         "message": (
-            "Amazon se incorpora mediante enlaces en /products/import-url. "
-            "Este endpoint no ejecuta la sincronización de Mercado Libre."
+            "Para buscar ofertas verificadas de todos los proveedores disponibles, "
+            "usa /store/sync o el comando Telegram /inyectar."
         ),
     }
 
