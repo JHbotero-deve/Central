@@ -27,41 +27,47 @@ def _access_token() -> str:
     if not CREDENTIAL_ID or not CREDENTIAL_SECRET or not PARTNER_TAG:
         raise RuntimeError("Faltan AMAZON_CREDENTIAL_ID, AMAZON_CREDENTIAL_SECRET o AMAZON_PARTNER_TAG")
 
-    versions = ["3.1","3.2","3.3","2.1","2.2","2.3"]
-    candidates = ([CREDENTIAL_VERSION] + [v for v in versions if v != CREDENTIAL_VERSION]) if CREDENTIAL_VERSION in versions else versions
     configs = {
-        "3.1": ("https://api.amazon.com/auth/o2/token", "creatorsapi::default", False),
-        "3.2": ("https://api.amazon.co.uk/auth/o2/token", "creatorsapi::default", False),
-        "3.3": ("https://api.amazon.co.jp/auth/o2/token", "creatorsapi::default", False),
-        "2.1": ("https://creatorsapi.auth.us-east-1.amazoncognito.com/oauth2/token", "creatorsapi/default", True),
-        "2.2": ("https://creatorsapi.auth.eu-south-2.amazoncognito.com/oauth2/token", "creatorsapi/default", True),
-        "2.3": ("https://creatorsapi.auth.us-west-2.amazoncognito.com/oauth2/token", "creatorsapi/default", True),
+        "3.1": "https://api.amazon.com/auth/o2/token",
+        "3.2": "https://api.amazon.co.uk/auth/o2/token",
+        "3.3": "https://api.amazon.co.jp/auth/o2/token",
     }
+    if CREDENTIAL_VERSION not in configs:
+        raise RuntimeError(
+            "AMAZON_CREDENTIAL_VERSION debe ser la versión Creators API asignada "
+            "(3.1 para NA, 3.2 para EU o 3.3 para FE)."
+        )
     errors = []
-    for version in candidates:
-        endpoint, scope, cognito = configs[version]
+    endpoint = configs[CREDENTIAL_VERSION]
+    try:
+        response = requests.post(
+            endpoint,
+            headers={"Content-Type": "application/json"},
+            json={
+                "grant_type": "client_credentials",
+                "client_id": CREDENTIAL_ID,
+                "client_secret": CREDENTIAL_SECRET,
+                "scope": "creatorsapi::default",
+            },
+            timeout=20,
+        )
+        if response.ok:
+            data = response.json()
+            token = data.get("access_token")
+            if token:
+                _TOKEN = token
+                _TOKEN_VERSION = CREDENTIAL_VERSION
+                _TOKEN_EXPIRES_AT = time.time() + int(data.get("expires_in", 3600))
+                print("[amazon] Creators API autenticado con credencial " + CREDENTIAL_VERSION + ".")
+                return token
         try:
-            if cognito:
-                response = requests.post(endpoint, headers={"Content-Type":"application/x-www-form-urlencoded"}, data={"grant_type":"client_credentials","client_id":CREDENTIAL_ID,"client_secret":CREDENTIAL_SECRET,"scope":scope}, timeout=20)
-            else:
-                response = requests.post(endpoint, headers={"Content-Type":"application/json"}, json={"grant_type":"client_credentials","client_id":CREDENTIAL_ID,"client_secret":CREDENTIAL_SECRET,"scope":scope}, timeout=20)
-            if response.ok:
-                data = response.json()
-                token = data.get("access_token")
-                if token:
-                    _TOKEN = token
-                    _TOKEN_VERSION = version
-                    _TOKEN_EXPIRES_AT = time.time() + int(data.get("expires_in",3600))
-                    print("[amazon] Creators API autenticado con credencial " + version + ".")
-                    return token
-            try:
-                detail = response.json()
-                detail = detail.get("error_description") or detail.get("error") or str(detail)
-            except ValueError:
-                detail = response.text[:300]
-            errors.append(version + ": HTTP " + str(response.status_code) + ": " + str(detail))
-        except requests.RequestException as exc:
-            errors.append(version + ": " + type(exc).__name__ + ": " + str(exc))
+            detail = response.json()
+            detail = detail.get("error_description") or detail.get("error") or str(detail)
+        except ValueError:
+            detail = response.text[:300]
+        errors.append("HTTP " + str(response.status_code) + ": " + str(detail))
+    except requests.RequestException as exc:
+        errors.append(type(exc).__name__ + ": " + str(exc))
     raise RuntimeError("Amazon OAuth rechazó las credenciales; " + " | ".join(errors))
 
 
@@ -374,35 +380,57 @@ def _fallback_images(url: str) -> dict[str, Any]:
     return {"primary": {"large": {"url": img}}} if img else {}
 
 
-def search_products(keywords: str, limit: int = 10) -> list[dict[str, Any]]:
+def search_products(
+    keywords: str,
+    limit: int = 10,
+    *,
+    delivery_flags: list[str] | None = None,
+    min_saving_percent: int | None = None,
+    official_only: bool = False,
+) -> list[dict[str, Any]]:
     global _AUTH_FAILURE
+    if official_only and _AUTH_FAILURE:
+        raise RuntimeError("Amazon Creators API quedó deshabilitada por credenciales no válidas.")
     if not _AUTH_FAILURE:
         try:
+            payload = {
+                "keywords": keywords,
+                "searchIndex": "All",
+                "itemCount": min(max(limit, 1), 10),
+                "sortBy": "Relevance",
+                "resources": [
+                    "images.primary.large",
+                    "images.primary.medium",
+                    "images.primary.small",
+                    "images.variants.large",
+                    "itemInfo.title",
+                    "itemInfo.byLineInfo",
+                    "itemInfo.features",
+                    "offersV2.listings.price",
+                    "offersV2.listings.savingBasis",
+                    "offersV2.listings.merchantInfo",
+                ],
+            }
+            if delivery_flags:
+                payload["deliveryFlags"] = delivery_flags
+            if min_saving_percent is not None:
+                payload["minSavingPercent"] = min(max(int(min_saving_percent), 1), 99)
+            if official_only:
+                payload.update({"availability": "Available", "condition": "New"})
             data = _request(
                 "searchItems",
-                {
-                    "keywords": keywords,
-                    "searchIndex": "All",
-                    "itemCount": min(max(limit, 1), 10),
-                    "sortBy": "Relevance",
-                    "resources": [
-                        "images.primary.large",
-                        "images.primary.medium",
-                        "images.primary.small",
-                        "images.variants.large",
-                        "itemInfo.title",
-                        "itemInfo.byLineInfo",
-                        "itemInfo.features",
-                        "offersV2.listings.price",
-                        "offersV2.listings.savingBasis",
-                        "offersV2.listings.merchantInfo",
-                    ],
-                },
+                payload,
             )
             items = ((data.get("searchResult") or {}).get("items") or [])
             if items:
                 return items
+            if official_only:
+                return []
         except Exception as exc:
+            if official_only:
+                raise RuntimeError(
+                    f"Amazon Creators API falló en búsqueda oficial: {type(exc).__name__}: {str(exc)[:180]}"
+                ) from exc
             message = str(exc)
             print(f"[amazon] Creators API no disponible para '{keywords}': {message}")
             if (
@@ -413,6 +441,8 @@ def search_products(keywords: str, limit: int = 10) -> list[dict[str, Any]]:
                 _AUTH_FAILURE = True
                 print("[amazon] API deshabilitada para este proceso; se continúa con búsqueda pública.", flush=True)
 
+    if official_only:
+        return []
     html_results = _search_amazon_html(keywords, limit)
     if html_results:
         return html_results
@@ -654,10 +684,25 @@ def fetch_amazon_products(
     return results
 
 
-def search_amazon_products(keywords: str, limit: int = 3, category: str = "otros") -> list[dict[str, Any]]:
+def search_amazon_products(
+    keywords: str,
+    limit: int = 3,
+    category: str = "otros",
+    *,
+    prime_only: bool = False,
+    min_saving_percent: int | None = None,
+    official_only: bool = False,
+) -> list[dict[str, Any]]:
     """Return normalized real Amazon results for interactive product discovery."""
     results: list[dict[str, Any]] = []
-    for item in search_products(keywords, min(max(int(limit), 1), 10)):
+    items = search_products(
+        keywords,
+        min(max(int(limit), 1), 10),
+        delivery_flags=["Prime"] if prime_only else None,
+        min_saving_percent=min_saving_percent,
+        official_only=official_only,
+    )
+    for item in items:
         product = _map_item(item, category, allow_missing_image=True)
         if not product:
             continue

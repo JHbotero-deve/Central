@@ -46,6 +46,8 @@ Documento operativo para levantar Central cuando haya presupuesto (Railway Hobby
 | `CATALOG_MIN_DISCOUNT_PCT` | Descuento mínimo verificable (por defecto 40) |
 | `CATALOG_EXPIRY_DAYS` | Vigencia del catálogo automático en días (por defecto 7) |
 | `AMAZON_CREDENTIAL_ID`, `AMAZON_CREDENTIAL_SECRET`, `AMAZON_PARTNER_TAG` | Credenciales/identificador de Creators API; necesarias para comprobar precios originales |
+| `AMAZON_CREDENTIAL_VERSION` | Versión exacta asignada a la credencial: `3.1` (NA), `3.2` (EU) o `3.3` (FE); por defecto `3.1` |
+| `AMAZON_MARKETPLACE` | Marketplace del tracking ID (por defecto `www.amazon.com`); el tracking ID debe pertenecer a ese mismo marketplace |
 | `ALIEXPRESS_APP_KEY` | AliExpress Open Platform |
 | `ALIEXPRESS_APP_SECRET` | AliExpress Open Platform |
 | `ALIEXPRESS_CALLBACK_URL` | Por defecto: `https://central-7ykr.vercel.app/api/v1/aliexpress/oauth/callback` |
@@ -69,6 +71,7 @@ Documento operativo para levantar Central cuando haya presupuesto (Railway Hobby
 | `TELEGRAM_POLL_INTERVAL` | Segundos entre polls (por defecto 3) |
 | `MELI_CLIENT_ID`, `MELI_CLIENT_SECRET`, `MELI_TOKEN_ENCRYPTION_KEY` | Necesarias para consultar/renovar Mercado Libre desde `/inyectar` |
 | `AMAZON_CREDENTIAL_ID`, `AMAZON_CREDENTIAL_SECRET`, `AMAZON_PARTNER_TAG` | Necesarias para consultar Amazon y verificar precios de referencia |
+| `AMAZON_CREDENTIAL_VERSION`, `AMAZON_MARKETPLACE` | Deben coincidir con la aplicación/credencial y Associates store donde se generó el Partner Tag |
 | `CATALOG_SYNC_MAX_PRODUCTS`, `CATALOG_MIN_DISCOUNT_PCT`, `CATALOG_EXPIRY_DAYS` | Opcionales; defaults: 200, 40 y 7 |
 
 ### 3. Vercel (frontend)
@@ -130,6 +133,8 @@ En Railway: **Settings → Deploy → Start Command** y pegar el comando (no dep
      AMAZON_CREDENTIAL_ID=<creators_api_id>
      AMAZON_CREDENTIAL_SECRET=<creators_api_secret>
      AMAZON_PARTNER_TAG=<tag_de_afiliado>
+     AMAZON_CREDENTIAL_VERSION=<version_exacta_de_Amazon>
+     AMAZON_MARKETPLACE=www.amazon.com
      ```
    - Start Command: `python telegram_alert.py`
    - Deploy.
@@ -147,6 +152,18 @@ En Railway: **Settings → Deploy → Start Command** y pegar el comando (no dep
    ```
 7. **Frontend**  
    Confirmar que Vercel sigue apuntando a la API activa.
+
+### Amazon Creators API / Prime
+
+Para el filtro de ofertas de `/inyectar`, la aplicación usa Creators API oficial, con `deliveryFlags=["Prime"]`, `availability="Available"`, `condition="New"` y `minSavingPercent=40`; vuelve a calcular el descuento usando precio actual y `savingBasis`. En este modo no hay fallback a Bing/HTML: si Creators API falla o no devuelve una oferta elegible, no se inventa ni se importa una alternativa. Amazon documenta que `Prime` representa una oferta elegible para su programa Prime.
+
+La cuenta debe estar completamente aceptada en Amazon Associates del marketplace objetivo, tener acceso aprobado a Creators API y sus credenciales vigentes (Credential ID, Secret y Version). Amazon indica como requisito de acceso actual al menos 10 ventas calificadas en los últimos 30 días. `AMAZON_PARTNER_TAG` debe ser el tracking/store ID del mismo marketplace de `AMAZON_MARKETPLACE`; la credencial-version debe copiarse exactamente desde Associates Central, no adivinarse. Referencias: [requisitos e introducción](https://affiliate-program.amazon.com/creatorsapi/docs/en-us/introduction), [registro/credenciales](https://affiliate-program.amazon.com/creatorsapi/docs/en-us/onboarding/register-for-creators-api), [SearchItems y filtros Prime/ahorro](https://affiliate-program.amazon.com/creatorsapi/docs/en-us/api-reference/operations/search-items), [marketplace y Partner Tag](https://affiliate-program.amazon.com/creatorsapi/docs/en-us/concepts/common-request-headers-and-parameters).
+
+### Diagnóstico de Mercado Libre 403
+
+En la aplicación de Mercado Libre, conserva la redirect URI exacta `https://gracious-renewal-production-76df.up.railway.app/api/v1/meli/oauth/callback`; corrige la URL de notificaciones a `https://central-production-c644.up.railway.app/api/v1/meli/notifications` (sin `z` final). Mantén habilitado OAuth Authorization Code y el acceso de usuario requerido. Para el Worker y Telegram, verifica que `DATABASE_URL` y `MELI_TOKEN_ENCRYPTION_KEY` correspondan a la misma base y clave que usa el callback OAuth.
+
+No agregues scopes de publicaciones, mensajes, ventas o pagos para intentar quitar el 403 de lectura: son permisos distintos y no arreglan por sí solos el endpoint de catálogo. Después de reconectar, con el mismo token y sin compartirlo, prueba `GET https://api.mercadolibre.com/users/me` y luego `GET https://api.mercadolibre.com/sites/MCO/search?q=audifonos%20bluetooth&limit=1`. Si `/users/me` responde 200 pero la búsqueda sigue devolviendo 403, comparte con soporte/desarrolladores de Mercado Libre el `x-request-id`, hora UTC, aplicación/client ID y ruta del recurso; pide que confirmen si la aplicación tiene habilitado acceso a búsqueda de publicaciones (`/sites/MCO/search`). No publiques el access token. El 403 observado desde Railway no se corrige cambiando scopes al azar ni se resuelve desde el código si Mercado Libre deniega el recurso.
 
 ---
 

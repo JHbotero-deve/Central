@@ -9,7 +9,7 @@ from api import _sync_store_catalog
 from url_import import import_url
 
 from catalog_rules import discount_percentage
-from amazon_api import _previous_offer
+from amazon_api import _access_token, _previous_offer, search_amazon_products, search_products
 from ingest import fetch_mercadolibre
 from store_orders import _public_order_summary, create_store_order
 from tiktok_creator import _normalize
@@ -17,11 +17,101 @@ from wompi import create_cart_checkout, create_product_checkout
 
 
 class AmazonAffiliateUrlTests(unittest.TestCase):
+    def test_creators_api_uses_only_the_credential_version_endpoint(self):
+        response = requests.Response()
+        response.status_code = 200
+        response._content = b'{"access_token":"test-access-token","expires_in":3600}'
+        with patch("amazon_api._TOKEN", None), patch("amazon_api._TOKEN_EXPIRES_AT", 0), \
+             patch("amazon_api.CREDENTIAL_VERSION", "3.1"), \
+             patch("amazon_api.CREDENTIAL_ID", "test-id"), \
+             patch("amazon_api.CREDENTIAL_SECRET", "test-secret"), \
+             patch("amazon_api.PARTNER_TAG", "test-20"), \
+             patch("amazon_api.requests.post", return_value=response) as post:
+            self.assertEqual(_access_token(), "test-access-token")
+
+        post.assert_called_once()
+        self.assertEqual(post.call_args.args[0], "https://api.amazon.com/auth/o2/token")
+        self.assertEqual(post.call_args.kwargs["json"]["scope"], "creatorsapi::default")
+
+    def test_creators_api_rejects_unknown_credential_version_without_trying_other_regions(self):
+        with patch("amazon_api._TOKEN", None), patch("amazon_api._TOKEN_EXPIRES_AT", 0), \
+             patch("amazon_api.CREDENTIAL_VERSION", "unknown"), \
+             patch("amazon_api.CREDENTIAL_ID", "test-id"), \
+             patch("amazon_api.CREDENTIAL_SECRET", "test-secret"), \
+             patch("amazon_api.PARTNER_TAG", "test-20"), \
+             patch("amazon_api.requests.post") as post:
+            with self.assertRaisesRegex(RuntimeError, "AMAZON_CREDENTIAL_VERSION"):
+                _access_token()
+        post.assert_not_called()
+
     def test_catalog_sync_searches_amazon_only_with_official_partner_credentials(self):
         source = inspect.getsource(_sync_store_catalog)
         self.assertIn("search_amazon_products", source)
         self.assertIn("AMAZON_CREDENTIAL_ID", source)
         self.assertIn("AMAZON_PARTNER_TAG", source)
+        self.assertIn("prime_only=True", source)
+        self.assertIn("official_only=True", source)
+        self.assertIn("min_saving_percent=int(threshold)", source)
+
+    def test_prime_search_uses_official_api_filters_and_minimum_savings(self):
+        response = {
+            "searchResult": {
+                "items": [{
+                    "asin": "B012345678",
+                    "detailPageURL": "https://www.amazon.com/dp/B012345678",
+                    "itemInfo": {"title": {"displayValue": "Prime headphones"}},
+                    "images": {"primary": {"large": {"url": "https://images.example.com/a.jpg"}}},
+                    "offersV2": {"listings": [{
+                        "price": {"amount": 50, "currency": "USD"},
+                        "savingBasis": {"money": {"amount": 100, "currency": "USD"}},
+                    }]},
+                }]
+            }
+        }
+        with patch("amazon_api._AUTH_FAILURE", False), patch(
+            "amazon_api._request", return_value=response
+        ) as api_request, patch("amazon_api._search_amazon_html") as html_fallback, patch(
+            "amazon_api._search_amazon_web"
+        ) as web_fallback:
+            products = search_amazon_products(
+                "headphones",
+                prime_only=True,
+                min_saving_percent=40,
+                official_only=True,
+            )
+
+        payload = api_request.call_args.args[1]
+        self.assertEqual(payload["deliveryFlags"], ["Prime"])
+        self.assertEqual(payload["minSavingPercent"], 40)
+        self.assertEqual(payload["availability"], "Available")
+        self.assertEqual(payload["condition"], "New")
+        self.assertEqual(products[0]["previous_price"], 100)
+        html_fallback.assert_not_called()
+        web_fallback.assert_not_called()
+
+    def test_official_prime_search_does_not_scrape_when_no_eligible_results(self):
+        with patch("amazon_api._AUTH_FAILURE", False), patch(
+            "amazon_api._request", return_value={"searchResult": {"items": []}}
+        ), patch("amazon_api._search_amazon_html") as html_fallback, patch(
+            "amazon_api._search_amazon_web"
+        ) as web_fallback:
+            self.assertEqual(
+                search_amazon_products("headphones", prime_only=True, official_only=True),
+                [],
+            )
+        html_fallback.assert_not_called()
+        web_fallback.assert_not_called()
+
+    def test_official_amazon_api_errors_do_not_fall_back_to_scraping(self):
+        with patch("amazon_api._AUTH_FAILURE", False), patch(
+            "amazon_api._request", side_effect=requests.RequestException("API unavailable")
+        ), patch("amazon_api._search_amazon_html") as html_fallback, patch(
+            "amazon_api._search_amazon_web"
+        ) as web_fallback:
+            with self.assertRaisesRegex(RuntimeError, "Amazon Creators API falló"):
+                search_products("headphones", official_only=True, delivery_flags=["Prime"])
+        html_fallback.assert_not_called()
+        web_fallback.assert_not_called()
 
 
     def test_import_preserves_supplied_amazon_affiliate_url_and_manual_real_data(self):

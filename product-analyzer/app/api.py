@@ -340,7 +340,14 @@ def _sync_store_catalog():
                     if platform == "mercadolibre":
                         found = fetch_mercadolibre(query, limit=10)
                     else:
-                        found = search_amazon_products(query, limit=10, category=category)
+                        found = search_amazon_products(
+                            query,
+                            limit=10,
+                            category=category,
+                            prime_only=True,
+                            min_saving_percent=int(threshold),
+                            official_only=True,
+                        )
                 except Exception as exc:
                     errors.append(f"{label} '{query}': {type(exc).__name__}: {str(exc)[:180]}")
                     if platform == "mercadolibre" and (
@@ -388,6 +395,7 @@ def _sync_store_catalog():
                             "reference_price_source": (
                                 "mercadolibre_api" if platform == "mercadolibre" else "amazon_creators_api"
                             ),
+                            "amazon_delivery_filter": "Prime" if platform == "amazon" else None,
                         },
                     })
                     candidates[key] = {
