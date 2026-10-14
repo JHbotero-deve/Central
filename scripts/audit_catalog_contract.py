@@ -26,8 +26,9 @@ check("CATALOG_MIN_DISCOUNT_PCT" in API and "discount_percentage(" in API,
       "la publicación automática exige un descuento real configurable")
 check("affiliate_url" in API and "mongo_image_id" in API,
       "la tarjeta conserva enlace monetizable e imagen persistida")
-check("catalog_expired_after_48h" in API and "catalog_expires_at <= NOW()" in API and "catalog_rotation_deferred" not in API,
-      "las ofertas se desactivan al cumplir 48 horas aunque falle la ingesta")
+check("CATALOG_EXPIRY_DAYS" in API and "catalog_expires_at<=NOW()" in API and
+      "COALESCE(source_metadata->>'import_method','') <> 'product_url'" in API,
+      "la ingesta aplica la caducidad configurable y preserva imports manuales por URL")
 check("previous_price" in DB.split("INSERT INTO products", 1)[1].split("ON CONFLICT", 1)[0],
       "la ingesta persiste el precio original de la oferta")
 check("WHERE p.is_active = TRUE AND p.is_blocked = FALSE AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW()) {where}" in PUB,
@@ -42,7 +43,7 @@ check('function preview(){const m=model();S.mountDetail($("preview"),{...m,links
       "la vista previa administrativa no abre enlaces externos")
 
 check("p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW()" in API and "p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW()" in PUB,
-      "las vistas y publicaciones respetan la caducidad de 48 horas")
+      "las vistas y publicaciones respetan la caducidad configurada")
 check("p.current_price > 0" in API,
       "el radar y el catálogo administrativo excluyen productos sin precio real")
 check("NULLIF(p.source_metadata->>'mongo_image_id', '')" in PUB and "COALESCE(pc.sale_price, p.current_price) > 0" in PUB,
@@ -64,10 +65,12 @@ check("data = _public_search(query, limit)" in INGEST and "if not data.get(\"res
       "Mercado Libre cae a búsqueda pública cuando la API bloquea o no devuelve resultados")
 check("if not _AUTH_FAILURE:" in AMAZON and "se continúa con búsqueda pública" in AMAZON and "return _search_amazon_web(keywords, limit)" in AMAZON,
       "Amazon conserva la búsqueda pública cuando faltan o se rechazan credenciales API")
-SEARCH = (ROOT / "product-analyzer/app/product_search.py").read_text(encoding="utf-8-sig")
-check("search_external_products(term, limit=8)" in TELEGRAM and "upsert_product(conn, platform, category, item)" in TELEGRAM,
-      "el comando /buscar consulta proveedores externos y persiste productos verificados")
-check("fetch_mercadolibre(term, limit=per_source)" in SEARCH and "search_amazon_products(term, limit=per_source" in SEARCH and "search_aliexpress_products(term, limit=per_source)" in SEARCH,
-      "la búsqueda externa consulta Mercado Libre, Amazon y AliExpress de forma independiente")
+check("products = _search_products(term)" in TELEGRAM and "Resultados del catálogo Central:" in TELEGRAM and
+      "Usa /inyectar para buscar nuevas ofertas reales en las tiendas." in TELEGRAM and
+      "result = _sync_store_catalog()" in TELEGRAM,
+      "Telegram busca el catálogo local y reserva la búsqueda externa para /inyectar")
+check("fetch_mercadolibre(query, limit=10)" in API and "prime_only=True" in API and
+      "official_only=True" in API and "min_saving_percent=int(threshold)" in API,
+      "la ingesta usa Mercado Libre y ofertas Amazon Prime verificables con descuento mínimo")
 
 print("[PASS] Auditoría de contrato del catálogo completada.")
