@@ -400,8 +400,8 @@ def _sync_store_catalog():
                     conn.rollback()
                     meli_sync_complete = False
                     errors.append(f"Mercado Libre '{query}': {exc}")
-                    if isinstance(exc, MercadoLibreAccessDenied):
-                        print({"event": "mercadolibre_access_blocked", "query": query, "error": str(exc)}, flush=True)
+                    if isinstance(exc, MercadoLibreAccessDenied) or getattr(exc, "fatal", False):
+                        print({"event": "mercadolibre_sync_stopped", "query": query, "error": str(exc)}, flush=True)
                         break
 
         except Exception as exc:

@@ -5,13 +5,17 @@
 - Frontend estático en Vercel desde `product-analyzer/frontend`.
 - API, worker y bot en Railway desde `product-analyzer/app`.
 - PostgreSQL de Railway como persistencia única.
-- Amazon, Mercado Libre y TikTok Shop como fuentes según configuración.
+- Mercado Libre como fuente de sincronización del Worker; Amazon, AliExpress y TikTok Shop se importan por URL. Cada integración funciona con sus propias credenciales y permisos.
 - Telegram para consultas y alertas.
 - Wompi para pagos de productos propios.
 
 ## Flujo
 
-Fuentes → ingesta cada 2 horas → PostgreSQL → puntuación → API → Vercel.
+Mercado Libre → Worker al arrancar y cada 2 horas → PostgreSQL → puntuación → API → Vercel.
+
+Amazon, AliExpress y TikTok Shop se agregan por URL desde el bot de Telegram con `/agregar categoría|URL`. Si la tienda bloquea la lectura automática, completa los datos reales: `/agregar categoría|URL|PRECIO|TÍTULO|IMAGEN_URL|MONEDA`. Estos proveedores no forman parte de la sincronización automática del Worker.
+
+PostgreSQL es el origen de verdad para productos y publicaciones. MongoDB se usa para imágenes y auditoría, no para almacenar el catálogo.
 
 ## Publicación
 

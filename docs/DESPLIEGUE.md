@@ -7,12 +7,13 @@ Documento operativo para levantar Central cuando haya presupuesto (Railway Hobby
 | Servicio Railway | Rol | Start Command recomendado |
 |------------------|-----|---------------------------|
 | **API** (ej. `gracious-renewal`) | API FastAPI + rutas de publicaciones, OAuth, comercio | `uvicorn api:app --host 0.0.0.0 --port $PORT` |
-| **Worker** (opcional, puede ser el mismo que API) | Sincronización de catálogo cada 2 h | `uvicorn main:app --host 0.0.0.0 --port $PORT` o el entrypoint del worker |
+| **Worker** (necesario para ingesta automática) | Sincronización al arrancar y cada 2 h | `uvicorn main:app --host 0.0.0.0 --port $PORT` |
 | **central-telegram** | Bot de Telegram (polling) | `python telegram_alert.py` |
 | **PostgreSQL** | Base de datos | Gestionado por Railway |
 | **Vercel** | Frontend público y panel | Automático desde `product-analyzer/frontend` |
 
 > El bot de Telegram **debe** ser un servicio separado (o un proceso dedicado). Los Dockerfiles actuales arrancan solo la API (`uvicorn`). Si el servicio `central-telegram` usa el mismo Dockerfile, sobrescribe el **Start Command** en Railway.
+> API y Worker deben compartir `DATABASE_URL` y `MELI_TOKEN_ENCRYPTION_KEY`: OAuth guarda los tokens cifrados en PostgreSQL y el Worker necesita esa misma clave para leerlos. Telegram también necesita el mismo `DATABASE_URL`.
 
 ---
 
@@ -38,13 +39,13 @@ Documento operativo para levantar Central cuando haya presupuesto (Railway Hobby
 | `MELI_CLIENT_ID` | Mercado Libre OAuth |
 | `MELI_CLIENT_SECRET` | Mercado Libre OAuth |
 | `MELI_TOKEN_ENCRYPTION_KEY` | Clave Fernet para tokens Melí |
+| `MELI_REDIRECT_URI` | `https://gracious-renewal-production-76df.up.railway.app/api/v1/meli/oauth/callback`; debe coincidir con la URI de la aplicación |
+| `CATALOG_SYNC_INTERVAL_SECONDS` | Intervalo del Worker en segundos (por defecto 7200) |
 | `ALIEXPRESS_APP_KEY` | AliExpress Open Platform |
 | `ALIEXPRESS_APP_SECRET` | AliExpress Open Platform |
 | `ALIEXPRESS_CALLBACK_URL` | Por defecto: `https://central-7ykr.vercel.app/api/v1/aliexpress/oauth/callback` |
 | `ALIEXPRESS_TOKEN_ENCRYPTION_KEY` | Opcional; si falta reutiliza `MELI_TOKEN_ENCRYPTION_KEY` |
 | Credenciales Amazon / TikTok / Wompi | Según módulos habilitados |
-| `CATALOG_SYNC_INTERVAL_SECONDS` | Intervalo del worker (por defecto 7200) |
-
 ### 2. Servicio central-telegram (bot)
 
 #### Obligatorias
@@ -78,7 +79,7 @@ Documento operativo para levantar Central cuando haya presupuesto (Railway Hobby
 uvicorn api:app --host 0.0.0.0 --port $PORT
 ```
 
-### Worker de catálogo (si es servicio aparte)
+### Worker de catálogo (`central-worker`)
 ```bash
 uvicorn main:app --host 0.0.0.0 --port $PORT
 ```
@@ -145,6 +146,8 @@ En Railway: **Settings → Deploy → Start Command** y pegar el comando (no dep
 | URL de producto en el chat | Producto capturado + ID |
 | `/publicar ID` | Tarjeta publicada |
 | `/tienda` en Vercel | Tarjetas visibles |
+
+El Worker debe registrar `catalog_worker_started` al arrancar y `catalog_sync` al completar la ejecución. `/estado` solo consulta PostgreSQL; no inicia una búsqueda. `/top` y `/productos` muestran el ID y el comando `/publicar ID` para poder continuar el flujo. Si Mercado Libre devuelve `403` o `429`, revisar permisos OAuth y esperar el límite antes de reintentar. Amazon, AliExpress y TikTok Shop se incorporan manualmente desde Telegram mediante `/agregar categoría|URL`; el Worker automático de este proyecto sincroniza Mercado Libre.
 
 ---
 

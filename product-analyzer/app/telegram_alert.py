@@ -72,6 +72,11 @@ def _format_product(p):
 
     lines = [
         f"<b>{title}</b>",
+        *(
+            [f"ID: {int(p['product_id'])}", f"Publicar: /publicar {int(p['product_id'])}"]
+            if p.get("product_id") is not None
+            else []
+        ),
         f"Precio: {price if price is not None else 'N/D'} {currency}".strip(),
         f"Oportunidad: {round(float(opportunity), 1) if opportunity is not None else 'N/D'}/100",
         (
@@ -152,7 +157,7 @@ def _top_products(limit=5):
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT p.title, p.current_price, p.currency, p.product_url, p.affiliate_url, p.image_url,
+                SELECT p.id AS product_id, p.title, p.current_price, p.currency, p.product_url, p.affiliate_url, p.image_url,
                        p.rating, p.reviews_count, p.sales_estimate,
                        pl.name AS platform, c.name AS category,
                        COALESCE(s.price_score, 0) AS price_score,
@@ -165,6 +170,8 @@ def _top_products(limit=5):
                 LEFT JOIN product_scores s ON s.product_id = p.id
                 WHERE p.is_active = TRUE
                   AND p.is_blocked = FALSE
+                  AND p.current_price > 0
+                  AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW())
                 ORDER BY COALESCE(s.opportunity_score, 0) DESC, p.updated_at DESC
                 LIMIT %s
                 """,
@@ -181,7 +188,7 @@ def _catalog_products(limit=20, offset=0):
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT p.title, p.current_price, p.currency, p.product_url, p.affiliate_url, p.image_url,
+                SELECT p.id AS product_id, p.title, p.current_price, p.currency, p.product_url, p.affiliate_url, p.image_url,
                        p.rating, p.reviews_count, p.sales_estimate,
                        pl.name AS platform, c.name AS category,
                        COALESCE(s.price_score, 0) AS price_score,
@@ -194,7 +201,9 @@ def _catalog_products(limit=20, offset=0):
                 LEFT JOIN product_scores s ON s.product_id = p.id
                 WHERE p.is_active = TRUE
                   AND p.is_blocked = FALSE
-                  AND pl.name IN ('personal', 'mercadolibre', 'amazon', 'aliexpress')
+                  AND p.current_price > 0
+                  AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW())
+                  AND pl.name IN ('personal', 'mercadolibre', 'amazon', 'tiktok', 'aliexpress')
                 ORDER BY p.updated_at DESC NULLS LAST, p.id DESC
                 LIMIT %s OFFSET %s
                 """,
@@ -211,7 +220,7 @@ def _search_products(term, limit=8):
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT p.title, p.current_price, p.currency, p.product_url, p.affiliate_url, p.image_url,
+                SELECT p.id AS product_id, p.title, p.current_price, p.currency, p.product_url, p.affiliate_url, p.image_url,
                        p.rating, p.reviews_count, p.sales_estimate,
                        pl.name AS platform, c.name AS category,
                        COALESCE(s.price_score, 0) AS price_score,
@@ -224,6 +233,8 @@ def _search_products(term, limit=8):
                 LEFT JOIN product_scores s ON s.product_id = p.id
                 WHERE p.is_active = TRUE
                   AND p.is_blocked = FALSE
+                  AND p.current_price > 0
+                  AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW())
                   AND p.title ILIKE %s
                 ORDER BY COALESCE(s.opportunity_score, 0) DESC
                 LIMIT %s
@@ -469,6 +480,8 @@ def _publish_product(product_id):
                 JOIN platforms pl ON pl.id=p.platform_id
                 LEFT JOIN product_scores s ON s.product_id=p.id
                 WHERE p.id=%s AND p.is_active=TRUE AND p.is_blocked=FALSE
+                  AND p.current_price>0
+                  AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at>NOW())
                 """,
                 (product_id,),
             )
@@ -575,7 +588,7 @@ def _handle(token, chat_id, text):
             "/top — oportunidades con mayor score\n"
             "/buscar producto — buscar en los datos modelados\n"
             "/modelar — registrar y puntuar un producto\n"
-            "/agregar — importar un producto desde Amazon, Mercado Libre o AliExpress por URL\n"
+            "/agregar — importar un producto desde Amazon, Mercado Libre, TikTok Shop o AliExpress por URL\n"
             "/publicar ID — publicar un producto validado\n"
             "También puedes enviar una URL sola: Central la captura y la deja lista para publicar.\n"
             "/estado — estado del catálogo\n"
@@ -638,15 +651,17 @@ def _handle(token, chat_id, text):
                     continue
 
                 score = 0
+                saved_product_id = None
                 if conn is not None:
                     try:
-                        product_id = upsert_product(conn, platform, category, item)
-                        score = score_product(conn, product_id, price)
+                        saved_product_id = upsert_product(conn, platform, category, item)
+                        score = score_product(conn, saved_product_id, price)
                         conn.commit()
                     except Exception as exc:
                         conn.rollback()
                         print(f"[telegram-bot] persistencia {platform} fallida: {type(exc).__name__}")
                 products.append({
+                    "product_id": saved_product_id,
                     "title": title,
                     "current_price": price,
                     "currency": item.get("currency") or ("COP" if platform == "mercadolibre" else "USD"),
@@ -723,7 +738,16 @@ def _handle(token, chat_id, text):
         conn = get_connection()
         try:
             with conn.cursor() as cur:
-                cur.execute("SELECT COUNT(*) AS total FROM products WHERE is_active = TRUE")
+                cur.execute(
+                    """
+                    SELECT COUNT(*) AS total
+                    FROM products p
+                    WHERE p.is_active = TRUE
+                      AND p.is_blocked = FALSE
+                      AND p.current_price > 0
+                      AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW())
+                    """
+                )
                 total = cur.fetchone()["total"]
                 cur.execute(
                     """
@@ -731,6 +755,9 @@ def _handle(token, chat_id, text):
                     FROM products p
                     JOIN product_scores s ON s.product_id = p.id
                     WHERE p.is_active = TRUE
+                      AND p.is_blocked = FALSE
+                      AND p.current_price > 0
+                      AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW())
                     """
                 )
                 modeled = cur.fetchone()["modeled"]

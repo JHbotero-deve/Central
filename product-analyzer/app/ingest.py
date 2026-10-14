@@ -21,6 +21,12 @@ class MercadoLibreAccessDenied(RuntimeError):
     fatal = True
 
 
+class MercadoLibreRateLimited(RuntimeError):
+    """Pausa la sincronización cuando Mercado Libre responde 429."""
+
+    fatal = True
+
+
 def _headers(include_auth=True):
     headers = {
         "User-Agent": "CentralProductAnalyzer/2.2",
@@ -117,6 +123,13 @@ def _get(url, params=None, include_auth=True, retry_auth=True):
         trace = f"; request_id={request_id}" if request_id else ""
         raise MercadoLibreAccessDenied(
             f"Mercado Libre bloqueó el recurso {resource} (403){suffix}{trace}"
+        )
+    if response.status_code == 429:
+        resource = url.split("api.mercadolibre.com", 1)[-1].split("?", 1)[0]
+        retry_after = response.headers.get("Retry-After")
+        suffix = f"; retry_after={retry_after}s" if retry_after else ""
+        raise MercadoLibreRateLimited(
+            f"Mercado Libre limitó el recurso {resource} (429){suffix}"
         )
     response.raise_for_status()
     return response.json()
@@ -273,6 +286,8 @@ def _catalog_search(query, limit=20):
         }, include_auth=True)
     except MercadoLibreAccessDenied:
         raise
+    except MercadoLibreRateLimited:
+        raise
     except (RuntimeError, requests.RequestException) as exc:
         print(f"[Mercado Libre] catalog search '{query}' no disponible: {exc}")
         return []
@@ -333,7 +348,10 @@ def fetch_mercadolibre(query, limit=20):
             # el lector público: además de no ser una fuente estable, una llamada
             # por cada consulta provoca límites 429 y amplifica el fallo.
             print(f"[Mercado Libre] búsqueda detenida por falta de permisos: {catalog_exc}")
-            return []
+            raise
+        except MercadoLibreRateLimited as catalog_exc:
+            print(f"[Mercado Libre] búsqueda detenida por límite de solicitudes: {catalog_exc}")
+            raise
         except (RuntimeError, requests.RequestException) as catalog_exc:
             print(f"[Mercado Libre] catálogo API no disponible; se evalúa lector público: {catalog_exc}")
             catalog_products = []

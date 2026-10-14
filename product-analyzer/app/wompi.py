@@ -84,11 +84,13 @@ class ProductCheckout(BaseModel):
 
 @router.post("/checkout/product")
 def create_product_checkout(req: ProductCheckout):
-    if req.quantity<1 or req.quantity>100: raise HTTPException(status_code=400,detail="Cantidad inválida")
+    if req.quantity < 1 or req.quantity > 100:
+        raise HTTPException(status_code=400, detail="Cantidad inválida")
     public_key=_required("WOMPI_PUBLIC_KEY")
     currency="COP"
     environment=os.getenv("WOMPI_ENVIRONMENT","prod").strip().lower()
-    if currency!="COP": raise HTTPException(status_code=500,detail="Wompi Colombia requiere moneda COP")
+    if currency != "COP":
+        raise HTTPException(status_code=500, detail="Wompi Colombia requiere moneda COP")
     conn=get_connection()
     try:
         with conn.cursor() as cur:
@@ -96,12 +98,14 @@ def create_product_checkout(req: ProductCheckout):
                                   pc.id AS publication_id,pc.sale_price,pc.cost_price,
                                   pl.name AS platform_name
                            FROM products p
-                           LEFT JOIN published_cards pc ON pc.product_id=p.id AND pc.is_published=TRUE
+                           JOIN published_cards pc ON pc.product_id=p.id AND pc.is_published=TRUE
                            JOIN platforms pl ON pl.id=p.platform_id
-                           WHERE p.id=%s AND p.is_active=TRUE
+                           WHERE p.id=%s AND p.is_active=TRUE AND p.is_blocked=FALSE
+                             AND p.current_price>0
+                             AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at>NOW())
                            FOR UPDATE OF p""",(req.product_id,))
             product=cur.fetchone()
-            if not product: raise HTTPException(status_code=404,detail="Producto no encontrado")
+            if not product: raise HTTPException(status_code=404,detail="Producto publicado no encontrado")
             if str(product.get("platform_name") or "").lower() != "personal": raise HTTPException(status_code=409,detail="Este producto se compra en su plataforma de origen")
             if req.publication_id and product["publication_id"]!=req.publication_id: raise HTTPException(status_code=409,detail="La publicación no corresponde al producto solicitado")
             cur.execute("""SELECT COALESCE(SUM(quantity), 0) AS reserved
@@ -208,9 +212,11 @@ async def create_cart_checkout(request: Request):
                           pc.id AS publication_id, pc.sale_price, pc.cost_price,
                           pl.name AS platform_name
                    FROM products p
-                   LEFT JOIN published_cards pc ON pc.product_id=p.id AND pc.is_published=TRUE
+                   JOIN published_cards pc ON pc.product_id=p.id AND pc.is_published=TRUE
                    LEFT JOIN platforms pl ON pl.id=p.platform_id
-                   WHERE p.id = ANY(%s) AND p.is_active=TRUE
+                   WHERE p.id = ANY(%s) AND p.is_active=TRUE AND p.is_blocked=FALSE
+                     AND p.current_price>0
+                     AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at>NOW())
                    FOR UPDATE OF p""",
                 (list(wanted.keys()),),
             )
