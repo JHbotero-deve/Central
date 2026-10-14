@@ -3,6 +3,7 @@ import html
 import io
 import os
 import re
+import threading
 import time
 from urllib.parse import quote, urlparse
 
@@ -10,15 +11,16 @@ import requests
 from PIL import Image, ImageOps, UnidentifiedImageError
 
 from analysis import score_product
+from catalog_rules import discount_percentage
 from db import get_connection, upsert_product
 from url_import import detect_platform, import_url
-from product_search import search_external_products
 
 POLL_INTERVAL = int(os.getenv("TELEGRAM_POLL_INTERVAL", "3"))
 API_BASE = "https://api.telegram.org"
 CENTRAL_API_BASE = (os.getenv("CENTRAL_API_BASE") or "https://gracious-renewal-production-76df.up.railway.app").rstrip("/")
 ALLOWED_PLATFORMS = {"mercadolibre", "amazon", "tiktok", "aliexpress", "personal"}
 ALLOWED_CATEGORIES = {"ropa", "calzado", "accesorios", "electronica", "hogar", "fitness", "otros"}
+_CATALOG_INGESTION_LOCK = threading.Lock()
 
 
 def _token():
@@ -58,6 +60,7 @@ def _send(token, chat_id, text):
 def _format_product(p):
     title = html.escape(str(p.get("title") or "Sin título")[:90])
     price = p.get("current_price")
+    discount = discount_percentage(price, p.get("previous_price"))
     currency = html.escape(str(p.get("currency") or ""))
     platform = html.escape(str(p.get("platform") or "N/D"))
     category = html.escape(str(p.get("category") or "N/D"))
@@ -72,7 +75,13 @@ def _format_product(p):
 
     lines = [
         f"<b>{title}</b>",
+        *(
+            [f"ID: {int(p['product_id'])}", f"Publicar: /publicar {int(p['product_id'])}"]
+            if p.get("product_id") is not None
+            else []
+        ),
         f"Precio: {price if price is not None else 'N/D'} {currency}".strip(),
+        *([f"Descuento verificado: {discount:.1f}%"] if discount is not None else []),
         f"Oportunidad: {round(float(opportunity), 1) if opportunity is not None else 'N/D'}/100",
         (
             "Modelo: "
@@ -152,7 +161,7 @@ def _top_products(limit=5):
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT p.title, p.current_price, p.currency, p.product_url, p.affiliate_url, p.image_url,
+                SELECT p.id AS product_id, p.title, p.current_price, p.previous_price, p.currency, p.product_url, p.affiliate_url, p.image_url,
                        p.rating, p.reviews_count, p.sales_estimate,
                        pl.name AS platform, c.name AS category,
                        COALESCE(s.price_score, 0) AS price_score,
@@ -165,6 +174,8 @@ def _top_products(limit=5):
                 LEFT JOIN product_scores s ON s.product_id = p.id
                 WHERE p.is_active = TRUE
                   AND p.is_blocked = FALSE
+                  AND p.current_price > 0
+                  AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW())
                 ORDER BY COALESCE(s.opportunity_score, 0) DESC, p.updated_at DESC
                 LIMIT %s
                 """,
@@ -181,7 +192,7 @@ def _catalog_products(limit=20, offset=0):
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT p.title, p.current_price, p.currency, p.product_url, p.affiliate_url, p.image_url,
+                SELECT p.id AS product_id, p.title, p.current_price, p.previous_price, p.currency, p.product_url, p.affiliate_url, p.image_url,
                        p.rating, p.reviews_count, p.sales_estimate,
                        pl.name AS platform, c.name AS category,
                        COALESCE(s.price_score, 0) AS price_score,
@@ -194,7 +205,9 @@ def _catalog_products(limit=20, offset=0):
                 LEFT JOIN product_scores s ON s.product_id = p.id
                 WHERE p.is_active = TRUE
                   AND p.is_blocked = FALSE
-                  AND pl.name IN ('personal', 'mercadolibre', 'amazon', 'aliexpress')
+                  AND p.current_price > 0
+                  AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW())
+                  AND pl.name IN ('personal', 'mercadolibre', 'amazon', 'tiktok', 'aliexpress')
                 ORDER BY p.updated_at DESC NULLS LAST, p.id DESC
                 LIMIT %s OFFSET %s
                 """,
@@ -211,7 +224,7 @@ def _search_products(term, limit=8):
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT p.title, p.current_price, p.currency, p.product_url, p.affiliate_url, p.image_url,
+                SELECT p.id AS product_id, p.title, p.current_price, p.previous_price, p.currency, p.product_url, p.affiliate_url, p.image_url,
                        p.rating, p.reviews_count, p.sales_estimate,
                        pl.name AS platform, c.name AS category,
                        COALESCE(s.price_score, 0) AS price_score,
@@ -224,6 +237,8 @@ def _search_products(term, limit=8):
                 LEFT JOIN product_scores s ON s.product_id = p.id
                 WHERE p.is_active = TRUE
                   AND p.is_blocked = FALSE
+                  AND p.current_price > 0
+                  AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW())
                   AND p.title ILIKE %s
                 ORDER BY COALESCE(s.opportunity_score, 0) DESC
                 LIMIT %s
@@ -469,6 +484,8 @@ def _publish_product(product_id):
                 JOIN platforms pl ON pl.id=p.platform_id
                 LEFT JOIN product_scores s ON s.product_id=p.id
                 WHERE p.id=%s AND p.is_active=TRUE AND p.is_blocked=FALSE
+                  AND p.current_price>0
+                  AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at>NOW())
                 """,
                 (product_id,),
             )
@@ -573,9 +590,10 @@ def _handle(token, chat_id, text):
             "<b>Radar de Producto</b>\n\n"
             "/productos — mostrar los 20 productos del catálogo\n"
             "/top — oportunidades con mayor score\n"
-            "/buscar producto — buscar en los datos modelados\n"
+            "/buscar producto — buscar solo en el catálogo guardado en Central\n"
+            "/inyectar — buscar ofertas reales y publicarlas en la tienda (hasta 200, mínimo 40%, vigencia 7 días)\n"
             "/modelar — registrar y puntuar un producto\n"
-            "/agregar — importar un producto desde Amazon, Mercado Libre o AliExpress por URL\n"
+            "/agregar — importar un producto desde Amazon, Mercado Libre, TikTok Shop o AliExpress por URL\n"
             "/publicar ID — publicar un producto validado\n"
             "También puedes enviar una URL sola: Central la captura y la deja lista para publicar.\n"
             "/estado — estado del catálogo\n"
@@ -611,73 +629,66 @@ def _handle(token, chat_id, text):
         term = argument.strip()
         if not term:
             return _send(token, chat_id, "Uso: /buscar audífonos bluetooth")
-
-        try:
-            discovered = search_external_products(term, limit=8)
-        except Exception as exc:
-            print(f"[telegram-bot] búsqueda externa fallida: {type(exc).__name__}: {str(exc)[:180]}")
-            discovered = []
-
-        products = []
-        conn = None
-        try:
-            if discovered:
-                conn = get_connection()
-            category = _category_from_text(term)
-            for item in discovered:
-                platform = str(item.get("platform") or "").lower()
-                title = str(item.get("title") or "").strip()
-                product_url = str(item.get("product_url") or "").strip()
-                try:
-                    price = float(item.get("price") or 0)
-                except (TypeError, ValueError):
-                    price = 0
-                if platform not in {"mercadolibre", "amazon", "aliexpress"}:
-                    continue
-                if not title or not product_url.startswith(("https://", "http://")) or price <= 0:
-                    continue
-
-                score = 0
-                if conn is not None:
-                    try:
-                        product_id = upsert_product(conn, platform, category, item)
-                        score = score_product(conn, product_id, price)
-                        conn.commit()
-                    except Exception as exc:
-                        conn.rollback()
-                        print(f"[telegram-bot] persistencia {platform} fallida: {type(exc).__name__}")
-                products.append({
-                    "title": title,
-                    "current_price": price,
-                    "currency": item.get("currency") or ("COP" if platform == "mercadolibre" else "USD"),
-                    "product_url": product_url,
-                    "affiliate_url": item.get("affiliate_url") or product_url,
-                    "image_url": item.get("image_url") or "",
-                    "rating": item.get("rating"),
-                    "reviews_count": item.get("reviews_count") or 0,
-                    "sales_estimate": item.get("sales_estimate"),
-                    "platform": platform,
-                    "category": category,
-                    "opportunity_score": float(score or 0),
-                    "price_score": None,
-                    "demand_score": None,
-                    "trend_score": None,
-                })
-        except Exception as exc:
-            print(f"[telegram-bot] búsqueda sin persistencia: {type(exc).__name__}")
-        finally:
-            if conn is not None:
-                conn.close()
-
+        products = _search_products(term)
         if not products:
-            products = _search_products(term)
-        if not products:
-            return _send(token, chat_id, f"No encontré productos externos verificables ni coincidencias guardadas para: {html.escape(term)}")
+            return _send(
+                token,
+                chat_id,
+                f"No hay coincidencias guardadas en Central para: {html.escape(term)}\n"
+                "Usa /inyectar para buscar nuevas ofertas reales en las tiendas.",
+            )
 
-        _send(token, chat_id, f"<b>Resultados externos y catálogo: {html.escape(term)}</b> · {len(products)} productos")
+        _send(token, chat_id, f"<b>Resultados del catálogo Central: {html.escape(term)}</b> · {len(products)} productos")
         for product in products:
             _send_product(token, chat_id, product)
         return True
+
+    if command == "/inyectar":
+        if argument.strip():
+            return _send(token, chat_id, "Uso: /inyectar")
+        if not _CATALOG_INGESTION_LOCK.acquire(blocking=False):
+            return _send(token, chat_id, "Ya hay una ingesta de ofertas en curso.")
+
+        def run_ingestion():
+            try:
+                from api import _sync_store_catalog
+
+                result = _sync_store_catalog()
+                if result.get("status") == "already_running":
+                    _send(token, chat_id, "Ya hay una ingesta de catálogo en curso en otro servicio.")
+                    return
+                imported = result.get("imported") or {}
+                lines = [
+                    "<b>Ingesta de catálogo finalizada</b>",
+                    f"Importados: {sum(imported.values())}/{result.get('limit', 200)}",
+                    f"Publicados en la tienda: {result.get('published', 0)}",
+                    f"Descuento mínimo: {result.get('discount_threshold_pct', 40)}%",
+                    f"Vigencia: {result.get('expiry_days', 7)} días",
+                ]
+                for platform in ("mercadolibre", "amazon", "aliexpress"):
+                    lines.append(f"{html.escape(platform)}: {imported.get(platform, 0)}")
+                rejected = result.get("rejected") or {}
+                if rejected.get("missing_reference_price"):
+                    lines.append(
+                        "Omitidos sin precio original verificable: "
+                        f"{rejected['missing_reference_price']}"
+                    )
+                errors = result.get("errors") or []
+                if errors:
+                    lines.append("Avisos: " + html.escape(" | ".join(errors[:3]))[:900])
+                _send(token, chat_id, "\n".join(lines))
+            except Exception as exc:
+                print(f"[telegram-bot] catalog ingestion failed: {type(exc).__name__}: {str(exc)[:180]}", flush=True)
+                _send(token, chat_id, "No se pudo completar la ingesta. Revisa los logs del Worker/API.")
+            finally:
+                _CATALOG_INGESTION_LOCK.release()
+
+        try:
+            threading.Thread(target=run_ingestion, name="telegram-catalog-ingestion", daemon=True).start()
+        except RuntimeError:
+            _CATALOG_INGESTION_LOCK.release()
+            raise
+        return _send(token, chat_id, "Inicié la búsqueda de ofertas reales. Te enviaré el resumen cuando termine.")
 
     if command == "/agregar":
         full_text = text or ""
@@ -723,7 +734,16 @@ def _handle(token, chat_id, text):
         conn = get_connection()
         try:
             with conn.cursor() as cur:
-                cur.execute("SELECT COUNT(*) AS total FROM products WHERE is_active = TRUE")
+                cur.execute(
+                    """
+                    SELECT COUNT(*) AS total
+                    FROM products p
+                    WHERE p.is_active = TRUE
+                      AND p.is_blocked = FALSE
+                      AND p.current_price > 0
+                      AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW())
+                    """
+                )
                 total = cur.fetchone()["total"]
                 cur.execute(
                     """
@@ -731,6 +751,9 @@ def _handle(token, chat_id, text):
                     FROM products p
                     JOIN product_scores s ON s.product_id = p.id
                     WHERE p.is_active = TRUE
+                      AND p.is_blocked = FALSE
+                      AND p.current_price > 0
+                      AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW())
                     """
                 )
                 modeled = cur.fetchone()["modeled"]

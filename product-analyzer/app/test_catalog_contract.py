@@ -1,7 +1,9 @@
+import ast
 import unittest
 from unittest.mock import patch
 import inspect
 import requests
+from pathlib import Path
 
 from api import _sync_store_catalog
 from url_import import import_url
@@ -11,13 +13,16 @@ from amazon_api import _previous_offer
 from ingest import fetch_mercadolibre
 from store_orders import _public_order_summary, create_store_order
 from tiktok_creator import _normalize
+from wompi import create_cart_checkout, create_product_checkout
 
 
 class AmazonAffiliateUrlTests(unittest.TestCase):
-    def test_scheduled_catalog_does_not_call_amazon_product_api(self):
+    def test_catalog_sync_searches_amazon_only_with_official_partner_credentials(self):
         source = inspect.getsource(_sync_store_catalog)
-        self.assertNotIn("fetch_amazon_products", source)
-        self.assertIn("affiliate_url_only", source) if "affiliate_url_only" in source else None
+        self.assertIn("search_amazon_products", source)
+        self.assertIn("AMAZON_CREDENTIAL_ID", source)
+        self.assertIn("AMAZON_PARTNER_TAG", source)
+
 
     def test_import_preserves_supplied_amazon_affiliate_url_and_manual_real_data(self):
         affiliate_url = "https://www.amazon.com/dp/B0ABCDEF12?tag=partner-20"
@@ -37,6 +42,141 @@ class AmazonAffiliateUrlTests(unittest.TestCase):
         self.assertEqual(product["affiliate_url"], affiliate_url)
         self.assertEqual(product["price"], 129.99)
         self.assertEqual(product["image_url"], "https://images.example.com/audifonos.jpg")
+
+    def test_import_preserves_manual_aliexpress_affiliate_url_when_store_blocks_reading(self):
+        affiliate_url = "https://s.click.aliexpress.com/e/_example"
+        image_url = "https://images.example.com/product.jpg"
+        with patch("url_import._public_url"), patch(
+            "url_import._metadata", side_effect=requests.RequestException("lectura bloqueada")
+        ):
+            product = import_url(
+                affiliate_url,
+                "electronica",
+                title="Audífonos reales",
+                price=12.49,
+                currency="USD",
+                image_url=image_url,
+            )
+
+        self.assertEqual(product["platform"], "aliexpress")
+        self.assertEqual(product["affiliate_url"], affiliate_url)
+        self.assertEqual(product["price"], 12.49)
+        self.assertEqual(product["image_url"], image_url)
+
+
+class TelegramCatalogContractTests(unittest.TestCase):
+    def test_telegram_catalog_queries_show_publishable_products_with_ids(self):
+        path = Path(__file__).with_name("telegram_alert.py")
+        source = path.read_text(encoding="utf-8")
+        module = ast.parse(source)
+        functions = {
+            node.name: ast.get_source_segment(source, node)
+            for node in module.body
+            if isinstance(node, ast.FunctionDef)
+        }
+        for name in ("_top_products", "_catalog_products", "_search_products"):
+            with self.subTest(query=name):
+                self.assertIn("p.id AS product_id", functions[name])
+                self.assertIn("p.current_price > 0", functions[name])
+                self.assertIn("p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW()", functions[name])
+        self.assertIn("'tiktok'", functions["_catalog_products"])
+        self.assertIn("Publicar:", functions["_format_product"])
+        self.assertIn("products = _search_products(term)", functions["_handle"])
+        self.assertNotIn("search_external_products", functions["_handle"])
+
+    def test_telegram_status_counts_only_active_unexpired_products(self):
+        path = Path(__file__).with_name("telegram_alert.py")
+        source = path.read_text(encoding="utf-8")
+        module = ast.parse(source)
+        handler = next(
+            node for node in module.body
+            if isinstance(node, ast.FunctionDef) and node.name == "_handle"
+        )
+        source = ast.get_source_segment(source, handler)
+        self.assertIn("Productos activos: {total}", source)
+        self.assertIn("p.is_blocked = FALSE", source)
+        self.assertIn("p.current_price > 0", source)
+        self.assertIn("p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW()", source)
+
+    def test_telegram_help_lists_url_import_for_all_supported_platforms(self):
+        source = Path(__file__).with_name("telegram_alert.py").read_text(encoding="utf-8")
+        self.assertIn("Amazon, Mercado Libre, TikTok Shop o AliExpress por URL", source)
+        self.assertIn("/inyectar", source)
+
+    def test_store_search_uses_only_central_publications(self):
+        source = (Path(__file__).resolve().parents[1] / "frontend" / "tienda.html").read_text(encoding="utf-8")
+        self.assertIn('API+"/publications?limit="+pageSize+"&offset="+offset', source)
+        self.assertIn('data-mode="discount">🔥 40%+ descuento', source)
+        self.assertIn("discountPercent(p)>=40", source)
+        self.assertIn("verified_discount_pct", source)
+        self.assertNotIn("meta.promotion_discount_pct", source)
+
+    def test_store_discount_badge_requires_verified_ingestion_metadata(self):
+        from publications import list_publications
+
+        source = inspect.getsource(list_publications)
+        self.assertIn("p.source_metadata->>'catalog_ingestion' = 'verified_discount_search'", source)
+        self.assertIn("AS verified_discount_pct", source)
+
+    def test_telegram_publication_rejects_invalid_or_expired_products(self):
+        source = Path(__file__).with_name("telegram_alert.py").read_text(encoding="utf-8")
+        module = ast.parse(source)
+        publish = next(
+            node for node in module.body
+            if isinstance(node, ast.FunctionDef) and node.name == "_publish_product"
+        )
+        source = ast.get_source_segment(source, publish)
+        self.assertIn("p.is_blocked=FALSE", source)
+        self.assertIn("p.current_price>0", source)
+        self.assertIn("p.catalog_expires_at IS NULL OR p.catalog_expires_at>NOW()", source)
+
+
+class MercadoLibreRateLimitTests(unittest.TestCase):
+    def test_requests_include_the_bearer_token(self):
+        from ingest import _headers
+
+        with patch("ingest.get_meli_tokens", return_value=("access-token", "")):
+            self.assertEqual(_headers()["Authorization"], "Bearer access-token")
+
+    def test_retry_after_refresh_uses_the_new_bearer_token(self):
+        from unittest.mock import Mock
+        from ingest import _get
+
+        unauthorized = Mock(status_code=401)
+        authorized = Mock(status_code=200)
+        authorized.json.return_value = {"results": []}
+        with patch("ingest.get_meli_tokens", return_value=("old-token", "refresh-token")), \
+             patch("ingest._refresh_access_token", return_value="new-token"), \
+             patch("ingest.requests.get", side_effect=[unauthorized, authorized]) as get:
+            self.assertEqual(_get("https://api.mercadolibre.com/sites/MCO/search"), {"results": []})
+
+        self.assertEqual(get.call_args_list[1].kwargs["headers"]["Authorization"], "Bearer new-token")
+
+    def test_http_429_is_reported_as_a_rate_limit(self):
+        from unittest.mock import Mock
+        from ingest import MercadoLibreRateLimited, _get
+
+        response = Mock(status_code=429)
+        response.headers = {"Retry-After": "30"}
+        with patch("ingest.requests.get", return_value=response), \
+             patch("ingest.get_meli_tokens", return_value=("test-token", "")):
+            with self.assertRaisesRegex(MercadoLibreRateLimited, r"429.*retry_after=30s"):
+                _get("https://api.mercadolibre.com/sites/MCO/search")
+
+    def test_rate_limit_stops_search_without_public_scraping(self):
+        from ingest import MercadoLibreAccessDenied, MercadoLibreRateLimited
+
+        with patch(
+            "ingest._get",
+            side_effect=[
+                MercadoLibreAccessDenied("search forbidden"),
+                MercadoLibreRateLimited("catalog rate limited"),
+            ],
+        ), patch("ingest._public_search") as public_search:
+            with self.assertRaises(MercadoLibreRateLimited):
+                fetch_mercadolibre("audifonos bluetooth")
+
+        public_search.assert_not_called()
 
 
 class StoreOrderSecurityTests(unittest.TestCase):
@@ -58,6 +198,24 @@ class StoreOrderSecurityTests(unittest.TestCase):
         self.assertNotIn("LEFT JOIN published_cards pc", source)
         self.assertIn("p.is_blocked=FALSE", source)
         self.assertIn("p.catalog_expires_at > NOW()", source)
+
+
+class WompiCheckoutContractTests(unittest.TestCase):
+    def test_product_checkout_requires_a_live_published_product(self):
+        source = inspect.getsource(create_product_checkout)
+        self.assertIn("JOIN published_cards pc", source)
+        self.assertIn("pc.is_published=TRUE", source)
+        self.assertIn("p.is_blocked=FALSE", source)
+        self.assertIn("p.current_price>0", source)
+        self.assertIn("p.catalog_expires_at IS NULL OR p.catalog_expires_at>NOW()", source)
+
+    def test_cart_checkout_requires_live_published_products(self):
+        source = inspect.getsource(create_cart_checkout)
+        self.assertIn("JOIN published_cards pc", source)
+        self.assertIn("pc.is_published=TRUE", source)
+        self.assertIn("p.is_blocked=FALSE", source)
+        self.assertIn("p.current_price>0", source)
+        self.assertIn("p.catalog_expires_at IS NULL OR p.catalog_expires_at>NOW()", source)
 
 
 class DiscountRuleTests(unittest.TestCase):
@@ -131,12 +289,13 @@ class CatalogPublicationPolicyTests(unittest.TestCase):
     def test_auto_publication_policy_uses_score_and_card_limit(self):
         from api import _publish_external_product
         source = inspect.getsource(_publish_external_product)
-        self.assertIn("CATALOG_MIN_AUTO_PUBLISH_SCORE", source)
+        self.assertIn('CATALOG_MIN_DISCOUNT_PCT", "40"', source)
         self.assertIn("CATALOG_MAX_PUBLISHED_CARDS", source)
-        self.assertIn("CATALOG_EXPIRY_HIGH_SCORE_HOURS", source)
-        self.assertIn("CATALOG_EXPIRY_LOW_SCORE_HOURS", source)
+        self.assertIn('CATALOG_EXPIRY_DAYS", "7"', source)
 
     def test_expiry_waits_for_a_successful_complete_provider_sync(self):
         source = inspect.getsource(_sync_store_catalog)
-        self.assertIn("if meli_sync_available and meli_sync_complete:", source)
-        self.assertIn("meli_sync_complete = False", source)
+        self.assertIn('"CATALOG_SYNC_MAX_PRODUCTS", "200"', source)
+        self.assertIn('"CATALOG_MIN_DISCOUNT_PCT", "40"', source)
+        self.assertIn("catalog_expires_at<=NOW()", source)
+        self.assertIn("pg_try_advisory_lock", source)
