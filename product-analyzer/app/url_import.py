@@ -37,13 +37,11 @@ def detect_platform(url: str) -> str:
     host = (urlparse(url).hostname or "").lower()
     if AMAZON_HOST_RE.search(host):
         return "amazon"
-    if MELI_HOST_RE.search(host):
-        return "mercadolibre"
     if TIKTOK_HOST_RE.search(host):
         return "tiktok"
     if ALIEXPRESS_HOST_RE.search(host):
         return "aliexpress"
-    raise ValueError("La URL debe pertenecer a Amazon, Mercado Libre, TikTok Shop o AliExpress.")
+    raise ValueError("La URL debe pertenecer a Amazon o AliExpress.")
 
 
 def _aliexpress_affiliate_url(url: str) -> str | None:
