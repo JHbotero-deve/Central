@@ -26,11 +26,7 @@ class ProductSearchTests(unittest.TestCase):
         self.assertEqual(results[0]["currency"], "USD")
         self.assertEqual(results[0]["product_url"], "https://www.aliexpress.com/item/1005001234567890.html")
 
-    def test_external_search_calls_all_sources_and_normalizes_products(self):
-        meli = [{
-            "external_id": "MCO123", "title": "Auriculares Mercado Libre",
-            "product_url": "https://www.mercadolibre.com.co/p/MCO123", "price": 89000, "currency": "COP",
-        }]
+    def test_external_search_uses_only_amazon_and_aliexpress(self):
         amazon = [{
             "external_id": "B012345678", "title": "Auriculares Amazon",
             "product_url": "https://www.amazon.com/dp/B012345678", "price": 19.99, "currency": "USD",
@@ -39,13 +35,11 @@ class ProductSearchTests(unittest.TestCase):
             "external_id": "1005001234567890", "title": "Auriculares AliExpress",
             "product_url": "https://www.aliexpress.com/item/1005001234567890.html", "price": 8.25, "currency": "USD",
         }]
-        with patch("product_search.fetch_mercadolibre", return_value=meli) as meli_search, \
-             patch("product_search.search_amazon_products", return_value=amazon) as amazon_search, \
+        with patch("product_search.search_amazon_products", return_value=amazon) as amazon_search, \\
              patch("product_search.search_aliexpress_products", return_value=aliexpress) as ali_search:
             results = search_external_products("auriculares", limit=8)
-        self.assertEqual({item["platform"] for item in results}, {"mercadolibre", "amazon", "aliexpress"})
-        self.assertEqual(len(results), 3)
-        meli_search.assert_called_once()
+        self.assertEqual({item["platform"] for item in results}, {"amazon", "aliexpress"})
+        self.assertEqual(len(results), 2)
         amazon_search.assert_called_once()
         ali_search.assert_called_once()
 
