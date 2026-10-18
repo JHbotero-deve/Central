@@ -608,7 +608,7 @@ def _handle(token, chat_id, text):
             "<b>Radar de Producto</b>\n\n"
             "/productos — mostrar los 20 productos del catálogo\n"
             "/top — oportunidades con mayor score\n"
-            "/buscar producto — buscar solo en el catálogo guardado en Central\n"
+            "/buscar producto — buscar en Amazon y AliExpress\n"
             "/inyectar — buscar ofertas reales y publicarlas en la tienda (hasta 200, mínimo 40%, vigencia 7 días)\n"
             "/modelar — registrar y puntuar un producto\n"
             "/agregar — importar un producto desde Amazon o AliExpress por URL\n"
