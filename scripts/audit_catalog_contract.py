@@ -65,10 +65,9 @@ check("data = _public_search(query, limit)" in INGEST and "if not data.get(\"res
       "Mercado Libre cae a búsqueda pública cuando la API bloquea o no devuelve resultados")
 check("if not _AUTH_FAILURE:" in AMAZON and "se continúa con búsqueda pública" in AMAZON and "return _search_amazon_web(keywords, limit)" in AMAZON,
       "Amazon conserva la búsqueda pública cuando faltan o se rechazan credenciales API")
-check("products = _search_products(term)" in TELEGRAM and "Resultados del catálogo Central:" in TELEGRAM and
-      "Usa /inyectar para buscar nuevas ofertas reales en las tiendas." in TELEGRAM and
-      "result = _sync_store_catalog()" in TELEGRAM,
-      "Telegram busca el catálogo local y reserva la búsqueda externa para /inyectar")
+check("products = search_external_products(term, limit=8)" in TELEGRAM and "Búsqueda real:" in TELEGRAM and
+      "Amazon y AliExpress" in TELEGRAM and "result = _sync_store_catalog()" in TELEGRAM,
+      "Telegram busca productos reales únicamente en Amazon y AliExpress")
 check("prime_only=True" in API and
       "official_only=True" in API and "min_saving_percent=int(threshold)" in API,
       "la ingesta conserva ofertas Amazon Prime verificables con descuento mínimo y pausa fuentes sin referencia de precio")
