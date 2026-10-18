@@ -5,6 +5,7 @@ import os
 import re
 import threading
 import time
+import unicodedata
 from urllib.parse import quote, urlparse
 
 import requests
@@ -218,12 +219,28 @@ def _catalog_products(limit=20, offset=0):
         conn.close()
 
 
+def _normalize_search_term(term):
+    value = unicodedata.normalize("NFKD", str(term or "").lower())
+    value = "".join(char for char in value if not unicodedata.combining(char))
+    words = re.findall(r"[a-z0-9]+", value)
+    ignored = {"busco", "quiero", "necesito", "comprar", "compra", "vender", "precio", "precios", "barato", "barata", "baratos", "baratas", "economico", "economica", "economicos", "economicas", "oferta", "ofertas", "mejor", "mejores", "recomienda", "recomendacion", "hay", "tienes", "tiene", "por", "favor", "para", "con", "que", "del", "al", "de", "el", "la", "los", "las", "un", "una", "unos", "unas", "y", "en", "mi", "me"}
+    return list(dict.fromkeys(word for word in words if word not in ignored))
+
+
 def _search_products(term, limit=8):
+    words = _normalize_search_term(term)
+    if not words:
+        return []
+    conditions = " AND ".join(
+        ["(translate(lower(p.title), 'áéíóúüñ', 'aeiouun') ILIKE %s OR translate(lower(COALESCE(c.name, '')), 'áéíóúüñ', 'aeiouun') ILIKE %s)" for _ in words]
+    )
+    params = [pattern for word in words for pattern in (f"%{word}%", f"%{word}%")]
+    params.append(limit)
     conn = get_connection()
     try:
         with conn.cursor() as cur:
             cur.execute(
-                """
+                f"""
                 SELECT p.id AS product_id, p.title, p.current_price, p.previous_price, p.currency, p.product_url, p.affiliate_url, p.image_url,
                        p.rating, p.reviews_count, p.sales_estimate,
                        pl.name AS platform, c.name AS category,
@@ -239,11 +256,11 @@ def _search_products(term, limit=8):
                   AND p.is_blocked = FALSE
                   AND p.current_price > 0
                   AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW())
-                  AND p.title ILIKE %s
+                  AND {conditions}
                 ORDER BY COALESCE(s.opportunity_score, 0) DESC
                 LIMIT %s
                 """,
-                (f"%{term}%", limit),
+                params,
             )
             return cur.fetchall()
     finally:
