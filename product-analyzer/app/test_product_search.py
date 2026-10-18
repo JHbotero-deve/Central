@@ -49,7 +49,7 @@ class ProductSearchTests(unittest.TestCase):
             "product_url": "https://www.aliexpress.com/item/1005001234567890.html",
             "price": 10, "currency": "USD",
         }
-             patch("product_search.search_amazon_products", return_value=[]), \
+        with patch("product_search.search_amazon_products", return_value=[]), \
              patch("product_search.search_aliexpress_products", return_value=[product]):
             results = search_external_products("producto", limit=8)
         self.assertEqual(len(results), 1)
