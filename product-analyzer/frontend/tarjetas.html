@@ -72,7 +72,7 @@ body:not(.auth-ready) .sh-wrap{display:none!important}#panel{display:none}.centr
 
   <div class="ed-body" id="tab-add">
    <div class="ed-l" id="formHeading">NUEVO PRODUCTO</div>
-   <label class="ed-l">Tipo de producto<select class="ed-in" id="productType"><option value="personal">Producto propio · compra en Central/Wompi</option><option value="mercadolibre">Mercado Libre · compra externa</option></select></label>
+   <label class="ed-l">Tipo de producto<select class="ed-in" id="productType"><option value="personal">Producto propio · compra en Central/Wompi</option></select></label>
    <div class="ed-l">BUSCAR PRODUCTO EN MERCADO LIBRE</div>
    <div class="meli-search"><input class="ed-in" id="meliQuery" maxlength="120" placeholder="Ej: Raspberry Pi Pico original"><button class="ed-btn" id="meliSearch" type="button">Buscar</button></div>
    <div class="meli-search-note">Elige un resultado para cargar título, precio, imagen y enlace automáticamente.</div>
@@ -100,7 +100,7 @@ body:not(.auth-ready) .sh-wrap{display:none!important}#panel{display:none}.centr
    <div id="vars" style="display:flex;flex-direction:column;gap:10px"></div>
    <label class="ed-l" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" id="plate"> Marco claro para la imagen (útil si tiene fondo blanco)</label>
    <div class="ed-l">Links de compra</div>
-   <input class="ed-in" id="l_amz" placeholder="🟠 Amazon: https://…"><input class="ed-in" id="l_meli" placeholder="🟡 Mercado Libre: https://…"><input class="ed-in" id="l_wmp" placeholder="🔵 Wompi (link de pago): https://…">
+   <input class="ed-in" id="l_amz" placeholder="Amazon o AliExpress: https://…"><input class="ed-in" id="l_wmp" placeholder="Wompi (link de pago): https://…">
    <button class="ed-btn" id="save" type="button">Crear tarjeta</button><button class="ed-x" id="cancelEdit" type="button" hidden>Cancelar edición</button><div id="msg" class="ed-msg" hidden></div>
   </div>
 
@@ -142,7 +142,7 @@ function renderVars(){
 function model(){return{id:"preview",title:f("title")||"Nombre del producto",brand:f("brand"),tag:f("tag"),cat:f("category"),desc:f("description"),
   price:num(f("price")),prev:num(f("prev")),currency:f("currency"),rating:num(f("rating"))||0,reviews:parseInt(f("reviews"),10)||0,
   features:[1,2,3,4].map(i=>f("feat"+i)).filter(Boolean),variants:V.map(v=>({...v})),
-  links:{amazon:f("l_amz"),meli:f("l_meli"),wompi:f("l_wmp")},fallback:"",platform:f("productType"),plate:$("plate").checked}}
+  links:{amazon:f("l_amz"),wompi:f("l_wmp")},fallback:"",platform:f("productType"),plate:$("plate").checked}}
 function preview(){const m=model();S.mountDetail($("preview"),{...m,links:{},fallback:""},0)}
 
 function resize(file,max=700){return new Promise((res,rej)=>{const im=new Image(),u=URL.createObjectURL(file);
@@ -160,41 +160,7 @@ $("addVar").addEventListener("click",()=>{if(V.length<4){V.push({name:"",glow:Ma
 $("tab-add").addEventListener("input",preview);$("plate").addEventListener("change",preview);
 document.querySelectorAll("[data-tab]").forEach(b=>b.addEventListener("click",()=>tab(b.dataset.tab)));
 
-let meliItems=[];
- async function searchMeli(){
-   const q=$("meliQuery").value.trim(),btn=$("meliSearch"),box=$("meliResults"),msg=$("meliMsg");
-   msg.hidden=true;box.innerHTML="";
-   if(q.length<2)return show(msg,"err","Escribe al menos 2 caracteres para buscar.");
-   btn.disabled=true;btn.textContent="Buscando…";
-   try{
-     const data=await S.api("/mercadolibre/search?q="+encodeURIComponent(q)+"&limit=8");
-     meliItems=Array.isArray(data.items)?data.items:[];
-     if(!meliItems.length){show(msg,"err","No encontramos productos con precio disponible. Prueba otra búsqueda.");return}
-     box.innerHTML=meliItems.map((p,i)=>{
-       const src=S.imgOk(p.image_url);
-       return '<button type="button" class="meli-result" data-meli-index="'+i+'">'+
-         (src?'<img src="'+S.esc(src)+'" alt="" loading="lazy" referrerpolicy="no-referrer">':'<span class="admin-card-noimg">Sin imagen</span>')+
-         '<span><b>'+S.esc(p.title)+'</b><small>'+S.money(p.price,p.currency)+' · Mercado Libre</small></span></button>';
-     }).join("");
-   }catch(e){show(msg,"err",e.message||"No fue posible buscar en Mercado Libre.")}
-   finally{btn.disabled=false;btn.textContent="Buscar"}
- }
- $("meliSearch").addEventListener("click",searchMeli);
- $("meliQuery").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();searchMeli()}});
- $("meliResults").addEventListener("click",e=>{
-   const b=e.target.closest("[data-meli-index]");if(!b)return;
-   const p=meliItems[Number(b.dataset.meliIndex)];if(!p)return;
-   $("title").value=p.title;
-   $("price").value=String(p.price);
-   $("currency").value=["COP","USD"].includes(p.currency)?p.currency:"COP";
-   $("l_meli").value=p.product_url;
-   $("productType").value="mercadolibre";
-   V[0]={...V[0],name:V[0].name||"Principal",img:p.image_url||V[0].img};
-   renderVars();preview();
-   show($("msg"),"ok","Producto cargado. Revisa los datos y pulsa «Crear tarjeta».");
-   $("msg").scrollIntoView({behavior:"smooth",block:"nearest"});
- });
- function adminCardHtml(m){
+  function adminCardHtml(m){
   const v=m.variants[0]||{},src=S.imageSrc(v.img),own=m.platform==="personal";
   const img=src?'<img src="'+S.esc(src)+'" alt="'+S.esc(m.title)+'" loading="lazy" referrerpolicy="no-referrer" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span class="admin-card-noimg" hidden>Imagen no disponible</span>':'<span class="admin-card-noimg">Sin imagen</span>';
   return '<div class="admin-card-wrap"><button type="button" class="admin-card" data-open="'+S.esc(m.id)+'" aria-label="Ver '+S.esc(m.title)+'"><div class="admin-card-media '+(m.plate?"plate":"")+'">'+img+'</div><div class="admin-card-body"><span class="admin-card-brand">'+S.esc(m.brand||m.cat)+'</span><span class="admin-card-title">'+S.esc(m.title)+'</span><span class="admin-card-price">'+S.money(m.price,m.currency)+'</span><div class="admin-card-meta"><span>'+S.esc(m.platform||m.cat)+'</span><span class="admin-card-status">Activo</span></div></div></button><div class="admin-card-actions">'+(own?'<button type="button" data-edit="'+S.esc(m.id)+'">Editar</button>':'')+'<button type="button" data-publish="'+S.esc(m.id)+'">Publicar en tienda</button><button type="button" data-delete="'+S.esc(m.id)+'">Eliminar</button></div></div>'
@@ -202,7 +168,7 @@ let meliItems=[];
 let editingId=null;
 function resetEditor(){
   editingId=null;$("formHeading").textContent="NUEVO PRODUCTO";$("save").textContent="Crear tarjeta";$("cancelEdit").hidden=true;$("productType").disabled=false;
-  ["title","brand","description","tag","price","prev","rating","reviews","feat1","feat2","feat3","feat4","l_amz","l_meli","l_wmp"].forEach(id=>$(id).value="");
+  ["title","brand","description","tag","price","prev","rating","reviews","feat1","feat2","feat3","feat4","l_amz","l_wmp"].forEach(id=>$(id).value="");
   $("category").value="otros";$("currency").value="COP";$("productType").value="personal";V=[{name:"",glow:0,img:""}];renderVars();preview();
 }
 function bindAdminCards(){
@@ -211,7 +177,7 @@ function bindAdminCards(){
     const m=mineModels.find(x=>String(x.id)===String(b.dataset.edit));if(!m)return;
     editingId=m.id;$("formHeading").textContent="EDITAR PRODUCTO";$("save").textContent="Guardar cambios";$("cancelEdit").hidden=false;$("productType").value="personal";$("productType").disabled=true;
     $("title").value=m.title;$("brand").value=m.brand;$("description").value=m.desc;$("category").value=m.cat;$("price").value=m.price??"";$("prev").value=m.prev??"";$("currency").value=m.currency||"COP";$("tag").value=m.tag;$("rating").value=m.rating||"";$("reviews").value=m.reviews||"";
-    ["feat1","feat2","feat3","feat4"].forEach((id,i)=>$(id).value=m.features[i]||"");$("l_amz").value=m.links.amazon||"";$("l_meli").value=m.links.meli||"";$("l_wmp").value=m.links.wompi||"";
+    ["feat1","feat2","feat3","feat4"].forEach((id,i)=>$(id).value=m.features[i]||"");$("l_amz").value=m.links.amazon||"";$("l_wmp").value=m.links.wompi||"";
     V=m.variants.map(v=>({...v}));if(!V.length)V=[{name:"",glow:0,img:""}];renderVars();preview();tab("add");
   }));
   document.querySelectorAll("[data-delete]").forEach(b=>b.addEventListener("click",async()=>{
@@ -240,22 +206,16 @@ $("save").addEventListener("click",async()=>{
   if(!V.some(v=>v.img))return show(msg,"err","Agrega al menos una imagen en una variante");
   const gallery=[];
   const vs=V.filter(v=>v.img||v.name).map(v=>{let ref=v.img;if(v.img.startsWith("data:")){gallery.push(v.img);ref="g:"+(gallery.length-1)}return{n:v.name,g:v.glow,i:ref}});
-  const links={};if(m.links.amazon)links.amazon=m.links.amazon;if(m.links.meli)links.meli=m.links.meli;if(m.links.wompi)links.wompi=m.links.wompi;
+  const links={};if(m.links.amazon)links.amazon=m.links.amazon;if(m.links.wompi)links.wompi=m.links.wompi;
   const meta={v:1,brand:m.brand,tag:m.tag,rating:m.rating||null,reviews:m.reviews||null,features:m.features,variants:vs,links,plate:m.plate};
   const description=S.pack(f("description"),meta);
   if(description.length>5000)return show(msg,"err","Descripción + datos extra superan 5000 caracteres ("+description.length+"). Acórtala.");
   const first=V.find(v=>v.img);
-  const body={title:f("title"),description,price:m.price,previous_price:m.prev>0?m.prev:null,currency:m.currency,category:m.cat||"otros",image_url:first.img,image_gallery:gallery,product_url:links.amazon||links.meli||links.wompi||null};
+  const body={title:f("title"),description,price:m.price,previous_price:m.prev>0?m.prev:null,currency:m.currency,category:m.cat||"otros",image_url:first.img,image_gallery:gallery,product_url:links.amazon||links.wompi||null};
   const b=$("save");b.disabled=true;
   try{
     if(editingId){await S.api("/products/"+encodeURIComponent(editingId),{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});show(msg,"ok","Cambios guardados");resetEditor();await loadMine()}
-    else if(m.platform==="mercadolibre"){
-      const item=meliItems.find(p=>p.product_url===links.meli);
-      if(!item)return show(msg,"err","Selecciona un resultado de Mercado Libre para importar sus datos reales.");
-      const result=await S.api("/products/mercadolibre",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({external_id:item.id,title:item.title,image_url:item.image_url,product_url:item.product_url,price:item.price,currency:item.currency,category:m.cat||"otros"})});
-      show(msg,"ok","Producto externo guardado (ID "+result.product.id+"). No usa checkout Wompi.");await loadMine()
-    }else{
-      if(links.meli)return show(msg,"err","Este producto tiene enlace de Mercado Libre. Cambia el tipo a Mercado Libre para no tratarlo como producto propio.");
+    else{
       await S.api("/products/personal",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});show(msg,"ok","Tarjeta creada");resetEditor();await loadMine()
     }
   }catch(e){show(msg,"err",e.message)}finally{b.disabled=false}});
