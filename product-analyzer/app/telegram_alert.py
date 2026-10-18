@@ -15,6 +15,7 @@ from analysis import score_product
 from catalog_rules import discount_percentage
 from db import get_connection, upsert_product
 from url_import import detect_platform, import_url
+from product_search import search_external_products
 
 POLL_INTERVAL = int(os.getenv("TELEGRAM_POLL_INTERVAL", "3"))
 API_BASE = "https://api.telegram.org"
@@ -646,18 +647,24 @@ def _handle(token, chat_id, text):
         term = argument.strip()
         if not term:
             return _send(token, chat_id, "Uso: /buscar audífonos bluetooth")
-        products = _search_products(term)
+        products = search_external_products(term, limit=8)
         if not products:
-            return _send(
-                token,
-                chat_id,
-                f"No hay coincidencias guardadas en Central para: {html.escape(term)}\n"
-                "Usa /inyectar para buscar nuevas ofertas reales en las tiendas.",
-            )
-
-        _send(token, chat_id, f"<b>Resultados del catálogo Central: {html.escape(term)}</b> · {len(products)} productos")
+            return _send(token, chat_id, f"No encontramos resultados reales en Amazon o AliExpress para: {html.escape(term)}")
+        _send(token, chat_id, f"<b>Búsqueda real: {html.escape(term)}</b> · {len(products)} resultados de Amazon y AliExpress")
         for product in products:
-            _send_product(token, chat_id, product)
+            title = html.escape(str(product.get("title") or "Producto")[:180])
+            platform = html.escape(str(product.get("platform") or "tienda").capitalize())
+            price = product.get("price")
+            currency = html.escape(str(product.get("currency") or "USD"))
+            try:
+                price_text = f"{float(price):,.2f} {currency}"
+            except (TypeError, ValueError):
+                price_text = "Precio no disponible"
+            url = str(product.get("affiliate_url") or product.get("product_url") or "")
+            if not url.startswith(("https://", "http://")):
+                continue
+            safe_url = html.escape(url, quote=True)
+            _send(token, chat_id, f"<b>{title}</b>\n{platform} · {price_text}\n<a href=\"{safe_url}\">Ver producto</a>")
         return True
 
     if command == "/inyectar":
