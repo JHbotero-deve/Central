@@ -35,7 +35,7 @@ class ProductSearchTests(unittest.TestCase):
             "external_id": "1005001234567890", "title": "Auriculares AliExpress",
             "product_url": "https://www.aliexpress.com/item/1005001234567890.html", "price": 8.25, "currency": "USD",
         }]
-        with patch("product_search.search_amazon_products", return_value=amazon) as amazon_search, \\
+        with patch("product_search.search_amazon_products", return_value=amazon) as amazon_search, \
              patch("product_search.search_aliexpress_products", return_value=aliexpress) as ali_search:
             results = search_external_products("auriculares", limit=8)
         self.assertEqual({item["platform"] for item in results}, {"amazon", "aliexpress"})
@@ -49,7 +49,6 @@ class ProductSearchTests(unittest.TestCase):
             "product_url": "https://www.aliexpress.com/item/1005001234567890.html",
             "price": 10, "currency": "USD",
         }
-        with patch("product_search.fetch_mercadolibre", return_value=[product]), \
              patch("product_search.search_amazon_products", return_value=[]), \
              patch("product_search.search_aliexpress_products", return_value=[product]):
             results = search_external_products("producto", limit=8)
