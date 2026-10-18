@@ -335,9 +335,6 @@ def _sync_store_catalog():
                 if source_count >= target:
                     break
                 try:
-                    if platform == "aliexpress":
-                        errors.append("AliExpress: búsqueda de ofertas pausada hasta disponer de precio original verificable por API afiliada.")
-                        continue
                     found = search_amazon_products(
                             query,
                             limit=10,
