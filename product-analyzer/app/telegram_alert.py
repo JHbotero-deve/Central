@@ -19,7 +19,7 @@ from url_import import detect_platform, import_url
 POLL_INTERVAL = int(os.getenv("TELEGRAM_POLL_INTERVAL", "3"))
 API_BASE = "https://api.telegram.org"
 CENTRAL_API_BASE = (os.getenv("CENTRAL_API_BASE") or "https://gracious-renewal-production-76df.up.railway.app").rstrip("/")
-ALLOWED_PLATFORMS = {"mercadolibre", "amazon", "tiktok", "aliexpress", "personal"}
+ALLOWED_PLATFORMS = {"amazon", "aliexpress", "personal"}
 ALLOWED_CATEGORIES = {"ropa", "calzado", "accesorios", "electronica", "hogar", "fitness", "otros"}
 _CATALOG_INGESTION_LOCK = threading.Lock()
 
@@ -279,7 +279,7 @@ def _add_url(argument):
     try:
         price = float(parts[2]) if len(parts) > 2 and parts[2] else None
         platform = detect_platform(url)
-        default_currency = "COP" if platform in {"mercadolibre", "aliexpress"} else "USD"
+        default_currency = "USD"
         currency = parts[5].upper() if len(parts) > 5 and parts[5] else default_currency
         product = import_url(
             url,
@@ -610,7 +610,7 @@ def _handle(token, chat_id, text):
             "/buscar producto — buscar solo en el catálogo guardado en Central\n"
             "/inyectar — buscar ofertas reales y publicarlas en la tienda (hasta 200, mínimo 40%, vigencia 7 días)\n"
             "/modelar — registrar y puntuar un producto\n"
-            "/agregar — importar un producto desde Amazon, Mercado Libre, TikTok Shop o AliExpress por URL\n"
+            "/agregar — importar un producto desde Amazon o AliExpress por URL\n"
             "/publicar ID — publicar un producto validado\n"
             "También puedes enviar una URL sola: Central la captura y la deja lista para publicar.\n"
             "/estado — estado del catálogo\n"
