@@ -5,6 +5,7 @@ import os
 import re
 import threading
 import time
+import unicodedata
 from urllib.parse import quote, urlparse
 
 import requests
@@ -15,11 +16,12 @@ from catalog_rules import discount_percentage
 from db import get_connection, upsert_product
 from product_search import search_external_products
 from url_import import detect_platform, import_url
+from product_search import search_external_products
 
 POLL_INTERVAL = int(os.getenv("TELEGRAM_POLL_INTERVAL", "3"))
 API_BASE = "https://api.telegram.org"
 CENTRAL_API_BASE = (os.getenv("CENTRAL_API_BASE") or "https://gracious-renewal-production-76df.up.railway.app").rstrip("/")
-ALLOWED_PLATFORMS = {"mercadolibre", "amazon", "tiktok", "aliexpress", "personal"}
+ALLOWED_PLATFORMS = {"amazon", "aliexpress", "personal"}
 ALLOWED_CATEGORIES = {"ropa", "calzado", "accesorios", "electronica", "hogar", "fitness", "otros"}
 _CATALOG_INGESTION_LOCK = threading.Lock()
 
@@ -219,12 +221,28 @@ def _catalog_products(limit=20, offset=0):
         conn.close()
 
 
+def _normalize_search_term(term):
+    value = unicodedata.normalize("NFKD", str(term or "").lower())
+    value = "".join(char for char in value if not unicodedata.combining(char))
+    words = re.findall(r"[a-z0-9]+", value)
+    ignored = {"busco", "quiero", "necesito", "comprar", "compra", "vender", "precio", "precios", "barato", "barata", "baratos", "baratas", "economico", "economica", "economicos", "economicas", "oferta", "ofertas", "mejor", "mejores", "recomienda", "recomendacion", "hay", "tienes", "tiene", "por", "favor", "para", "con", "que", "del", "al", "de", "el", "la", "los", "las", "un", "una", "unos", "unas", "y", "en", "mi", "me"}
+    return list(dict.fromkeys(word for word in words if word not in ignored))
+
+
 def _search_products(term, limit=8):
+    words = _normalize_search_term(term)
+    if not words:
+        return []
+    conditions = " AND ".join(
+        ["(translate(lower(p.title), 'áéíóúüñ', 'aeiouun') ILIKE %s OR translate(lower(COALESCE(c.name, '')), 'áéíóúüñ', 'aeiouun') ILIKE %s)" for _ in words]
+    )
+    params = [pattern for word in words for pattern in (f"%{word}%", f"%{word}%")]
+    params.append(limit)
     conn = get_connection()
     try:
         with conn.cursor() as cur:
             cur.execute(
-                """
+                f"""
                 SELECT p.id AS product_id, p.title, p.current_price, p.previous_price, p.currency, p.product_url, p.affiliate_url, p.image_url,
                        p.rating, p.reviews_count, p.sales_estimate,
                        pl.name AS platform, c.name AS category,
@@ -240,11 +258,11 @@ def _search_products(term, limit=8):
                   AND p.is_blocked = FALSE
                   AND p.current_price > 0
                   AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW())
-                  AND p.title ILIKE %s
+                  AND {conditions}
                 ORDER BY COALESCE(s.opportunity_score, 0) DESC
                 LIMIT %s
                 """,
-                (f"%{term}%", limit),
+                params,
             )
             return cur.fetchall()
     finally:
@@ -263,7 +281,7 @@ def _add_url(argument):
     try:
         price = float(parts[2]) if len(parts) > 2 and parts[2] else None
         platform = detect_platform(url)
-        default_currency = "COP" if platform in {"mercadolibre", "aliexpress"} else "USD"
+        default_currency = "USD"
         currency = parts[5].upper() if len(parts) > 5 and parts[5] else default_currency
         product = import_url(
             url,
@@ -594,7 +612,7 @@ def _handle(token, chat_id, text):
             "/buscar producto — buscar en Amazon y AliExpress (no en la tienda Central)\n"
             "/inyectar — buscar ofertas reales y publicarlas en la tienda (hasta 200, mínimo 40%, vigencia 7 días)\n"
             "/modelar — registrar y puntuar un producto\n"
-            "/agregar — importar un producto desde Amazon, Mercado Libre, TikTok Shop o AliExpress por URL\n"
+            "/agregar — importar un producto desde Amazon o AliExpress por URL\n"
             "/publicar ID — publicar un producto validado\n"
             "También puedes enviar una URL sola: Central la captura y la deja lista para publicar.\n"
             "/estado — estado del catálogo\n"
@@ -640,7 +658,19 @@ def _handle(token, chat_id, text):
 
         _send(token, chat_id, f"<b>Resultados de Amazon y AliExpress para {html.escape(term)}</b> · {len(products)} productos")
         for product in products:
-            _send_product(token, chat_id, product)
+            title = html.escape(str(product.get("title") or "Producto")[:180])
+            platform = html.escape(str(product.get("platform") or "tienda").capitalize())
+            price = product.get("price")
+            currency = html.escape(str(product.get("currency") or "USD"))
+            try:
+                price_text = f"{float(price):,.2f} {currency}"
+            except (TypeError, ValueError):
+                price_text = "Precio no disponible"
+            url = str(product.get("affiliate_url") or product.get("product_url") or "")
+            if not url.startswith(("https://", "http://")):
+                continue
+            safe_url = html.escape(url, quote=True)
+            _send(token, chat_id, f"<b>{title}</b>\n{platform} · {price_text}\n<a href=\"{safe_url}\">Ver producto</a>")
         return True
 
     if command == "/inyectar":

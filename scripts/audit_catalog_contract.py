@@ -71,6 +71,6 @@ check("products = search_external_products(term, limit=8)" in TELEGRAM and
       "Telegram busca Amazon y AliExpress y reserva la ingesta para /inyectar")
 check("fetch_mercadolibre(query, limit=10)" in API and "prime_only=True" in API and
       "official_only=True" in API and "min_saving_percent=int(threshold)" in API,
-      "la ingesta usa Mercado Libre y ofertas Amazon Prime verificables con descuento mínimo")
+      "la ingesta conserva ofertas Amazon Prime verificables con descuento mínimo y pausa fuentes sin referencia de precio")
 
 print("[PASS] Auditoría de contrato del catálogo completada.")

@@ -18,7 +18,6 @@ from psycopg2.extras import Json
 from mongo_store import store_product_image
 
 from analysis import score_product
-from ingest import MercadoLibreAccessDenied, fetch_mercadolibre
 from amazon_api import search_amazon_products
 from db import get_connection, upsert_product, _affiliate_url
 from catalog_rules import discount_percentage
@@ -289,7 +288,7 @@ def _sync_store_catalog():
     errors = []
     rejected = {"missing_reference_price": 0, "below_discount_threshold": 0, "missing_image_or_url": 0}
     candidates = {}
-    imported = {"mercadolibre": [], "amazon": [], "aliexpress": []}
+    imported = {"amazon": [], "aliexpress": []}
     auto_published = []
     expired_count = 0
     card_unpublished_count = 0
@@ -307,7 +306,6 @@ def _sync_store_catalog():
         ("electronica", "control videojuegos"), ("hogar", "lampara led"),
     )
     providers = (
-        ("mercadolibre", "Mercado Libre"),
         ("amazon", "Amazon"),
         ("aliexpress", "AliExpress"),
     )
@@ -337,10 +335,7 @@ def _sync_store_catalog():
                 if source_count >= target:
                     break
                 try:
-                    if platform == "mercadolibre":
-                        found = fetch_mercadolibre(query, limit=10)
-                    else:
-                        found = search_amazon_products(
+                    found = search_amazon_products(
                             query,
                             limit=10,
                             category=category,
@@ -350,11 +345,6 @@ def _sync_store_catalog():
                         )
                 except Exception as exc:
                     errors.append(f"{label} '{query}': {type(exc).__name__}: {str(exc)[:180]}")
-                    if platform == "mercadolibre" and (
-                        isinstance(exc, MercadoLibreAccessDenied) or getattr(exc, "fatal", False)
-                    ):
-                        print({"event": "mercadolibre_sync_stopped", "query": query, "error": str(exc)}, flush=True)
-                        break
                     continue
 
                 for item in found or []:
@@ -393,7 +383,7 @@ def _sync_store_catalog():
                             "catalog_ingestion": "verified_discount_search",
                             "verified_discount_pct": discount_pct,
                             "reference_price_source": (
-                                "mercadolibre_api" if platform == "mercadolibre" else "amazon_creators_api"
+                                "amazon_creators_api"
                             ),
                             "amazon_delivery_filter": "Prime" if platform == "amazon" else None,
                         },
@@ -926,83 +916,13 @@ def public_sitemap():
     return Response(xml,media_type="application/xml")
 
 @core_router.get("/mercadolibre/search")
-def search_mercadolibre_products(
-    q: str = Query(..., min_length=2, max_length=120),
-    limit: int = Query(8, ge=1, le=20),
-):
-    """Busca productos reales de Mercado Libre para precargar una tarjeta sin copiar URLs."""
-    try:
-        found = fetch_mercadolibre(q.strip(), limit=limit)
-    except Exception as exc:
-        print(f"[Mercado Libre] búsqueda de tarjetas falló: {type(exc).__name__}: {exc}")
-        raise HTTPException(
-            status_code=502,
-            detail="Mercado Libre no respondió. Revisa la conexión OAuth y vuelve a intentar.",
-        )
-    results = []
-    for product in found[:limit]:
-        title = str(product.get("title") or "").strip()
-        image_url = str(product.get("image_url") or "").strip()
-        product_url = str(product.get("product_url") or "").strip()
-        try:
-            price = float(product.get("price") or 0)
-        except (TypeError, ValueError):
-            price = 0
-        if not title or price <= 0 or not product_url:
-            continue
-        results.append({
-            "id": str(product.get("external_id") or ""),
-            "title": title[:200],
-            "image_url": image_url,
-            "product_url": product_url,
-            "price": price,
-            "currency": str(product.get("currency") or "COP").upper(),
-        })
-    return {"query": q.strip(), "count": len(results), "items": results}
-
-
-class MercadoLibreCardImport(BaseModel):
-    external_id: str = Field(min_length=2, max_length=200)
-    title: str = Field(min_length=2, max_length=500)
-    image_url: str = Field(min_length=8, max_length=2_000_000)
-    product_url: str = Field(min_length=10, max_length=2000)
-    price: float = Field(gt=0)
-    currency: str = Field(default="COP", min_length=3, max_length=10)
-    category: str = Field(default="otros", min_length=2, max_length=100)
+def search_mercadolibre_products():
+    raise HTTPException(status_code=410, detail="La búsqueda de Mercado Libre está deshabilitada temporalmente. Usa /buscar en el bot para consultar Amazon y AliExpress.")
 
 
 @core_router.post("/products/mercadolibre")
-def import_mercadolibre_card(payload: MercadoLibreCardImport, _: dict = Depends(require_admin)):
-    """Guarda el producto seleccionado como fuente externa, nunca como producto propio/Wompi."""
-    from urllib.parse import urlparse
-    parsed = urlparse(payload.product_url)
-    host = (parsed.hostname or "").lower()
-    if parsed.scheme != "https" or not (host == "mercadolibre.com" or host.endswith(".mercadolibre.com") or host == "mercadolibre.com.co" or host.endswith(".mercadolibre.com.co")):
-        raise HTTPException(status_code=422, detail="El enlace debe pertenecer a Mercado Libre y usar HTTPS")
-    product = {
-        "external_id": payload.external_id.strip(), "title": payload.title.strip(),
-        "image_url": payload.image_url.strip(), "product_url": payload.product_url.strip(),
-        "price": payload.price, "currency": payload.currency.upper(), "rating": None,
-        "reviews_count": 0, "source_metadata": {"origin": "tarjetas-search", "source": "mercadolibre"},
-    }
-    conn = get_connection()
-    try:
-        product_id = upsert_product(conn, "mercadolibre", payload.category.lower().strip(), product)
-        with conn.cursor() as cur:
-            cur.execute("""SELECT p.id,p.title,pl.name AS platform,c.name AS category,p.current_price,
-                p.currency,p.image_url,p.image_gallery,p.product_url,p.affiliate_url,p.updated_at
-                FROM products p JOIN platforms pl ON pl.id=p.platform_id
-                LEFT JOIN categories c ON c.id=p.category_id WHERE p.id=%s""", (product_id,))
-            saved = cur.fetchone()
-        return {"product": saved}
-    except ValueError as exc:
-        conn.rollback()
-        raise HTTPException(status_code=422, detail=str(exc))
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
+def import_mercadolibre_card():
+    raise HTTPException(status_code=410, detail="La importación desde Mercado Libre está deshabilitada temporalmente.")
 
 
 class ProductImport(BaseModel):
