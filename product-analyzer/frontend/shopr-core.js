@@ -21,7 +21,11 @@ async function api(path,opt={}){
 function mkLinks(mt,plat,p,g){
   const L=Object.assign({},mt.links||{}),aff=g("affiliate_url")||g("product_url")||"";
   if(plat==="amazon"&&!L.amazon)L.amazon=aff;
-  if((plat==="mercadolibre"||plat==="meli")&&!L.meli)L.meli=aff;
+  if((plat==="mercadolibre"||plat==="meli")){
+    if(!L.external)L.external=L.meli||aff;
+    delete L.meli;
+  }
+  if(plat==="aliexpress"&&!L.aliexpress)L.aliexpress=aff;
   return L}
 function fromApi(p,detail){
   const d=detail?(detail.product||detail):p, g=k=>(d[k]!=null?d[k]:p[k]);
@@ -30,7 +34,7 @@ function fromApi(p,detail){
   let variants=(mt.variants||[]).map(v=>({name:v.n||"",glow:v.g|0,img:res(v.i)})).filter(v=>v.img||v.name);
   if(!variants.length)variants=[{name:"",glow:0,img:imageRef}];
   const plat=String(p.platform||"").toLowerCase();
-  return{id:p.id,raw:p,title:g("title")||"Producto",brand:mt.brand||(plat&&plat!=="personal"?plat.toUpperCase():""),tag:mt.tag||"",
+  return{id:p.id,raw:p,title:g("title")||"Producto",brand:mt.brand||(plat&&plat!=="personal"&&!["mercadolibre","meli"].includes(plat)?plat.toUpperCase():""),tag:mt.tag||"",
     cat:String(g("category")||"otros").toLowerCase(),desc:u.text,price:nn(g("current_price")??g("price")),prev:nn(g("previous_price")),
     currency:g("currency")||"COP",rating:nn(g("rating"))??(nn(mt.rating)||0),reviews:nn(g("reviews_count"))??(nn(mt.reviews)||0),features:mt.features||[],variants,
     links:mkLinks(mt,plat,p,g),fallback:g("product_url")||"",platform:plat,score:nn(g("opportunity_score"))||0,
@@ -43,12 +47,13 @@ function detailHtml(m,vi){
   const disc=m.prev&&m.price&&m.prev>m.price?Math.round((1-m.price/m.prev)*100):0;
   const a=(c,href,html)=>`<a class="sh-btn ${c}" href="${esc(href)}" target="_blank" rel="noopener noreferrer">${html} ↗</a>`;
   if(url(L.amazon))b.push(a("sh-amz",L.amazon,"Ver en <b>Amazon</b>"));
-  if(url(L.meli))b.push(a("sh-meli",L.meli,"Ver en <b>Mercado Libre</b>"));
+  if(url(L.aliexpress))b.push(a("sh-ali",L.aliexpress,"Ver en <b>AliExpress</b>"));
+  if(url(L.external))b.push(a("sh-external",L.external,"Ver <b>oferta</b>"));
   if(url(L.wompi))b.push(a("sh-wmp",L.wompi,"Pagar con <b>Wompi</b>"));
   if(!b.length&&url(m.fallback))b.push(a("sh-amz",m.fallback,"Ver <b>producto</b>"));
   if(!b.length&&m.platform==="personal")b.push('<a class="sh-btn sh-wmp" href="/tienda">Comprar en <b>Central</b></a>');
   const im=imageSrc(v.img)?`<img src="${esc(imageSrc(v.img))}" alt="${esc(m.title)}" referrerpolicy="no-referrer" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span class="sh-noimg" hidden>Imagen no disponible</span>`:'<span class="sh-noimg">Sin imagen</span>';
-  const facts=[];if(m.sku)facts.push(["SKU",m.sku]);if(m.stock!=null)facts.push(["Disponibilidad",m.stock>0?String(m.stock)+" unidades":"Agotado"]);if(m.sellerName)facts.push(["Vendedor",m.sellerName]);if(m.sellerReputation)facts.push(["Reputación",typeof m.sellerReputation==="string"?m.sellerReputation:JSON.stringify(m.sellerReputation)]);if(m.salesEstimate!=null)facts.push(["Ventas estimadas",String(m.salesEstimate)]);if(m.reviews>0)facts.push(["Reseñas",String(m.reviews)]);if(m.updatedAt)facts.push(["Actualizado",String(m.updatedAt).slice(0,10)]);if(m.platform)facts.push(["Origen",m.platform==="mercadolibre"?"Mercado Libre":m.platform==="amazon"?"Amazon":m.platform]);
+  const facts=[];if(m.sku)facts.push(["SKU",m.sku]);if(m.stock!=null)facts.push(["Disponibilidad",m.stock>0?String(m.stock)+" unidades":"Agotado"]);if(m.sellerName)facts.push(["Vendedor",m.sellerName]);if(m.sellerReputation)facts.push(["Reputación",typeof m.sellerReputation==="string"?m.sellerReputation:JSON.stringify(m.sellerReputation)]);if(m.salesEstimate!=null)facts.push(["Ventas estimadas",String(m.salesEstimate)]);if(m.reviews>0)facts.push(["Reseñas",String(m.reviews)]);if(m.updatedAt)facts.push(["Actualizado",String(m.updatedAt).slice(0,10)]);if(m.platform)facts.push(["Origen",["mercadolibre","meli"].includes(m.platform)?"Fuente anterior":m.platform==="amazon"?"Amazon":m.platform==="aliexpress"?"AliExpress":m.platform]);
   const sw=m.variants.length>1?`<div class="sh-color">COLOR: <b>${esc(v.name||gl[0])}</b></div><div class="sh-sw">${m.variants.map((x,i)=>`<button type="button" data-vi="${i}" class="${i===vi?"on":""}" title="${esc(x.name||"")}" style="background:${(GLOWS[x.glow]||GLOWS[0])[1]}"></button>`).join("")}</div>`:"";
   return `<section class="sh-detail"><div class="sh-stage ${m.plate?"plate":""}">${im}</div><div class="sh-info">
     <div class="sh-meta">${m.brand?`<span class="sh-brand">${esc(m.brand)}</span>`:""}${m.tag?`<span class="sh-tag">${esc(m.tag)}</span>`:""}</div>
