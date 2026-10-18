@@ -2,6 +2,7 @@ import unittest
 from unittest.mock import patch
 
 from product_search import _parse_aliexpress_search_page, search_external_products
+from telegram_alert import _format_product, _handle
 
 
 class ProductSearchTests(unittest.TestCase):
@@ -26,11 +27,7 @@ class ProductSearchTests(unittest.TestCase):
         self.assertEqual(results[0]["currency"], "USD")
         self.assertEqual(results[0]["product_url"], "https://www.aliexpress.com/item/1005001234567890.html")
 
-    def test_external_search_calls_all_sources_and_normalizes_products(self):
-        meli = [{
-            "external_id": "MCO123", "title": "Auriculares Mercado Libre",
-            "product_url": "https://www.mercadolibre.com.co/p/MCO123", "price": 89000, "currency": "COP",
-        }]
+    def test_external_search_uses_only_amazon_and_aliexpress(self):
         amazon = [{
             "external_id": "B012345678", "title": "Auriculares Amazon",
             "product_url": "https://www.amazon.com/dp/B012345678", "price": 19.99, "currency": "USD",
@@ -39,13 +36,11 @@ class ProductSearchTests(unittest.TestCase):
             "external_id": "1005001234567890", "title": "Auriculares AliExpress",
             "product_url": "https://www.aliexpress.com/item/1005001234567890.html", "price": 8.25, "currency": "USD",
         }]
-        with patch("product_search.fetch_mercadolibre", return_value=meli) as meli_search, \
-             patch("product_search.search_amazon_products", return_value=amazon) as amazon_search, \
+        with patch("product_search.search_amazon_products", return_value=amazon) as amazon_search, \
              patch("product_search.search_aliexpress_products", return_value=aliexpress) as ali_search:
             results = search_external_products("auriculares", limit=8)
-        self.assertEqual({item["platform"] for item in results}, {"mercadolibre", "amazon", "aliexpress"})
-        self.assertEqual(len(results), 3)
-        meli_search.assert_called_once()
+        self.assertEqual({item["platform"] for item in results}, {"amazon", "aliexpress"})
+        self.assertEqual(len(results), 2)
         amazon_search.assert_called_once()
         ali_search.assert_called_once()
 
@@ -55,11 +50,27 @@ class ProductSearchTests(unittest.TestCase):
             "product_url": "https://www.aliexpress.com/item/1005001234567890.html",
             "price": 10, "currency": "USD",
         }
-        with patch("product_search.fetch_mercadolibre", return_value=[product]), \
-             patch("product_search.search_amazon_products", return_value=[]), \
+        with patch("product_search.search_amazon_products", return_value=[]), \
              patch("product_search.search_aliexpress_products", return_value=[product]):
             results = search_external_products("producto", limit=8)
         self.assertEqual(len(results), 1)
+
+    def test_telegram_search_uses_external_products_instead_of_central_catalog(self):
+        external_product = {
+            "title": "Auriculares nuevos", "price": 12.49, "currency": "USD",
+            "product_url": "https://www.aliexpress.com/item/1005001234567890.html",
+            "platform": "aliexpress",
+        }
+        with patch("telegram_alert._search_products") as catalog_search, \
+             patch("telegram_alert.search_external_products", return_value=[external_product]) as external_search, \
+             patch("telegram_alert._send", return_value=True), \
+             patch("telegram_alert._send_product") as send_product:
+            self.assertTrue(_handle("token", "chat", "/buscar auriculares"))
+
+        catalog_search.assert_not_called()
+        external_search.assert_called_once_with("auriculares", limit=8)
+        send_product.assert_called_once_with("token", "chat", external_product)
+        self.assertIn("Precio: 12.49 USD", _format_product(external_product))
 
 
 if __name__ == "__main__":
