@@ -238,7 +238,7 @@ class TelegramCatalogContractTests(unittest.TestCase):
                 self.assertIn("p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW()", functions[name])
         self.assertIn("'tiktok'", functions["_catalog_products"])
         self.assertIn("Publicar:", functions["_format_product"])
-        self.assertIn("products = _search_products(term)", functions["_handle"])
+        self.assertIn("products = search_external_products(term, limit=8)", functions["_handle"])
         self.assertIn("search_external_products", functions["_handle"])
 
     def test_telegram_status_counts_only_active_unexpired_products(self):
