@@ -8,7 +8,6 @@ from urllib.parse import urlparse
 import requests
 
 from amazon_api import search_amazon_products
-from ingest import fetch_mercadolibre
 
 BING_SEARCH_URL = "https://www.bing.com/search"
 SEARCH_HEADERS = {
@@ -122,7 +121,7 @@ def _valid_product(item: dict, platform: str) -> dict | None:
         "product_url": product_url,
         "affiliate_url": str(item.get("affiliate_url") or product_url),
         "price": price,
-        "currency": str(item.get("currency") or ("COP" if platform == "mercadolibre" else "USD")),
+        "currency": str(item.get("currency") or "USD"),
         "image_url": str(item.get("image_url") or ""),
         "rating": item.get("rating"),
         "reviews_count": item.get("reviews_count") or 0,
@@ -139,7 +138,6 @@ def search_external_products(term: str, limit: int = 8) -> list[dict]:
         return []
     per_source = max(1, min(4, (max(1, int(limit)) + 2) // 3))
     providers = (
-        ("mercadolibre", lambda: fetch_mercadolibre(term, limit=per_source)),
         ("amazon", lambda: search_amazon_products(term, limit=per_source, category="otros")),
         ("aliexpress", lambda: search_aliexpress_products(term, limit=per_source)),
     )
