@@ -18,7 +18,6 @@ from psycopg2.extras import Json
 from mongo_store import store_product_image
 
 from analysis import score_product
-from ingest import MercadoLibreAccessDenied, fetch_mercadolibre
 from amazon_api import search_amazon_products
 from db import get_connection, upsert_product, _affiliate_url
 from catalog_rules import discount_percentage
@@ -289,7 +288,7 @@ def _sync_store_catalog():
     errors = []
     rejected = {"missing_reference_price": 0, "below_discount_threshold": 0, "missing_image_or_url": 0}
     candidates = {}
-    imported = {"mercadolibre": [], "amazon": [], "aliexpress": []}
+    imported = {"amazon": [], "aliexpress": []}
     auto_published = []
     expired_count = 0
     card_unpublished_count = 0
@@ -307,7 +306,6 @@ def _sync_store_catalog():
         ("electronica", "control videojuegos"), ("hogar", "lampara led"),
     )
     providers = (
-        ("mercadolibre", "Mercado Libre"),
         ("amazon", "Amazon"),
         ("aliexpress", "AliExpress"),
     )
@@ -337,10 +335,10 @@ def _sync_store_catalog():
                 if source_count >= target:
                     break
                 try:
-                    if platform == "mercadolibre":
-                        found = fetch_mercadolibre(query, limit=10)
-                    else:
-                        found = search_amazon_products(
+                    if platform == "aliexpress":
+                        errors.append("AliExpress: búsqueda de ofertas pausada hasta disponer de precio original verificable por API afiliada.")
+                        continue
+                    found = search_amazon_products(
                             query,
                             limit=10,
                             category=category,
@@ -350,11 +348,6 @@ def _sync_store_catalog():
                         )
                 except Exception as exc:
                     errors.append(f"{label} '{query}': {type(exc).__name__}: {str(exc)[:180]}")
-                    if platform == "mercadolibre" and (
-                        isinstance(exc, MercadoLibreAccessDenied) or getattr(exc, "fatal", False)
-                    ):
-                        print({"event": "mercadolibre_sync_stopped", "query": query, "error": str(exc)}, flush=True)
-                        break
                     continue
 
                 for item in found or []:
@@ -393,7 +386,7 @@ def _sync_store_catalog():
                             "catalog_ingestion": "verified_discount_search",
                             "verified_discount_pct": discount_pct,
                             "reference_price_source": (
-                                "mercadolibre_api" if platform == "mercadolibre" else "amazon_creators_api"
+                                "amazon_creators_api"
                             ),
                             "amazon_delivery_filter": "Prime" if platform == "amazon" else None,
                         },
