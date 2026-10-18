@@ -2,6 +2,7 @@ import unittest
 from unittest.mock import patch
 
 from product_search import _parse_aliexpress_search_page, search_external_products
+from telegram_alert import _format_product, _handle
 
 
 class ProductSearchTests(unittest.TestCase):
@@ -53,6 +54,23 @@ class ProductSearchTests(unittest.TestCase):
              patch("product_search.search_aliexpress_products", return_value=[product]):
             results = search_external_products("producto", limit=8)
         self.assertEqual(len(results), 1)
+
+    def test_telegram_search_uses_external_products_instead_of_central_catalog(self):
+        external_product = {
+            "title": "Auriculares nuevos", "price": 12.49, "currency": "USD",
+            "product_url": "https://www.aliexpress.com/item/1005001234567890.html",
+            "platform": "aliexpress",
+        }
+        with patch("telegram_alert._search_products") as catalog_search, \
+             patch("telegram_alert.search_external_products", return_value=[external_product]) as external_search, \
+             patch("telegram_alert._send", return_value=True), \
+             patch("telegram_alert._send_product") as send_product:
+            self.assertTrue(_handle("token", "chat", "/buscar auriculares"))
+
+        catalog_search.assert_not_called()
+        external_search.assert_called_once_with("auriculares", limit=8)
+        send_product.assert_called_once_with("token", "chat", external_product)
+        self.assertIn("Precio: 12.49 USD", _format_product(external_product))
 
 
 if __name__ == "__main__":

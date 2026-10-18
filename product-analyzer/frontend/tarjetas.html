@@ -1,6 +1,7 @@
 <!doctype html>
-<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#4f7a2a"><meta name="robots" content="noindex">
 <title>Panel de tarjetas | Central</title>
+<link rel="manifest" href="/admin-manifest.json"><link rel="icon" href="/central-icon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/central-icon.svg">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/shopr.css"><script src="/shopr-core.js"></script><style>
 .admin-cards{grid-template-columns:repeat(auto-fill,minmax(220px,1fr))!important;gap:16px!important}
@@ -18,17 +19,18 @@
 .admin-card-meta{display:flex;align-items:center;justify-content:space-between;gap:8px;color:var(--muted);font-size:11px}
 .admin-card-status{display:inline-flex;width:max-content;padding:2px 6px;border:1px solid color-mix(in srgb,var(--ok) 45%,var(--line));border-radius:999px;color:var(--ok);font-weight:700}
 .admin-card-wrap{min-width:0;display:flex;flex-direction:column;gap:7px}.admin-card-actions{display:flex;gap:6px;flex-wrap:wrap}.admin-card-actions button{font-size:11px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:inherit;cursor:pointer}
-.meli-search{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;margin:8px 0}
-.meli-search .ed-in{min-width:0}
-.meli-results{display:flex;flex-direction:column;gap:8px;margin:8px 0 16px}
-.meli-result{display:grid;grid-template-columns:56px minmax(0,1fr);gap:10px;align-items:center;width:100%;padding:8px;border:1px solid var(--line);border-radius:12px;background:var(--panel);color:inherit;text-align:left;cursor:pointer;font:inherit}
-.meli-result:hover,.meli-result:focus-visible{border-color:var(--brand);outline-color:var(--brand)}
-.meli-result img{width:56px;height:56px;object-fit:contain;border-radius:8px;background:#fff}
-.meli-result b{display:block;font-size:12px;line-height:1.3}
-.meli-result small{display:block;color:var(--muted);font-size:11px;margin-top:4px}
-.meli-search-note{font-size:11px;color:var(--muted);margin:4px 0 8px}
-
 body:not(.auth-ready) .sh-wrap{display:none!important}#panel{display:none}.central-auth{min-height:100vh;display:grid;place-items:center;padding:24px;background:var(--bg);color:var(--ink);font-family:var(--font)}.central-auth-card{width:min(100%,440px);padding:clamp(22px,5vw,34px);background:var(--panel);border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow)}.central-auth-brand{display:flex;align-items:center;gap:12px;margin-bottom:28px}.central-auth-brand img{width:48px;height:48px}.central-auth-brand strong{display:block;font:800 17px var(--display)}.central-auth-brand span,.central-auth-copy,.central-auth-note{color:var(--muted);font-size:13px}.central-auth-kicker{font-size:11px;font-weight:800;letter-spacing:.14em;color:var(--brand);margin:0}.central-auth-card h1{font:700 clamp(28px,7vw,36px)/1.1 var(--display);margin:10px 0}.central-auth-form{display:grid;gap:14px;margin-top:22px}.central-auth-form label{display:grid;gap:7px;font-size:12px;font-weight:700;color:var(--muted)}.central-auth-form input{width:100%;min-width:0;border:1px solid var(--line);border-radius:10px;padding:13px;background:var(--panel2);color:var(--ink);font:14px var(--font)}.central-auth-form input:focus-visible{outline:2px solid var(--brand);outline-offset:2px}.central-auth-submit{min-height:48px;border:0;border-radius:10px;background:var(--brand);color:white;font:700 14px var(--font);cursor:pointer}.central-auth-submit:disabled{opacity:.6;cursor:wait}.central-auth-message{font-size:13px;color:var(--danger);min-height:18px;margin:0}.central-auth-note{margin:18px 0 0}.admin-session-actions{display:flex;gap:8px;align-items:center}
+.admin-install{border:1px solid var(--line);background:var(--panel);color:var(--ink);min-height:40px}
+.admin-connectivity{grid-column:1/-1;padding:10px 14px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--muted);font-size:12px}
+.admin-connectivity.offline{border-color:var(--danger);color:var(--danger)}
+.admin-session-actions #connectionState.offline{color:var(--danger);border-color:var(--danger)}
+.admin-draft-tools{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.admin-draft-card{padding:12px;border:1px dashed var(--brand);border-radius:14px;background:var(--panel);min-width:0}
+.admin-draft-card strong{display:block;overflow-wrap:anywhere}
+.admin-draft-card small{display:block;margin:5px 0;color:var(--muted)}
+.admin-draft-actions{display:flex;gap:7px;flex-wrap:wrap}
+.admin-draft-actions button,.admin-draft-tools button{min-height:40px;padding:8px 11px;border:1px solid var(--line);border-radius:9px;background:var(--panel);color:var(--ink);font:600 12px var(--font);cursor:pointer}
+.admin-draft-actions button.primary,.admin-draft-tools button.primary{background:var(--brand);color:#fff;border-color:var(--brand)}
 .admin-card{background:#fffdf8!important;box-shadow:0 5px 20px rgba(35,39,32,.055)}
 .admin-card-media{background:#f8f7f3!important}
 .admin-card-body{background:#fffdf8}
@@ -60,23 +62,20 @@ body:not(.auth-ready) .sh-wrap{display:none!important}#panel{display:none}.centr
 <p class="central-auth-message" id="reset-message" role="status" aria-live="polite"></p>
 <button class="central-auth-note" id="back-forgot" type="button" style="border:0;background:none;padding:0;cursor:pointer;font:inherit">Solicitar otro código</button>
 </form>
-<p class="central-auth-note" id="auth-note">Sesión segura en este dispositivo.</p>
+<p class="central-auth-note" id="auth-note">Instala Central desde el menú del navegador. Inicia sesión con internet para guardar el catálogo en este dispositivo; después podrás preparar borradores offline y sincronizarlos manualmente.</p>
 </section></main><div class="sh-wrap">
-<header class="sh-top"><a class="sh-logo" href="/">CENTRAL</a><div class="admin-session-actions"><a class="sh-pill" href="/tienda">Ver tienda</a><button class="sh-pill" id="logout" type="button">Cerrar sesión</button></div></header>
+<header class="sh-top"><a class="sh-logo" href="/">CENTRAL</a><div class="admin-session-actions"><span id="connectionState" class="sh-pill" role="status">Conectando…</span><button class="sh-pill admin-install" id="installApp" type="button" hidden>Instalar app</button><a class="sh-pill" href="/tienda">Ver tienda</a><button class="sh-pill" id="logout" type="button">Cerrar sesión</button></div></header>
+<div id="connectionNotice" class="admin-connectivity" role="status" aria-live="polite" hidden></div>
 
 <section id="panel"><div class="ed-grid">
  <aside class="ed-side">
   <div class="ed-tabs"><button type="button" data-tab="mine">Productos</button><button type="button" data-tab="add" class="on">Agregar</button></div>
 
-  <div class="ed-body" id="tab-mine" hidden><div class="ed-l">Productos</div><div class="sh-grid admin-cards" id="mine"></div></div>
+  <div class="ed-body" id="tab-mine" hidden><div class="ed-l">Productos</div><div class="admin-draft-tools"><span id="draftStatus" class="ed-note">Borradores locales: 0</span><button id="syncDrafts" class="primary" type="button" disabled>Sincronizar borradores</button></div><div id="syncMessage" class="ed-msg" role="status" aria-live="polite" hidden></div><div class="sh-grid admin-cards" id="mine"></div></div>
 
   <div class="ed-body" id="tab-add">
    <div class="ed-l" id="formHeading">NUEVO PRODUCTO</div>
    <label class="ed-l">Tipo de producto<select class="ed-in" id="productType"><option value="personal">Producto propio · compra en Central/Wompi</option></select></label>
-   <div class="ed-l">BUSCAR PRODUCTO EN MERCADO LIBRE</div>
-   <div class="meli-search"><input class="ed-in" id="meliQuery" maxlength="120" placeholder="Ej: Raspberry Pi Pico original"><button class="ed-btn" id="meliSearch" type="button">Buscar</button></div>
-   <div class="meli-search-note">Elige un resultado para cargar título, precio, imagen y enlace automáticamente.</div>
-   <div id="meliMsg" class="ed-msg" hidden></div><div id="meliResults" class="meli-results"></div>
    <div class="ed-l">O completa los datos manualmente</div>
    <label class="ed-l">Nombre del producto *<input class="ed-in" id="title" maxlength="200" placeholder="Ej: Air Street Pro X"></label>
    <div class="ed-2">
@@ -100,8 +99,9 @@ body:not(.auth-ready) .sh-wrap{display:none!important}#panel{display:none}.centr
    <div id="vars" style="display:flex;flex-direction:column;gap:10px"></div>
    <label class="ed-l" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" id="plate"> Marco claro para la imagen (útil si tiene fondo blanco)</label>
    <div class="ed-l">Links de compra</div>
-   <input class="ed-in" id="l_amz" placeholder="Amazon o AliExpress: https://…"><input class="ed-in" id="l_wmp" placeholder="Wompi (link de pago): https://…">
-   <button class="ed-btn" id="save" type="button">Crear tarjeta</button><button class="ed-x" id="cancelEdit" type="button" hidden>Cancelar edición</button><div id="msg" class="ed-msg" hidden></div>
+   <input class="ed-in" id="l_amz" placeholder="🟠 Amazon: https://…"><input class="ed-in" id="l_ali" placeholder="🔴 AliExpress: https://…"><input class="ed-in" id="l_wmp" placeholder="🔵 Wompi (link de pago): https://…">
+   <input id="l_external" type="hidden">
+   <button class="ed-btn" id="save" type="button">Crear tarjeta</button><button class="ed-btn ghost" id="saveDraft" type="button">Guardar borrador local</button><button class="ed-x" id="cancelEdit" type="button" hidden>Cancelar edición</button><div id="msg" class="ed-msg" hidden></div>
   </div>
 
   
@@ -115,8 +115,80 @@ body:not(.auth-ready) .sh-wrap{display:none!important}#panel{display:none}.centr
 const f=id=>$(id).value.trim();
 const num=v=>{v=String(v).trim().replace(",",".");return v===""||isNaN(Number(v))?null:Number(v)};
 let V=[{name:"",glow:0,img:""}];
+const OFFLINE_DB="central-admin-offline-v1";
+let deferredInstall=null,activeDraftId=null,editingId=null,editingUpdatedAt=null,adminOfflineMode=false;
+function createDraftId(){
+  if(crypto.randomUUID)return crypto.randomUUID();
+  const bytes=new Uint8Array(16);crypto.getRandomValues(bytes);
+  return"draft-"+Array.from(bytes,value=>value.toString(16).padStart(2,"0")).join("");
+}
+
+function openOfflineDb(){
+  if(!("indexedDB" in window))return Promise.reject(new Error("Este navegador no permite guardar borradores offline."));
+  return new Promise((resolve,reject)=>{
+    const request=indexedDB.open(OFFLINE_DB,1);
+    request.onupgradeneeded=()=>{
+      const db=request.result;
+      if(!db.objectStoreNames.contains("drafts"))db.createObjectStore("drafts",{keyPath:"id"});
+      if(!db.objectStoreNames.contains("meta"))db.createObjectStore("meta");
+    };
+    request.onsuccess=()=>resolve(request.result);
+    request.onerror=()=>reject(request.error||new Error("No se pudo abrir el almacenamiento offline."));
+  });
+}
+async function offlineOperation(storeName,mode,run){
+  const db=await openOfflineDb();
+  return new Promise((resolve,reject)=>{
+    const tx=db.transaction(storeName,mode),store=tx.objectStore(storeName);
+    let result;
+    const request=run(store);
+    if(request){
+      request.onsuccess=()=>{result=request.result};
+      request.onerror=()=>reject(request.error||new Error("No se pudo leer el almacenamiento offline."));
+    }
+    tx.oncomplete=()=>{db.close();resolve(result)};
+    tx.onerror=()=>{db.close();reject(tx.error||new Error("No se pudo guardar el almacenamiento offline."))};
+    tx.onabort=()=>{db.close();reject(tx.error||new Error("La operación offline fue cancelada."))};
+  });
+}
+const getOfflineDrafts=()=>offlineOperation("drafts","readonly",store=>store.getAll());
+const saveOfflineDraft=draft=>offlineOperation("drafts","readwrite",store=>store.put(draft));
+const deleteOfflineDraft=id=>offlineOperation("drafts","readwrite",store=>store.delete(id));
+const getOfflineSnapshot=()=>offlineOperation("meta","readonly",store=>store.get("products"));
+const saveOfflineSnapshot=products=>offlineOperation("meta","readwrite",store=>store.put(products,"products"));
+async function hasOfflineWorkspace(){
+  const [snapshot,drafts]=await Promise.all([getOfflineSnapshot(),getOfflineDrafts()]);
+  return (Array.isArray(snapshot)&&snapshot.length>0)||drafts.length>0;
+}
+function updateConnectionState(){
+  const state=$("connectionState");
+  state.textContent=navigator.onLine&&!adminOfflineMode?"Conectado · cambios online":navigator.onLine?"Servidor no disponible · borradores locales":"Sin conexión · guardado local";
+  state.classList.toggle("offline",!navigator.onLine||adminOfflineMode);
+  state.setAttribute("aria-label",state.textContent);
+  const notice=$("connectionNotice");
+  notice.hidden=navigator.onLine&&!adminOfflineMode;
+  notice.textContent=adminOfflineMode&&navigator.onLine
+    ?"El servidor de Central no respondió. Puedes revisar los datos guardados y crear borradores locales; prueba la sincronización cuando el servicio vuelva."
+    :"Sin conexión: puedes consultar el último catálogo guardado y crear borradores locales. No se publica ni sincroniza ningún cambio hasta que recuperes internet y pulses «Sincronizar borradores».";
+}
+window.addEventListener("online",()=>{updateConnectionState();refreshDraftStatus()});
+window.addEventListener("offline",()=>{updateConnectionState();refreshDraftStatus()});
+window.addEventListener("beforeinstallprompt",event=>{
+  event.preventDefault();deferredInstall=event;$("installApp").hidden=false;
+});
+window.addEventListener("appinstalled",()=>{$("installApp").hidden=true;show($("msg"),"ok","Central quedó instalada en este dispositivo.")});
+$("installApp").addEventListener("click",async()=>{
+  if(!deferredInstall){show($("msg"),"ok","Abre el menú del navegador y elige «Instalar aplicación» o «Añadir a pantalla de inicio».");return}
+  const prompt=deferredInstall;deferredInstall=null;$("installApp").disabled=true;
+  try{await prompt.prompt();const choice=await prompt.userChoice;show($("msg"),"ok",choice.outcome==="accepted"?"Instalación aceptada.":"Instalación cancelada.");}
+  catch(error){show($("msg"),"err","No se pudo iniciar la instalación: "+error.message)}
+  finally{$("installApp").disabled=false;$("installApp").hidden=true}
+});
+if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("/central-sw.js",{scope:"/"}).catch(error=>{console.warn("No se pudo preparar el acceso offline:",error);$("auth-note").textContent="No se pudo preparar el acceso sin conexión: "+error.message;}));
+updateConnectionState();
 
 function show(el,k,t){el.hidden=false;el.className="ed-msg "+k;el.textContent=t}
+function reportDraftStatus(kind,text){const message=$("syncMessage");message.hidden=!text;message.className="ed-msg "+kind;message.textContent=text}
 function gate(){renderVars();preview();loadMine()}
 function tab(n){["mine","add"].forEach(x=>{$("tab-"+x).hidden=x!==n});document.querySelectorAll("[data-tab]").forEach(b=>b.classList.toggle("on",b.dataset.tab===n))}
 
@@ -142,8 +214,42 @@ function renderVars(){
 function model(){return{id:"preview",title:f("title")||"Nombre del producto",brand:f("brand"),tag:f("tag"),cat:f("category"),desc:f("description"),
   price:num(f("price")),prev:num(f("prev")),currency:f("currency"),rating:num(f("rating"))||0,reviews:parseInt(f("reviews"),10)||0,
   features:[1,2,3,4].map(i=>f("feat"+i)).filter(Boolean),variants:V.map(v=>({...v})),
-  links:{amazon:f("l_amz"),wompi:f("l_wmp")},fallback:"",platform:f("productType"),plate:$("plate").checked}}
+  links:{amazon:f("l_amz"),aliexpress:f("l_ali"),wompi:f("l_wmp"),external:f("l_external")},fallback:"",platform:f("productType"),plate:$("plate").checked}}
 function preview(){const m=model();S.mountDetail($("preview"),{...m,links:{},fallback:""},0)}
+function editorState(){
+  return{
+    title:f("title"),brand:f("brand"),category:f("category"),description:f("description"),tag:f("tag"),
+    price:f("price"),previousPrice:f("prev"),currency:f("currency"),rating:f("rating"),reviews:f("reviews"),
+    features:[1,2,3,4].map(i=>f("feat"+i)),amazon:f("l_amz"),aliexpress:f("l_ali"),wompi:f("l_wmp"),
+    external:f("l_external"),plate:$("plate").checked,variants:V.map(v=>({...v}))
+  };
+}
+function restoreEditorState(state){
+  $("title").value=state.title||"";$("brand").value=state.brand||"";$("category").value=state.category||"otros";
+  $("description").value=state.description||"";$("tag").value=state.tag||"";$("price").value=state.price||"";
+  $("prev").value=state.previousPrice||"";$("currency").value=state.currency||"COP";$("rating").value=state.rating||"";
+  $("reviews").value=state.reviews||"";
+  ["feat1","feat2","feat3","feat4"].forEach((id,i)=>$(id).value=state.features?.[i]||"");
+  $("l_amz").value=state.amazon||"";$("l_ali").value=state.aliexpress||"";$("l_wmp").value=state.wompi||"";
+  $("l_external").value=state.external||"";$("plate").checked=!!state.plate;
+  V=Array.isArray(state.variants)&&state.variants.length?state.variants.map(v=>({...v})):[{name:"",glow:0,img:""}];
+  renderVars();preview();
+}
+async function refreshDraftStatus(){
+  try{
+    const drafts=await getOfflineDrafts();
+    const pending=drafts.filter(draft=>draft.status==="pending").length;
+    $("draftStatus").textContent="Borradores locales: "+drafts.length+(drafts.length?" · pendientes de sincronizar: "+pending:"");
+    $("syncDrafts").disabled=!navigator.onLine||pending===0;
+    $("syncDrafts").textContent=navigator.onLine?"Sincronizar borradores":"Sin conexión";
+    const notice=$("connectionNotice");
+    notice.hidden=navigator.onLine&&!adminOfflineMode&&drafts.length===0;
+    if(navigator.onLine&&drafts.length)notice.textContent="Hay "+drafts.length+" borrador(es) en este dispositivo. Revisa conflictos y pulsa «Sincronizar borradores» cuando quieras enviarlos.";
+  }catch(error){
+    $("draftStatus").textContent="No se pudo leer el almacenamiento de borradores: "+error.message;
+    $("syncDrafts").disabled=true;
+  }
+}
 
 function resize(file,max=700){return new Promise((res,rej)=>{const im=new Image(),u=URL.createObjectURL(file);
   im.onload=()=>{const s=Math.min(1,max/Math.max(im.width,im.height)),c=document.createElement("canvas");c.width=Math.round(im.width*s);c.height=Math.round(im.height*s);
@@ -160,25 +266,66 @@ $("addVar").addEventListener("click",()=>{if(V.length<4){V.push({name:"",glow:Ma
 $("tab-add").addEventListener("input",preview);$("plate").addEventListener("change",preview);
 document.querySelectorAll("[data-tab]").forEach(b=>b.addEventListener("click",()=>tab(b.dataset.tab)));
 
-  function adminCardHtml(m){
+ function adminCardHtml(m){
   const v=m.variants[0]||{},src=S.imageSrc(v.img),own=m.platform==="personal";
   const img=src?'<img src="'+S.esc(src)+'" alt="'+S.esc(m.title)+'" loading="lazy" referrerpolicy="no-referrer" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span class="admin-card-noimg" hidden>Imagen no disponible</span>':'<span class="admin-card-noimg">Sin imagen</span>';
   return '<div class="admin-card-wrap"><button type="button" class="admin-card" data-open="'+S.esc(m.id)+'" aria-label="Ver '+S.esc(m.title)+'"><div class="admin-card-media '+(m.plate?"plate":"")+'">'+img+'</div><div class="admin-card-body"><span class="admin-card-brand">'+S.esc(m.brand||m.cat)+'</span><span class="admin-card-title">'+S.esc(m.title)+'</span><span class="admin-card-price">'+S.money(m.price,m.currency)+'</span><div class="admin-card-meta"><span>'+S.esc(m.platform||m.cat)+'</span><span class="admin-card-status">Activo</span></div></div></button><div class="admin-card-actions">'+(own?'<button type="button" data-edit="'+S.esc(m.id)+'">Editar</button>':'')+'<button type="button" data-publish="'+S.esc(m.id)+'">Publicar en tienda</button><button type="button" data-delete="'+S.esc(m.id)+'">Eliminar</button></div></div>'
 }
-let editingId=null;
+function offlineDraftHtml(draft){
+  const form=draft.form||{},price=num(form.price),status=draft.status==="conflict"?"Conflicto: producto modificado en servidor":draft.status==="needs_review"?"Revisar antes de reintentar":draft.type==="update"?"Edición pendiente":"Creación pendiente";
+  return'<article class="admin-draft-card"><strong>'+S.esc(form.title||"Borrador sin título")+'</strong><small>'+S.esc(status)+' · '+S.money(price,form.currency||"COP")+'</small>'+(draft.message?'<small>'+S.esc(draft.message)+'</small>':'')+'<div class="admin-draft-actions"><button type="button" data-draft-edit="'+S.esc(draft.id)+'">Editar borrador</button>'+(draft.status==="needs_review"?'<button type="button" data-draft-retry="'+S.esc(draft.id)+'">Reintentar con revisión</button>':'')+'<button type="button" data-draft-remove="'+S.esc(draft.id)+'">Descartar</button></div></article>';
+}
+async function renderMine(){
+  let drafts=[];
+  try{drafts=await getOfflineDrafts()}
+  catch(error){
+    $("draftStatus").textContent="Borradores no disponibles: "+error.message;
+    $("syncDrafts").disabled=true;
+    $("connectionNotice").hidden=false;
+    $("connectionNotice").textContent="El almacenamiento seguro de borradores no está disponible en este navegador.";
+  }
+  const cards=mineModels.map(adminCardHtml).concat(drafts.map(offlineDraftHtml));
+  $("mine").innerHTML=cards.length?cards.join(""):'<div class="ed-note" style="color:var(--muted)">Aún no tienes productos ni borradores guardados.</div>';
+  if(drafts.length||"indexedDB" in window)await refreshDraftStatus();
+  bindAdminCards();
+}
 function resetEditor(){
-  editingId=null;$("formHeading").textContent="NUEVO PRODUCTO";$("save").textContent="Crear tarjeta";$("cancelEdit").hidden=true;$("productType").disabled=false;
-  ["title","brand","description","tag","price","prev","rating","reviews","feat1","feat2","feat3","feat4","l_amz","l_wmp"].forEach(id=>$(id).value="");
+  editingId=null;editingUpdatedAt=null;activeDraftId=null;$("formHeading").textContent="NUEVO PRODUCTO";$("save").textContent="Crear tarjeta";$("cancelEdit").hidden=true;$("productType").disabled=false;
+  ["title","brand","description","tag","price","prev","rating","reviews","feat1","feat2","feat3","feat4","l_amz","l_ali","l_wmp","l_external"].forEach(id=>$(id).value="");
   $("category").value="otros";$("currency").value="COP";$("productType").value="personal";V=[{name:"",glow:0,img:""}];renderVars();preview();
 }
 function bindAdminCards(){
   document.querySelectorAll("[data-open]").forEach(b=>b.addEventListener("click",()=>{const m=mineModels.find(x=>String(x.id)===String(b.dataset.open));if(m)S.mountDetail($("preview"),m,0)}));
   document.querySelectorAll("[data-edit]").forEach(b=>b.addEventListener("click",()=>{
     const m=mineModels.find(x=>String(x.id)===String(b.dataset.edit));if(!m)return;
-    editingId=m.id;$("formHeading").textContent="EDITAR PRODUCTO";$("save").textContent="Guardar cambios";$("cancelEdit").hidden=false;$("productType").value="personal";$("productType").disabled=true;
-    $("title").value=m.title;$("brand").value=m.brand;$("description").value=m.desc;$("category").value=m.cat;$("price").value=m.price??"";$("prev").value=m.prev??"";$("currency").value=m.currency||"COP";$("tag").value=m.tag;$("rating").value=m.rating||"";$("reviews").value=m.reviews||"";
-    ["feat1","feat2","feat3","feat4"].forEach((id,i)=>$(id).value=m.features[i]||"");$("l_amz").value=m.links.amazon||"";$("l_wmp").value=m.links.wompi||"";
-    V=m.variants.map(v=>({...v}));if(!V.length)V=[{name:"",glow:0,img:""}];renderVars();preview();tab("add");
+    editingId=m.id;editingUpdatedAt=m.raw?.updated_at||null;activeDraftId=null;$("formHeading").textContent="EDITAR PRODUCTO";$("save").textContent="Guardar cambios";$("cancelEdit").hidden=false;$("productType").value="personal";$("productType").disabled=true;
+    restoreEditorState({title:m.title,brand:m.brand,description:m.desc,category:m.cat,price:m.price,previousPrice:m.prev,currency:m.currency,tag:m.tag,rating:m.rating,reviews:m.reviews,features:m.features,amazon:m.links.amazon,aliexpress:m.links.aliexpress,wompi:m.links.wompi,external:m.links.external,plate:m.plate,variants:m.variants});tab("add");
+  }));
+  document.querySelectorAll("[data-draft-edit]").forEach(b=>b.addEventListener("click",async()=>{
+    try{
+      const draft=(await getOfflineDrafts()).find(item=>item.id===b.dataset.draftEdit);if(!draft)return;
+      activeDraftId=draft.id;editingId=draft.product_id||null;editingUpdatedAt=draft.base_updated_at||null;
+      $("formHeading").textContent=editingId?"EDITAR BORRADOR":"BORRADOR LOCAL";
+      $("save").textContent="Guardar borrador";$("cancelEdit").hidden=false;$("productType").value="personal";$("productType").disabled=!!editingId;
+      restoreEditorState(draft.form||{});tab("add");
+      if(draft.status==="conflict"||draft.status==="needs_review")show($("msg"),"err",draft.message||"Revisa este borrador antes de sincronizarlo.");
+    }catch(error){show($("msg"),"err","No se pudo abrir el borrador: "+error.message)}
+  }));
+  document.querySelectorAll("[data-draft-remove]").forEach(b=>b.addEventListener("click",async()=>{
+    if(!confirm("¿Descartar este borrador local? Esta acción no modifica productos del servidor."))return;
+    try{await deleteOfflineDraft(b.dataset.draftRemove);await renderMine();reportDraftStatus("ok","Borrador local descartado.")}
+    catch(error){reportDraftStatus("err","No se pudo descartar el borrador: "+error.message)}
+  }));
+  document.querySelectorAll("[data-draft-retry]").forEach(b=>b.addEventListener("click",async()=>{
+    try{
+      const draft=(await getOfflineDrafts()).find(item=>item.id===b.dataset.draftRetry);if(!draft)return;
+      const warning=draft.type==="create"
+        ?"Revisa primero el catálogo del servidor. Si esta creación ya se guardó, reintentar puede crear un duplicado. ¿Confirmas que quieres reintentar?"
+        :"Revisa el producto actual. La sincronización volverá a comprobar su versión antes de actualizarlo. ¿Confirmas que quieres reintentar?";
+      if(!confirm(warning))return;
+      draft.status="pending";draft.message="Reintento confirmado manualmente.";await saveOfflineDraft(draft);await renderMine();
+      reportDraftStatus("ok","Reintento preparado; sincroniza de forma manual.");
+    }catch(error){reportDraftStatus("err","No se pudo preparar el reintento: "+error.message)}
   }));
   document.querySelectorAll("[data-delete]").forEach(b=>b.addEventListener("click",async()=>{
     const m=mineModels.find(x=>String(x.id)===String(b.dataset.delete));if(!m||!confirm("¿Desactivar y retirar '"+m.title+"' del catálogo?"))return;b.disabled=true;
@@ -192,10 +339,24 @@ function bindAdminCards(){
 }
 let mineModels=[];
 async function loadMine(){
-  try{const d=await S.api("/products?limit=100");const l=Array.isArray(d)?d:(d.items||d.products||[]);mineModels=l.map(p=>S.fromApi(p));$("mine").innerHTML=mineModels.length?mineModels.map(adminCardHtml).join(""):'<div class="ed-note" style="color:var(--muted)">Aún no tienes productos.</div>';bindAdminCards()}
-  catch(e){$("mine").innerHTML='<div class="ed-msg err">'+S.esc(e.message)+'</div>'}
+  try{
+    const d=await S.api("/products?limit=100"),l=Array.isArray(d)?d:(d.items||d.products||[]);
+    mineModels=l.map(p=>S.fromApi(p));
+    let snapshotError="";
+    try{await saveOfflineSnapshot(l)}catch(error){snapshotError=error.message}
+    await renderMine();
+    if(snapshotError){$("connectionNotice").hidden=false;$("connectionNotice").textContent="Catálogo cargado, pero no se pudo guardar para consulta offline: "+snapshotError}
+  }catch(e){
+    try{
+      const snapshot=await getOfflineSnapshot();
+      mineModels=Array.isArray(snapshot)?snapshot.map(p=>S.fromApi(p)):[];
+      await renderMine();
+      $("connectionNotice").hidden=false;
+      $("connectionNotice").textContent=Array.isArray(snapshot)?"Mostrando el catálogo guardado en este dispositivo. Sincronización requiere internet.":"Sin catálogo guardado todavía. Puedes crear borradores locales y sincronizarlos al reconectar.";
+    }catch(storageError){$("mine").innerHTML='<div class="ed-msg err">'+S.esc(storageError.message||e.message)+'</div>'}
+  }
 }
-$("save").addEventListener("click",async()=>{
+async function saveProduct(localOnly=false){
   const m=model(),msg=$("msg");msg.hidden=true;
   if(f("title").length<2)return show(msg,"err","El nombre necesita al menos 2 caracteres");
   if(!(m.price>0))return show(msg,"err","El precio debe ser mayor a 0");
@@ -206,20 +367,78 @@ $("save").addEventListener("click",async()=>{
   if(!V.some(v=>v.img))return show(msg,"err","Agrega al menos una imagen en una variante");
   const gallery=[];
   const vs=V.filter(v=>v.img||v.name).map(v=>{let ref=v.img;if(v.img.startsWith("data:")){gallery.push(v.img);ref="g:"+(gallery.length-1)}return{n:v.name,g:v.glow,i:ref}});
-  const links={};if(m.links.amazon)links.amazon=m.links.amazon;if(m.links.wompi)links.wompi=m.links.wompi;
+  const links={};if(m.links.amazon)links.amazon=m.links.amazon;if(m.links.aliexpress)links.aliexpress=m.links.aliexpress;if(m.links.wompi)links.wompi=m.links.wompi;if(m.links.external)links.external=m.links.external;
   const meta={v:1,brand:m.brand,tag:m.tag,rating:m.rating||null,reviews:m.reviews||null,features:m.features,variants:vs,links,plate:m.plate};
   const description=S.pack(f("description"),meta);
   if(description.length>5000)return show(msg,"err","Descripción + datos extra superan 5000 caracteres ("+description.length+"). Acórtala.");
   const first=V.find(v=>v.img);
-  const body={title:f("title"),description,price:m.price,previous_price:m.prev>0?m.prev:null,currency:m.currency,category:m.cat||"otros",image_url:first.img,image_gallery:gallery,product_url:links.amazon||links.wompi||null};
+  const body={title:f("title"),description,price:m.price,previous_price:m.prev>0?m.prev:null,currency:m.currency,category:m.cat||"otros",image_url:first.img,image_gallery:gallery,product_url:links.amazon||links.aliexpress||links.wompi||links.external||null};
+  if(localOnly||!navigator.onLine||adminOfflineMode||activeDraftId){
+    try{
+      const existing=activeDraftId?(await getOfflineDrafts()).find(draft=>draft.id===activeDraftId):editingId?(await getOfflineDrafts()).find(draft=>String(draft.product_id)===String(editingId)):null;
+      if(existing?.status==="conflict"&&editingId)return show(msg,"err","Este producto cambió en el servidor. Revisa la tarjeta actual, descarta este borrador y vuelve a editar la versión vigente; no se sobrescribirá automáticamente.");
+      const draft={
+        id:existing?.id||createDraftId(),type:editingId?"update":"create",product_id:editingId,
+        base_updated_at:editingUpdatedAt,form:editorState(),body,status:"pending",message:"",
+        created_at:existing?.created_at||new Date().toISOString(),updated_at:new Date().toISOString()
+      };
+      if(existing?.status==="needs_review"&&existing.type==="create"&&!confirm("Este borrador tuvo una sincronización incierta. Comprueba antes que no exista ya en Central para evitar duplicados. ¿Guardar para volver a intentarlo?"))return;
+      await saveOfflineDraft(draft);
+      show(msg,"ok",navigator.onLine?"Borrador guardado en este dispositivo. Sincronízalo cuando esté listo.":"Borrador guardado en este dispositivo; se sincroniza manualmente al reconectar.");
+      resetEditor();await renderMine();
+    }catch(error){show(msg,"err","No se pudo guardar el borrador local: "+error.message)}
+    return;
+  }
   const b=$("save");b.disabled=true;
   try{
     if(editingId){await S.api("/products/"+encodeURIComponent(editingId),{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});show(msg,"ok","Cambios guardados");resetEditor();await loadMine()}
     else{
       await S.api("/products/personal",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});show(msg,"ok","Tarjeta creada");resetEditor();await loadMine()
     }
-  }catch(e){show(msg,"err",e.message)}finally{b.disabled=false}});
+  }catch(e){show(msg,"err",e.message+". Si no hay conexión, guarda este formulario como borrador local.")}finally{b.disabled=false}
+}
+$("save").addEventListener("click",()=>saveProduct(false));
+$("saveDraft").addEventListener("click",()=>saveProduct(true));
 $("cancelEdit").addEventListener("click",resetEditor);
+$("syncDrafts").addEventListener("click",async()=>{
+  if(!navigator.onLine)return reportDraftStatus("err","Conéctate a internet antes de sincronizar.");
+  const button=$("syncDrafts");button.disabled=true;button.textContent="Sincronizando…";
+  reportDraftStatus("","Sincronizando borradores. No cierres esta pantalla hasta que termine.");
+  let synced=0,conflicts=0,review=0,loginRequired=false;
+  try{
+    const drafts=await getOfflineDrafts();
+    for(const draft of drafts){
+      if(draft.status!=="pending")continue;
+      try{
+        if(draft.type==="update"){
+          const latest=await S.api("/products/"+encodeURIComponent(draft.product_id));
+          const current=latest.product||latest,serverVersion=current.updated_at;
+          if(!draft.base_updated_at||!serverVersion||String(draft.base_updated_at)!==String(serverVersion)){
+            draft.status="conflict";draft.message="El producto cambió en el servidor desde que se creó el borrador. Revisa ambos antes de volver a guardar.";
+            await saveOfflineDraft(draft);conflicts++;continue;
+          }
+          await S.api("/products/"+encodeURIComponent(draft.product_id),{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(draft.body)});
+        }else{
+          await S.api("/products/personal",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(draft.body)});
+        }
+        adminOfflineMode=false;updateConnectionState();
+        await deleteOfflineDraft(draft.id);synced++;
+      }catch(error){
+        if(error.status===401){
+          draft.message="Inicia sesión con internet para sincronizar este borrador.";
+          await saveOfflineDraft(draft);loginRequired=true;break;
+        }
+        draft.status="needs_review";
+        draft.message="No se pudo confirmar la sincronización ("+error.message+"). Comprueba si el producto ya existe antes de reintentar.";
+        await saveOfflineDraft(draft);review++;
+      }
+    }
+    await loadMine();
+    const summary=synced+" sincronizado(s), "+conflicts+" conflicto(s), "+review+" para revisar.";
+    reportDraftStatus(loginRequired||conflicts||review?"err":"ok",loginRequired?"Sincronización pausada: inicia sesión en línea. "+summary:"Sincronización terminada. "+summary);
+  }catch(error){reportDraftStatus("err","No se pudo sincronizar: "+error.message)}
+  finally{button.disabled=false;await refreshDraftStatus()}
+});
 async function initAuth(){
  const screen=$("auth-screen"),loginForm=$("auth-form"),loginMsg=$("auth-message"),loginBtn=$("auth-submit");
  const email=$("auth-email"),password=$("auth-password"),forgotForm=$("forgot-form"),resetForm=$("reset-form");
@@ -237,8 +456,13 @@ async function initAuth(){
    if(name==="forgot"){$("forgot-email").value=email.value.trim();}
    if(name==="reset"){$("reset-code").focus();}
  };
- const showPanel=()=>{
+ const showPanel=(offline=false)=>{
+   adminOfflineMode=offline;updateConnectionState();
    document.body.classList.add("auth-ready");screen.hidden=true;$("panel").style.display="block";
+   if(offline){
+     $("connectionNotice").hidden=false;
+     $("connectionNotice").textContent="Modo offline: puedes revisar el catálogo guardado y crear borradores locales. No se aplicarán cambios al servidor hasta que vuelvas a conectarte y sincronices.";
+   }
    $("logout").addEventListener("click",async()=>{try{await S.api("/auth/logout",{method:"POST"})}finally{location.reload()}});
    gate();
  };
@@ -246,7 +470,11 @@ async function initAuth(){
  $("back-login").addEventListener("click",()=>view("login"));
  $("back-forgot").addEventListener("click",()=>{say("forgot-message","");view("forgot");});
  try{const status=await S.api("/auth/status");if(status.authenticated){showPanel();return}}
- catch{say("auth-message","No se pudo conectar con el servicio de autenticación.");loginBtn.disabled=true;return}
+ catch(error){
+   try{if(await hasOfflineWorkspace()){showPanel(true);return}}
+   catch(storageError){say("auth-message","No se pudo abrir el espacio offline: "+storageError.message);loginBtn.disabled=true;return}
+   say("auth-message","No se pudo conectar con el servicio de autenticación.");loginBtn.disabled=true;return;
+ }
  if(email.value.trim())password.focus();else email.focus();
  loginForm.addEventListener("submit",async e=>{
    e.preventDefault();say("auth-message","");loginBtn.disabled=true;

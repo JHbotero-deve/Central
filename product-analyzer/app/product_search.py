@@ -121,7 +121,7 @@ def _valid_product(item: dict, platform: str) -> dict | None:
         "product_url": product_url,
         "affiliate_url": str(item.get("affiliate_url") or product_url),
         "price": price,
-        "currency": str(item.get("currency") or "USD"),
+        "currency": str(item.get("currency") or ("USD" if platform in {"amazon", "aliexpress"} else "COP")),
         "image_url": str(item.get("image_url") or ""),
         "rating": item.get("rating"),
         "reviews_count": item.get("reviews_count") or 0,
@@ -136,7 +136,7 @@ def search_external_products(term: str, limit: int = 8) -> list[dict]:
     term = str(term or "").strip()
     if not term:
         return []
-    per_source = max(1, min(4, (max(1, int(limit)) + 2) // 3))
+    per_source = max(1, min(6, (max(1, int(limit)) + 1) // 2))
     providers = (
         ("amazon", lambda: search_amazon_products(term, limit=per_source, category="otros")),
         ("aliexpress", lambda: search_aliexpress_products(term, limit=per_source)),

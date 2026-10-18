@@ -14,6 +14,7 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 from analysis import score_product
 from catalog_rules import discount_percentage
 from db import get_connection, upsert_product
+from product_search import search_external_products
 from url_import import detect_platform, import_url
 from product_search import search_external_products
 
@@ -61,7 +62,7 @@ def _send(token, chat_id, text):
 
 def _format_product(p):
     title = html.escape(str(p.get("title") or "Sin título")[:90])
-    price = p.get("current_price")
+    price = p.get("current_price", p.get("price"))
     discount = discount_percentage(price, p.get("previous_price"))
     currency = html.escape(str(p.get("currency") or ""))
     platform = html.escape(str(p.get("platform") or "N/D"))
@@ -608,7 +609,7 @@ def _handle(token, chat_id, text):
             "<b>Radar de Producto</b>\n\n"
             "/productos — mostrar los 20 productos del catálogo\n"
             "/top — oportunidades con mayor score\n"
-            "/buscar producto — buscar en Amazon y AliExpress\n"
+            "/buscar producto — buscar en Amazon y AliExpress (no en la tienda Central)\n"
             "/inyectar — buscar ofertas reales y publicarlas en la tienda (hasta 200, mínimo 40%, vigencia 7 días)\n"
             "/modelar — registrar y puntuar un producto\n"
             "/agregar — importar un producto desde Amazon o AliExpress por URL\n"
@@ -649,8 +650,13 @@ def _handle(token, chat_id, text):
             return _send(token, chat_id, "Uso: /buscar audífonos bluetooth")
         products = search_external_products(term, limit=8)
         if not products:
-            return _send(token, chat_id, f"No encontramos resultados reales en Amazon o AliExpress para: {html.escape(term)}")
-        _send(token, chat_id, f"<b>Búsqueda real: {html.escape(term)}</b> · {len(products)} resultados de Amazon y AliExpress")
+            return _send(
+                token,
+                chat_id,
+                f"No encontré coincidencias en Amazon ni AliExpress para: {html.escape(term)}",
+            )
+
+        _send(token, chat_id, f"<b>Resultados de Amazon y AliExpress para {html.escape(term)}</b> · {len(products)} productos")
         for product in products:
             title = html.escape(str(product.get("title") or "Producto")[:180])
             platform = html.escape(str(product.get("platform") or "tienda").capitalize())

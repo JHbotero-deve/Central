@@ -239,7 +239,8 @@ class TelegramCatalogContractTests(unittest.TestCase):
         self.assertIn("'tiktok'", functions["_catalog_products"])
         self.assertIn("Publicar:", functions["_format_product"])
         self.assertIn("products = search_external_products(term, limit=8)", functions["_handle"])
-        self.assertIn("search_external_products", functions["_handle"])
+        self.assertNotIn("_search_products(term)", functions["_handle"])
+        self.assertIn("search_external_products", source)
 
     def test_telegram_status_counts_only_active_unexpired_products(self):
         path = Path(__file__).with_name("telegram_alert.py")

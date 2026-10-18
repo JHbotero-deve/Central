@@ -10,6 +10,6 @@
   "display_override": ["standalone", "minimal-ui"],
   "orientation": "any",
   "background_color": "#f7f4ed",
-  "theme_color": "#171a19",
+  "theme_color": "#4f7a2a",
   "icons": [{"src": "/central-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any"}]
 }
