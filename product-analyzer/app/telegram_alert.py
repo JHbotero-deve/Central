@@ -813,9 +813,9 @@ def _handle(token, chat_id, text):
         finally:
             conn.close()
 
-    # Recupera URLs pegadas con una barra inicial accidental, por ejemplo /https://a.co/...
+    # Acepta URLs enviadas solas o con una barra inicial accidental.
     urls = _extract_urls(text or "")
-    if urls and command.startswith("/http"):
+    if urls and (not command.startswith("/") or command.startswith("/http")):
         result, payload = _ingest_telegram_url(urls[0], (text or "").strip())
         if result is None:
             return _send(token, chat_id, f"<b>Error de importación</b>\n{html.escape(str(payload))}")
