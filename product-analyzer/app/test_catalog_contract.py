@@ -190,15 +190,43 @@ class AmazonAffiliateUrlTests(unittest.TestCase):
         self.assertEqual(product["affiliate_url"], url)
         self.assertEqual(product["source_metadata"]["metadata_source"], "amazon_creators_api")
 
-    def test_amazon_503_without_creators_api_returns_actionable_import_error(self):
+    def test_amazon_503_without_creators_api_preserves_url_as_draft(self):
         response = requests.Response()
         response.status_code = 503
         error = requests.HTTPError("503 Server Error", response=response)
         with patch("url_import._public_url"), patch(
             "url_import.creators_api_configured", return_value=False
         ), patch("url_import._metadata", side_effect=error):
-            with self.assertRaisesRegex(ValueError, "Amazon bloqueó la lectura automática"):
-                import_url("https://www.amazon.com/dp/B0HJB69GJL", "electronica")
+            product = import_url("https://www.amazon.com/dp/B0HJB69GJL", "electronica")
+        self.assertEqual(product["platform"], "amazon")
+        self.assertTrue(product["source_metadata"]["draft"])
+        self.assertIn("bloqueó la lectura automática", product["source_metadata"]["import_warning"])
+        self.assertEqual(product["product_url"], "https://www.amazon.com/dp/B0HJB69GJL")
+
+    def test_generic_public_store_url_is_imported_as_personal_draft_or_product(self):
+        page = '''
+        <html><head>
+        <meta property="og:title" content="Audífonos de prueba">
+        <meta property="og:image" content="https://shop.example/images/item.jpg">
+        <meta property="product:price:amount" content="129900">
+        <meta property="product:price:currency" content="COP">
+        </head></html>
+        '''
+        with patch("url_import._public_url"), patch(
+            "url_import.requests.get"
+        ) as get:
+            response = requests.Response()
+            response.status_code = 200
+            response.url = "https://shop.example/products/headphones"
+            response._content = page.encode()
+            response.encoding = "utf-8"
+            get.return_value = response
+            product = import_url("https://shop.example/products/headphones", "electronica")
+        self.assertEqual(product["platform"], "personal")
+        self.assertEqual(product["title"], "Audífonos de prueba")
+        self.assertEqual(product["price"], 129900.0)
+        self.assertEqual(product["currency"], "COP")
+        self.assertEqual(product["image_url"], "https://shop.example/images/item.jpg")
 
     def test_import_preserves_manual_aliexpress_affiliate_url_when_store_blocks_reading(self):
         affiliate_url = "https://s.click.aliexpress.com/e/_example"
