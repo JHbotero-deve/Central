@@ -864,8 +864,25 @@ def run_bot():
                     chat = message.get("chat") or {}
                     text = message.get("text") or message.get("caption") or ""
                     chat_id = chat.get("id")
-                    if chat_id is None or not _allowed_chat(chat_id):
+                    if chat_id is None:
+                        print(f"[telegram-bot] update sin chat_id; update_id={update.get('update_id')}", flush=True)
                         continue
+                    configured_chat_id = (os.getenv("TELEGRAM_CHAT_ID") or os.getenv("CHAT_ID") or "").strip()
+                    if str(chat_id) != configured_chat_id:
+                        print(
+                            f"[telegram-bot] mensaje recibido pero rechazado por chat_id; "
+                            f"recibido={chat_id}, configurado={configured_chat_id}, "
+                            f"update_id={update.get('update_id')}",
+                            flush=True,
+                        )
+                        continue
+                    print(
+                        f"[telegram-bot] mensaje recibido; chat_id={chat_id}, "
+                        f"tipo={'comando' if text.startswith('/') else 'texto'}, "
+                        f"comando={(text.split()[0][:40] if text.startswith('/') else 'URL/texto')}, "
+                        f"update_id={update.get('update_id')}",
+                        flush=True,
+                    )
                     if text.startswith("/"):
                         try:
                             _handle(token, chat_id, text)
