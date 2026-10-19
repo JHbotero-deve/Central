@@ -18,7 +18,6 @@ from psycopg2.extras import Json
 from mongo_store import store_product_image
 
 from analysis import score_product
-from ingest import MercadoLibreAccessDenied, fetch_mercadolibre
 from amazon_api import search_amazon_products
 from db import get_connection, upsert_product, _affiliate_url
 from catalog_rules import discount_percentage
@@ -30,7 +29,6 @@ from auth import router as auth_router, require_admin
 from tiktok_api import router as tiktok_creator_router
 from url_import import import_url, _public_url
 from wompi import router as wompi_router
-from meli_oauth import router as meli_oauth_router, notification_router as meli_notification_router
 from aliexpress_oauth import router as aliexpress_oauth_router
 
 
@@ -46,8 +44,6 @@ app = FastAPI(
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(monetization_router, prefix="/api/v1")
 app.include_router(wompi_router, prefix="/api/v1")
-app.include_router(meli_oauth_router, prefix="/api/v1")
-app.include_router(meli_notification_router, prefix="/api/v1")
 app.include_router(aliexpress_oauth_router, prefix="/api/v1")
 app.include_router(tiktok_creator_router, prefix="/api/v1")
 app.include_router(publication_router, prefix="/api/v1")
@@ -289,7 +285,7 @@ def _sync_store_catalog():
     errors = []
     rejected = {"missing_reference_price": 0, "below_discount_threshold": 0, "missing_image_or_url": 0}
     candidates = {}
-    imported = {"mercadolibre": [], "amazon": [], "aliexpress": []}
+    imported = {"amazon": [], "aliexpress": []}
     auto_published = []
     expired_count = 0
     card_unpublished_count = 0
@@ -306,11 +302,7 @@ def _sync_store_catalog():
         ("accesorios", "mochila portatil"), ("electronica", "microfono usb"),
         ("electronica", "control videojuegos"), ("hogar", "lampara led"),
     )
-    providers = (
-        ("mercadolibre", "Mercado Libre"),
-        ("amazon", "Amazon"),
-        ("aliexpress", "AliExpress"),
-    )
+    providers = (("amazon", "Amazon"), ("aliexpress", "AliExpress"))
     try:
         with conn.cursor() as cur:
             cur.execute("SELECT pg_try_advisory_lock(734218906)")
@@ -337,9 +329,7 @@ def _sync_store_catalog():
                 if source_count >= target:
                     break
                 try:
-                    if platform == "mercadolibre":
-                        found = fetch_mercadolibre(query, limit=10)
-                    else:
+                    if platform == "amazon":
                         found = search_amazon_products(
                             query,
                             limit=10,
@@ -350,11 +340,6 @@ def _sync_store_catalog():
                         )
                 except Exception as exc:
                     errors.append(f"{label} '{query}': {type(exc).__name__}: {str(exc)[:180]}")
-                    if platform == "mercadolibre" and (
-                        isinstance(exc, MercadoLibreAccessDenied) or getattr(exc, "fatal", False)
-                    ):
-                        print({"event": "mercadolibre_sync_stopped", "query": query, "error": str(exc)}, flush=True)
-                        break
                     continue
 
                 for item in found or []:
