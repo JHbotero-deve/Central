@@ -33,12 +33,12 @@ def _public_url(url: str) -> None:
 
 
 def detect_platform(url: str) -> str:
-    host = (urlparse(url).hostname or "").lower()
-    if AMAZON_HOST_RE.search(host):
+    host = (urlparse(url).hostname or "").lower().rstrip(".")
+    if host == "a.co" or AMAZON_HOST_RE.search(host):
         return "amazon"
     if TIKTOK_HOST_RE.search(host):
         return "tiktok"
-    if ALIEXPRESS_HOST_RE.search(host):
+    if host in {"s.click.aliexpress.com", "a.aliexpress.com"} or ALIEXPRESS_HOST_RE.search(host):
         return "aliexpress"
     raise ValueError("La URL debe pertenecer a Amazon, TikTok Shop o AliExpress.")
 
