@@ -721,6 +721,16 @@ def _handle(token, chat_id, text):
             if result is None:
                 return _send(token, chat_id, f"<b>Error de importación</b>\n{html.escape(str(payload))}")
             return _send(token, chat_id, payload)
+        if "|" not in argument:
+            title = _context_title(argument)
+            if title:
+                return _send(
+                    token,
+                    chat_id,
+                    "Recibí el nombre del producto, pero falta su URL de compra. "
+                    "Envía el enlace de Amazon, TikTok Shop o AliExpress en el siguiente mensaje; "
+                    "también puedes enviarlo directamente sin escribir un comando."
+                )
 
         result, payload, score = _add_url(argument.strip())
         if result is None:
@@ -802,6 +812,14 @@ def _handle(token, chat_id, text):
             )
         finally:
             conn.close()
+
+    # Recupera URLs pegadas con una barra inicial accidental, por ejemplo /https://a.co/...
+    urls = _extract_urls(text or "")
+    if urls and command.startswith("/http"):
+        result, payload = _ingest_telegram_url(urls[0], (text or "").strip())
+        if result is None:
+            return _send(token, chat_id, f"<b>Error de importación</b>\n{html.escape(str(payload))}")
+        return _send(token, chat_id, payload)
 
     return _send(token, chat_id, "Comando no reconocido. Usa /help.")
 
