@@ -192,7 +192,7 @@ def import_url(
     price: float | None = None,
     currency: str = "USD",
     image_url: str | None = None,
-    require_image: bool = True,
+    require_image: bool = False,
 ) -> dict:
     url = url.strip()
     _public_url(url)
