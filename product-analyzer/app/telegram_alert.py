@@ -438,7 +438,7 @@ def _ingest_telegram_url(url, context="", image_url=None):
             image_url=image_url,
             require_image=False,
         )
-        if product["platform"] not in {"amazon", "tiktok", "aliexpress"}:
+        if product["platform"] not in {"amazon", "tiktok", "aliexpress", "personal"}:
             return None, "Fuente no habilitada."
         conn = get_connection()
         try:
