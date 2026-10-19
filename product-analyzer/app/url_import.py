@@ -171,10 +171,10 @@ def _metadata(url: str) -> dict:
     result = {"resolved_url": response.url, "gallery_urls": _gallery_from_content(content)}
     def meta_value(*keys):
         wanted = {key.casefold() for key in keys}
-        for tag in re.findall(r"<meta\\b[^>]*>", content, re.I):
+        for tag in re.findall(r"<meta\b[^>]*>", content, re.I):
             attrs = {
                 match.group(1).lower(): html.unescape(match.group(3)).strip()
-                for match in re.finditer(r"""([a-zA-Z_:][-a-zA-Z0-9_:.]*)\\s*=\\s*(["'])(.*?)\\2""", tag, re.S)
+                for match in re.finditer(r"""([a-zA-Z_:][-a-zA-Z0-9_:.]*)\s*=\s*(["'])(.*?)\2""", tag, re.S)
             }
             property_name = (attrs.get("property") or attrs.get("name") or attrs.get("itemprop") or "").casefold()
             if property_name in wanted and attrs.get("content"):
