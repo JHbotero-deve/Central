@@ -185,6 +185,12 @@ def _metadata(url: str) -> dict:
     result["image_url"] = meta_value("og:image", "twitter:image", "image")
     result["title"] = meta_value("og:title", "twitter:title")
     result["description"] = meta_value("og:description", "twitter:description")
+    result["sku"] = meta_value("sku", "product:retailer_item_id", "product:sku")
+    result["gtin"] = meta_value("gtin", "gtin8", "gtin12", "gtin13", "gtin14", "product:gtin")
+    result["brand"] = meta_value("brand", "product:brand")
+    result["availability"] = meta_value("availability", "product:availability")
+    result["previous_price"] = meta_value("product:price:original_amount", "og:price:original_amount", "price:original")
+    result["seller"] = meta_value("seller", "product:seller", "og:site_name")
     patterns = {
         "title": r'<meta[^>]+(?:property|name)=["\']og:title["\'][^>]+content=["\']([^"\']+)["\']|<meta[^>]+content=["\']([^"\']+)["\'][^>]+(?:property|name)=["\']og:title["\']',
         "image_url": r'<meta[^>]+(?:property|name)=["\']og:image["\'][^>]+content=["\']([^"\']+)["\']|<meta[^>]+content=["\']([^"\']+)["\'][^>]+(?:property|name)=["\']og:image["\']',
@@ -194,7 +200,22 @@ def _metadata(url: str) -> dict:
         match = re.search(pattern, content, re.I)
         if match:
             result[key] = html.unescape(match.group(1) or match.group(2)).strip()
-    result.update({k: v for k, v in _product_jsonld(content).items() if v not in (None, "", [])})
+    jsonld = _product_jsonld(content)
+    result.update({k: v for k, v in jsonld.items() if v not in (None, "", [])})
+    result["gtin"] = result.get("gtin") or next(
+        (node.get(key) for node in _jsonld(content) if str(node.get("@type", "")).lower() == "product"
+         for key in ("gtin", "gtin8", "gtin12", "gtin13", "gtin14") if node.get(key)),
+        None,
+    )
+    offers = next(
+        (node.get("offers") for node in _jsonld(content)
+         if "product" in [str(value).lower() for value in (node.get("@type") if isinstance(node.get("@type"), list) else [node.get("@type")])]),
+        {},
+    )
+    if isinstance(offers, list):
+        offers = offers[0] if offers else {}
+    if isinstance(offers, dict):
+        result["previous_price"] = result.get("previous_price") or offers.get("priceSpecification", {}).get("price") if isinstance(offers.get("priceSpecification"), dict) else result.get("previous_price")
     if result.get("price") is None:
         result["price"], result["currency"] = _parse_price(content)
     if not result.get("title"):
@@ -279,6 +300,9 @@ def import_url(
         "title": final_title[:500],
         "description": str(metadata.get("description") or "").strip()[:5000] or None,
         "sku": str(metadata.get("sku") or "").strip()[:150] or None,
+        "gtin": str(metadata.get("gtin") or "").strip()[:32] or None,
+        "brand": str(metadata.get("brand") or "").strip()[:200] or None,
+        "previous_price": float(metadata["previous_price"]) if metadata.get("previous_price") not in (None, "") and float(metadata["previous_price"]) > 0 else None,
         "image_url": final_image,
         "gallery_urls": gallery[:24],
         "product_url": url if platform == "amazon" else resolved_url,
@@ -292,9 +316,13 @@ def import_url(
         "rating": float(metadata["rating"]) if metadata.get("rating") not in (None, "") else None,
         "reviews_count": int(float(metadata["reviews_count"])) if metadata.get("reviews_count") not in (None, "") else 0,
         "sales_estimate": None,
-        "seller": {"name": metadata.get("seller")} if metadata.get("seller") else {},
+        "seller": {"name": metadata.get("seller"), "url": metadata.get("seller_url")} if metadata.get("seller") or metadata.get("seller_url") else {},
         "source_metadata": {
             "import_method": "product_url",
+            "gtin": str(metadata.get("gtin") or "").strip() or None,
+            "sku": str(metadata.get("sku") or "").strip() or None,
+            "seller_url": metadata.get("seller_url"),
+            "previous_price": metadata.get("previous_price"),
             "metadata_source": metadata.get("metadata_source") or "open_graph+jsonld",
             "import_warning": metadata.get("import_warning"),
             "draft": not bool(final_image and final_price is not None and float(final_price) > 0),
