@@ -623,7 +623,7 @@ def _handle(token, chat_id, text):
         page_size = 20
         products = _catalog_products(page_size, (page - 1) * page_size)
         if not products:
-            return _send(token, chat_id, f"No hay productos en la página {page}. Prueba /productos 1.")
+            return _send(token, chat_id, "No hay productos activos con precio válido en Amazon, TikTok Shop o AliExpress. Envía una URL de producto para crear un borrador o ejecuta /buscar audífonos bluetooth.")
         _send(token, chat_id, f"<b>Catálogo Central · página {page}</b>\\nProductos mostrados: {len(products)}\\nSiguiente página: /productos {page + 1}")
         for i, product in enumerate(products, (page - 1) * page_size + 1):
             product["title"] = f"{i}. {product['title']}"
@@ -649,7 +649,7 @@ def _handle(token, chat_id, text):
             return _send(
                 token,
                 chat_id,
-                f"No encontré coincidencias en Amazon ni AliExpress para: {html.escape(term)}",
+                f"No llegaron resultados de Amazon ni AliExpress para: {html.escape(term)}. La búsqueda automática depende del acceso disponible en esas plataformas; puedes enviar una URL directa para importar el producto.",
             )
 
         _send(token, chat_id, f"<b>Resultados de Amazon y AliExpress para {html.escape(term)}</b> · {len(products)} productos")
@@ -736,6 +736,8 @@ def _handle(token, chat_id, text):
         return _send(token, chat_id, message)
 
     if command == "/modelar":
+        if not argument.strip():
+            return _send(token, chat_id, "Para importar sin completar campos manualmente, usa /agregar y envía la URL. /modelar es el modo avanzado y requiere los 10 campos indicados en /help.")
         result, error = _model_product(argument.strip())
         if result is None:
             return _send(token, chat_id, f"<b>Error de modelado</b>\n{html.escape(str(error))}")
@@ -745,7 +747,7 @@ def _handle(token, chat_id, text):
         try:
             product_id = int(argument.strip())
         except ValueError:
-            return _send(token, chat_id, "Uso: /publicar ID")
+            return _send(token, chat_id, "Indica el ID del producto: /publicar 123. Consulta /productos para ver los productos disponibles; solo se publican productos con precio, imagen y enlace válidos.")
         result, message = _publish_product(product_id)
         if result is None:
             return _send(token, chat_id, f"<b>No publicado</b>\n{html.escape(message)}")
@@ -757,28 +759,42 @@ def _handle(token, chat_id, text):
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    SELECT COUNT(*) AS total
+                    SELECT
+                        COUNT(*) FILTER (
+                            WHERE p.current_price > 0
+                              AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW())
+                        ) AS active,
+                        COUNT(*) FILTER (
+                            WHERE (p.current_price IS NULL OR p.current_price <= 0)
+                              AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW())
+                        ) AS drafts
                     FROM products p
+                    JOIN platforms pl ON pl.id = p.platform_id
                     WHERE p.is_active = TRUE
                       AND p.is_blocked = FALSE
-                      AND p.current_price > 0
-                      AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW())
+                      AND pl.name IN ('personal', 'amazon', 'tiktok', 'aliexpress')
                     """
                 )
-                total = cur.fetchone()["total"]
+                counts = cur.fetchone()
                 cur.execute(
                     """
                     SELECT COUNT(*) AS modeled
                     FROM products p
+                    JOIN platforms pl ON pl.id = p.platform_id
                     JOIN product_scores s ON s.product_id = p.id
                     WHERE p.is_active = TRUE
                       AND p.is_blocked = FALSE
                       AND p.current_price > 0
                       AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW())
+                      AND pl.name IN ('personal', 'amazon', 'tiktok', 'aliexpress')
                     """
                 )
                 modeled = cur.fetchone()["modeled"]
-            return _send(token, chat_id, f"<b>Estado del catálogo</b>\nProductos activos: {total}\nProductos modelados: {modeled}")
+            return _send(
+                token,
+                chat_id,
+                f"<b>Estado del catálogo Central</b>\nOfertas activas con precio: {counts['active']}\nBorradores pendientes de completar: {counts['drafts']}\nProductos modelados: {modeled}\nFuentes activas: Amazon, TikTok Shop y AliExpress",
+            )
         finally:
             conn.close()
 
