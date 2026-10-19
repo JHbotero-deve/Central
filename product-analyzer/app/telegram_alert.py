@@ -607,7 +607,7 @@ def _handle(token, chat_id, text):
             "/productos — catálogo de productos activos\n"
             "/top — oportunidades activas de Amazon, TikTok Shop y AliExpress\n"
             "/buscar producto — buscar en Amazon y AliExpress\n"
-            "/inyectar — buscar ofertas verificables con las APIs configuradas\n"
+            "/inyectar (alias: /inyeccion o /inyección) — buscar ofertas verificables con las APIs configuradas\n"
             "/modelar plataforma|categoría|id|título|precio|url|rating|reseñas|ventas|imagen — registrar producto con datos completos\n"
             "/agregar — iniciar importación manual; después envía la URL\n"
             "/publicar ID — publicar un producto con precio, imagen y enlace\n"
@@ -657,7 +657,7 @@ def _handle(token, chat_id, text):
             _send_product(token, chat_id, product)
         return True
 
-    if command == "/inyectar":
+    if command in ("/inyectar", "/inyeccion", "/inyección"):
         if argument.strip():
             return _send(token, chat_id, "Uso: /inyectar")
         if not _CATALOG_INGESTION_LOCK.acquire(blocking=False):
@@ -762,10 +762,15 @@ def _handle(token, chat_id, text):
                     SELECT
                         COUNT(*) FILTER (
                             WHERE p.current_price > 0
+                              AND NULLIF(BTRIM(p.image_url), '') IS NOT NULL
                               AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW())
                         ) AS active,
                         COUNT(*) FILTER (
-                            WHERE (p.current_price IS NULL OR p.current_price <= 0)
+                            WHERE (
+                                p.current_price IS NULL
+                                OR p.current_price <= 0
+                                OR NULLIF(BTRIM(p.image_url), '') IS NULL
+                            )
                               AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW())
                         ) AS drafts
                     FROM products p
