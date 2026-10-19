@@ -263,7 +263,7 @@ def _add_url(argument):
     try:
         price = float(parts[2]) if len(parts) > 2 and parts[2] else None
         platform = detect_platform(url)
-        default_currency = "COP" if platform in {"mercadolibre", "aliexpress"} else "USD"
+        default_currency = "COP" if platform == "aliexpress" else "USD"
         currency = parts[5].upper() if len(parts) > 5 and parts[5] else default_currency
         product = import_url(
             url,
@@ -437,7 +437,7 @@ def _ingest_telegram_url(url, context="", image_url=None):
             image_url=image_url,
             require_image=False,
         )
-        if product["platform"] not in {"amazon", "mercadolibre", "tiktok", "aliexpress"}:
+        if product["platform"] not in {"amazon", "tiktok", "aliexpress"}:
             return None, "Fuente no habilitada."
         conn = get_connection()
         try:
@@ -665,7 +665,7 @@ def _handle(token, chat_id, text):
                     f"Descuento mínimo: {result.get('discount_threshold_pct', 40)}%",
                     f"Vigencia: {result.get('expiry_days', 7)} días",
                 ]
-                for platform in ("mercadolibre", "amazon", "aliexpress"):
+                for platform in ("amazon", "aliexpress"):
                     lines.append(f"{html.escape(platform)}: {imported.get(platform, 0)}")
                 rejected = result.get("rejected") or {}
                 if rejected.get("missing_reference_price"):
