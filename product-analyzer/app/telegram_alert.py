@@ -208,7 +208,7 @@ def _catalog_products(limit=20, offset=0):
                   AND p.is_blocked = FALSE
                   AND p.current_price > 0
                   AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW())
-                  AND pl.name IN ('personal', 'mercadolibre', 'amazon', 'tiktok', 'aliexpress')
+                  AND pl.name IN ('personal', 'amazon', 'tiktok', 'aliexpress')
                 ORDER BY p.updated_at DESC NULLS LAST, p.id DESC
                 LIMIT %s OFFSET %s
                 """,
@@ -602,17 +602,16 @@ def _handle(token, chat_id, text):
 
     if command in ("/start", "/help"):
         return _send(token, chat_id, (
-            "<b>Radar de Producto</b>\n\n"
-            "/productos — mostrar los 20 productos del catálogo\n"
-            "/top — oportunidades con mayor score\n"
-            "/buscar producto — buscar en Amazon y AliExpress (no en la tienda Central)\n"
-            "/inyectar — buscar ofertas reales y publicarlas en la tienda (hasta 200, mínimo 40%, vigencia 7 días)\n"
-            "/modelar — registrar y puntuar un producto\n"
-            "/agregar — importar un producto desde Amazon, TikTok Shop o AliExpress por URL\n"
-            "/publicar ID — publicar un producto validado\n"
-            "También puedes enviar una URL sola: Central la captura y la deja lista para publicar.\n"
-            "/estado — estado del catálogo\n"
-            "/help — ayuda"
+            "<b>Central Radar</b>\n\n"
+            "/productos — catálogo de productos activos\n"
+            "/top — oportunidades activas de Amazon, TikTok Shop y AliExpress\n"
+            "/buscar producto — buscar en Amazon y AliExpress\n"
+            "/inyectar — buscar ofertas verificables con las APIs configuradas\n"
+            "/modelar plataforma|categoría|id|título|precio|url|rating|reseñas|ventas|imagen — registrar producto con datos completos\n"
+            "/agregar — iniciar importación manual; después envía la URL\n"
+            "/publicar ID — publicar un producto con precio, imagen y enlace\n"
+            "También puedes enviar una URL directamente. Si la tienda bloquea la lectura, Central guarda un borrador para completar.\n"
+            "/estado — estado del catálogo"
         ))
 
     if command in ("/productos", "/catalogo"):
@@ -633,7 +632,7 @@ def _handle(token, chat_id, text):
     if command == "/top":
         products = _top_products()
         if not products:
-            return _send(token, chat_id, "No hay oportunidades disponibles en la base de datos.")
+            return _send(token, chat_id, "No hay oportunidades activas de Amazon, TikTok Shop o AliExpress. Envía una URL para importar un borrador o revisa la configuración de las APIs.")
         _send(token, chat_id, "<b>Top oportunidades</b>")
         for i, product in enumerate(products, 1):
             product["title"] = f"{i}. {product['title']}"
@@ -705,6 +704,13 @@ def _handle(token, chat_id, text):
         return _send(token, chat_id, "Inicié la búsqueda de ofertas reales. Te enviaré el resumen cuando termine.")
 
     if command == "/agregar":
+        if not argument.strip():
+            return _send(
+                token,
+                chat_id,
+                "Envíame la URL de Amazon, TikTok Shop o AliExpress en el siguiente mensaje. "
+                "Central intentará capturar los datos y guardará un borrador si faltan precio o imagen."
+            )
         full_text = text or ""
         urls = _extract_urls(full_text)
         if "|" not in argument and urls:
