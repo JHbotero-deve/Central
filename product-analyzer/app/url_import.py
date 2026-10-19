@@ -33,14 +33,17 @@ def _public_url(url: str) -> None:
 
 
 def detect_platform(url: str) -> str:
-    host = (urlparse(url).hostname or "").lower().rstrip(".")
+    parsed = urlparse((url or "").strip())
+    host = (parsed.hostname or "").lower().rstrip(".")
+    if parsed.scheme not in ("http", "https") or not host:
+        raise ValueError("Envía una URL pública completa que comience con https:// o http://.")
     if host == "a.co" or AMAZON_HOST_RE.search(host):
         return "amazon"
     if TIKTOK_HOST_RE.search(host):
         return "tiktok"
     if host in {"s.click.aliexpress.com", "a.aliexpress.com"} or ALIEXPRESS_HOST_RE.search(host):
         return "aliexpress"
-    raise ValueError("La URL debe pertenecer a Amazon, TikTok Shop o AliExpress.")
+    return "personal"
 
 
 def _aliexpress_affiliate_url(url: str) -> str | None:
@@ -166,6 +169,25 @@ def _metadata(url: str) -> dict:
     _public_url(response.url)
     content = response.text[:2_000_000]
     result = {"resolved_url": response.url, "gallery_urls": _gallery_from_content(content)}
+    def meta_value(*keys):
+        for key in keys:
+            pattern = (
+                r'<meta\\b(?=[^>]*(?:property|name|itemprop)=["\\']'
+                + re.escape(key)
+                + r'["\\'])(?=[^>]*content=["\\']([^"\\']+)["\\'])[^>]*>'
+                r'|<meta\\b(?=[^>]*content=["\\']([^"\\']+)["\\'])(?=[^>]*(?:property|name|itemprop)=["\\']'
+                + re.escape(key)
+                + r'["\\'])[^>]*>'
+            )
+            match = re.search(pattern, content, re.I)
+            if match:
+                return html.unescape(match.group(1) or match.group(2)).strip()
+        return None
+    result["price"] = meta_value("product:price:amount", "og:price:amount", "price")
+    result["currency"] = meta_value("product:price:currency", "og:price:currency", "priceCurrency")
+    result["image_url"] = meta_value("og:image", "twitter:image", "image")
+    result["title"] = meta_value("og:title", "twitter:title")
+    result["description"] = meta_value("og:description", "twitter:description")
     patterns = {
         "title": r'<meta[^>]+(?:property|name)=["\']og:title["\'][^>]+content=["\']([^"\']+)["\']|<meta[^>]+content=["\']([^"\']+)["\'][^>]+(?:property|name)=["\']og:title["\']',
         "image_url": r'<meta[^>]+(?:property|name)=["\']og:image["\'][^>]+content=["\']([^"\']+)["\']|<meta[^>]+content=["\']([^"\']+)["\'][^>]+(?:property|name)=["\']og:image["\']',
