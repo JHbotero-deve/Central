@@ -442,22 +442,36 @@ def _ingest_telegram_url(url, context="", image_url=None):
         conn = get_connection()
         try:
             product_id = upsert_product(conn, product["platform"], category, product)
-            score = score_product(conn, product_id, float(product.get("price") or 0))
+            score = None
+            if product.get("price") is not None:
+                score = score_product(conn, product_id, float(product["price"]))
         finally:
             conn.close()
-        if product.get("image_url"):
-            next_step = f"<b>Listo para publicar:</b> /publicar {product_id}"
-        else:
+        missing = []
+        if not product.get("price"):
+            missing.append("precio")
+        if not product.get("image_url"):
+            missing.append("imagen")
+        if missing:
             next_step = (
-                "<b>Guardado en el catálogo, no publicado.</b> Falta una imagen real. "
-                "Añádela en Central antes de publicar esta tarjeta."
+                "<b>Borrador guardado, no publicado.</b> Completa "
+                + " y ".join(missing)
+                + " en el administrador de Central antes de publicar."
             )
+        else:
+            next_step = f"<b>Listo para publicar:</b> /publicar {product_id}"
+        price_display = (
+            f"{float(product['price']):,.0f} {html.escape(product['currency'])}"
+            if product.get("price") is not None
+            else "Pendiente de completar"
+        )
+        score_display = f"{float(score):.1f}/100" if score is not None else "Pendiente (borrador)"
         message = (
             f"<b>Producto capturado</b> · ID {product_id}\n"
             f"{html.escape(product['title'])}\n"
             f"Fuente: {html.escape(product['platform'])}\n"
-            f"Precio: {product['price']:,.0f} {html.escape(product['currency'])}\n"
-            f"Score: {float(score):.1f}/100\n"
+            f"Precio: {price_display}\n"
+            f"Score: {score_display}\n"
             f"{next_step}"
         )
         return product_id, message
