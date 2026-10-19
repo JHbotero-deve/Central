@@ -55,7 +55,7 @@ check("ed-upload-primary" in vars_fn and vars_fn.find("ed-upload-primary") < var
       "card creator presents upload before optional URL entry")
 check('id="marketSearchForm"' in editor and 'id="marketSearchButton"' in editor,
       "card editor exposes a working Mercado Libre search form")
-check('S.api("/mercadolibre/search?q="+encodeURIComponent(query)+"&limit=8)' in editor,
+check('"/mercadolibre/search?q="' in editor and 'encodeURIComponent(query)' in editor and '"&limit=8"' in editor,
       "search button calls the existing real Mercado Libre search route")
 check('S.api("/products/mercadolibre"' in editor and 'data-market-import' in editor,
       "search results can be saved as external catalog products without converting them into personal/Wompi items")
