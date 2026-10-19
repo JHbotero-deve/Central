@@ -99,10 +99,16 @@ def upsert_product(conn, platform_name: str, category_name: str, product: dict):
             seller_id = cur.fetchone()["id"]
 
         source_metadata = dict(product.get("source_metadata") or {})
+        for field in ("sku", "gtin", "brand", "previous_price", "stock", "availability", "seller_url"):
+            value = product.get(field)
+            if value not in (None, "", [], {}):
+                source_metadata[field] = value
         if seller_data:
             source_metadata["seller"] = {key: value for key, value in seller_data.items() if value not in (None, "", [], {})}
         if product.get("brand") and not source_metadata.get("brand"):
             source_metadata["brand"] = product.get("brand")
+        if product.get("product_url") and not source_metadata.get("original_url"):
+            source_metadata["original_url"] = product.get("product_url")
         stored_image_url = product.get("image_url")
         stored_gallery = list(product.get("gallery_urls") or product.get("image_gallery") or [])
 
