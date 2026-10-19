@@ -170,18 +170,15 @@ def _metadata(url: str) -> dict:
     content = response.text[:2_000_000]
     result = {"resolved_url": response.url, "gallery_urls": _gallery_from_content(content)}
     def meta_value(*keys):
-        for key in keys:
-            pattern = (
-                r'<meta\\b(?=[^>]*(?:property|name|itemprop)=["\\']'
-                + re.escape(key)
-                + r'["\\'])(?=[^>]*content=["\\']([^"\\']+)["\\'])[^>]*>'
-                r'|<meta\\b(?=[^>]*content=["\\']([^"\\']+)["\\'])(?=[^>]*(?:property|name|itemprop)=["\\']'
-                + re.escape(key)
-                + r'["\\'])[^>]*>'
-            )
-            match = re.search(pattern, content, re.I)
-            if match:
-                return html.unescape(match.group(1) or match.group(2)).strip()
+        wanted = {key.casefold() for key in keys}
+        for tag in re.findall(r"<meta\\b[^>]*>", content, re.I):
+            attrs = {
+                match.group(1).lower(): html.unescape(match.group(3)).strip()
+                for match in re.finditer(r"""([a-zA-Z_:][-a-zA-Z0-9_:.]*)\\s*=\\s*(["'])(.*?)\\2""", tag, re.S)
+            }
+            property_name = (attrs.get("property") or attrs.get("name") or attrs.get("itemprop") or "").casefold()
+            if property_name in wanted and attrs.get("content"):
+                return attrs["content"]
         return None
     result["price"] = meta_value("product:price:amount", "og:price:amount", "price")
     result["currency"] = meta_value("product:price:currency", "og:price:currency", "priceCurrency")
