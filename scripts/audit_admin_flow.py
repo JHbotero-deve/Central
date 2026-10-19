@@ -64,12 +64,10 @@ vars_end = editor.find("function model(){", vars_start)
 vars_fn = editor[vars_start:vars_end]
 check("ed-upload-primary" in vars_fn and vars_fn.find("ed-upload-primary") < vars_fn.find("ed-image-url"),
       "card creator presents upload before optional URL entry")
-check('id="marketSearchForm"' in editor and 'id="marketSearchButton"' in editor,
-      "card editor exposes a working Mercado Libre search form")
-check('"/mercadolibre/search?q="' in editor and 'encodeURIComponent(query)' in editor and '"&limit=8"' in editor,
-      "search button calls the existing real Mercado Libre search route")
-check('S.api("/products/mercadolibre"' in editor and 'data-market-import' in editor,
-      "search results can be saved as external catalog products without converting them into personal/Wompi items")
+check('id="marketSearchForm"' not in editor and 'id="marketSearchButton"' not in editor,
+      "card editor no expone búsqueda activa de Mercado Libre")
+check('"/mercadolibre/search' not in editor and 'S.api("/products/mercadolibre"' not in editor,
+      "el editor no ofrece rutas de búsqueda o importación de Mercado Libre")
 check('data-publish="' in editor and 'S.api("/publications"' in editor,
       "publish buttons use the publications API")
 check('data-delete="' in editor and '"/status"' in editor,
