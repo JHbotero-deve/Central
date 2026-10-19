@@ -277,9 +277,9 @@ def _publish_external_product(conn, product_id, product, platform_label):
     return True
 
 def _sync_store_catalog():
-    """Ingesta hasta 200 ofertas reales verificadas y expira el lote a los siete días."""
+    """Busca hasta 500 ofertas reales verificadas; el total depende de las fuentes habilitadas."""
     conn = get_connection()
-    target = max(1, min(int(os.getenv("CATALOG_SYNC_MAX_PRODUCTS", "200")), 200))
+    target = max(1, min(int(os.getenv("CATALOG_SYNC_MAX_PRODUCTS", "500")), 500))
     threshold = float(os.getenv("CATALOG_MIN_DISCOUNT_PCT", "40"))
     expiry_days = max(1, min(int(os.getenv("CATALOG_EXPIRY_DAYS", "7")), 30))
     errors = []
