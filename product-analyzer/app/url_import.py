@@ -10,7 +10,6 @@ import requests
 from amazon_api import creators_api_configured, fetch_amazon_product_by_asin
 
 AMAZON_HOST_RE = re.compile(r"(^|\.)amazon\.[a-z.]+$", re.I)
-MELI_HOST_RE = re.compile(r"(^|\.)(mercadolibre|mercadolivre)\.[a-z.]+$", re.I)
 TIKTOK_HOST_RE = re.compile(r"(^|\.)tiktok(?:shop)?\.com$", re.I)
 ALIEXPRESS_HOST_RE = re.compile(r"(^|\.)aliexpress\.[a-z.]+$", re.I)
 ASIN_RE = re.compile(r"(?:/dp/|/gp/product/)([A-Z0-9]{10})(?:[/?]|$)", re.I)
@@ -37,13 +36,11 @@ def detect_platform(url: str) -> str:
     host = (urlparse(url).hostname or "").lower()
     if AMAZON_HOST_RE.search(host):
         return "amazon"
-    if MELI_HOST_RE.search(host):
-        return "mercadolibre"
     if TIKTOK_HOST_RE.search(host):
         return "tiktok"
     if ALIEXPRESS_HOST_RE.search(host):
         return "aliexpress"
-    raise ValueError("La URL debe pertenecer a Amazon, Mercado Libre, TikTok Shop o AliExpress.")
+    raise ValueError("La URL debe pertenecer a Amazon, TikTok Shop o AliExpress.")
 
 
 def _aliexpress_affiliate_url(url: str) -> str | None:
