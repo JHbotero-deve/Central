@@ -481,7 +481,7 @@ class CatalogPublicationPolicyTests(unittest.TestCase):
 
     def test_expiry_waits_for_a_successful_complete_provider_sync(self):
         source = inspect.getsource(_sync_store_catalog)
-        self.assertIn('"CATALOG_SYNC_MAX_PRODUCTS", "200"', source)
+        self.assertIn('"CATALOG_SYNC_MAX_PRODUCTS", "500"', source)
         self.assertIn('"CATALOG_MIN_DISCOUNT_PCT", "40"', source)
         self.assertIn("catalog_expires_at<=NOW()", source)
         self.assertIn("pg_try_advisory_lock", source)
