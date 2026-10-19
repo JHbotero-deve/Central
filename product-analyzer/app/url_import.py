@@ -220,37 +220,21 @@ def import_url(
             else:
                 raise ValueError(f"Amazon Creators API no encontró una oferta disponible para el ASIN {asin}.")
         except (requests.RequestException, RuntimeError, ValueError) as exc:
-            enough_manual_data = bool(title and price is not None and (image_url or not require_image))
-            if not enough_manual_data:
-                raise ValueError(
-                    f"No se pudo importar el ASIN {asin} con Amazon Creators API: {str(exc)[:240]}. "
-                    "Verifica el marketplace y las credenciales, o envía nombre, precio e imagen real."
-                ) from exc
             metadata = {
                 "resolved_url": url,
                 "gallery_urls": [],
-                "metadata_source": "manual",
+                "metadata_source": "manual_draft",
+                "import_warning": f"Amazon no entregó metadatos automáticamente: {str(exc)[:180]}",
             }
     else:
         try:
             metadata = _metadata(url)
         except requests.RequestException as exc:
-            # Algunas tiendas bloquean lectura automática. Solo se admite salida manual
-            # cuando el usuario aportó título, precio e imagen real; no se inventan datos.
-            enough_manual_data = bool(title and price is not None and (image_url or not require_image))
-            if not enough_manual_data:
-                if platform == "aliexpress":
-                    raise ValueError("AliExpress no entregó los metadatos. Completa nombre y precio; añade una imagen real para publicar.") from exc
-                if platform == "amazon" and getattr(exc.response, "status_code", None) == 503:
-                    raise ValueError(
-                        "Amazon bloqueó la lectura automática de esa página (HTTP 503). "
-                        "Configura el acceso a Creators API o envía /agregar categoría|URL|PRECIO|TÍTULO|IMAGEN_URL|MONEDA."
-                    ) from exc
-                raise
             metadata = {
                 "resolved_url": url,
                 "gallery_urls": [],
-                "metadata_source": "manual",
+                "metadata_source": "manual_draft",
+                "import_warning": f"La tienda bloqueó la lectura automática: {str(exc)[:180]}",
             }
     resolved_url = metadata.get("resolved_url") or url
     external_id = _asin(resolved_url) if platform == "amazon" else None
@@ -259,15 +243,14 @@ def import_url(
         match = re.search(r"/([A-Z]{2,4}-?\d{6,})", path, re.I)
         external_id = match.group(1).upper() if match else re.sub(r"[^a-zA-Z0-9]+", "-", path.strip("/"))[:120]
     final_title = (title or metadata.get("title") or "").strip()
+    if not final_title:
+        host = (urlparse(resolved_url).hostname or platform).replace("www.", "")
+        final_title = f"Borrador importado de {host}"
     final_image = (image_url or metadata.get("image_url") or "").strip() or None
     final_price = price if price is not None else metadata.get("price")
     final_currency = (currency if price is not None else metadata.get("currency")) or currency
-    if not final_title:
-        raise ValueError("No fue posible obtener el nombre real del producto.")
     if not final_image and require_image:
-        raise ValueError("No fue posible obtener una imagen real del producto. Proporciónala para publicar la tarjeta.")
-    if final_price is None or float(final_price) <= 0:
-        raise ValueError("No fue posible obtener el precio real. Proporciónalo manualmente para importarlo.")
+        raise ValueError("No fue posible obtener una imagen real del producto. Desactiva require_image para guardarlo como borrador.")
     gallery = metadata.get("gallery_urls") or []
     if final_image and final_image not in gallery:
         gallery.insert(0, final_image)
@@ -285,7 +268,7 @@ def import_url(
             else url if platform == "amazon" and re.search(r"(?:^|&)tag=", urlparse(url).query, re.I)
             else None
         ),
-        "price": float(final_price),
+        "price": float(final_price) if final_price is not None and float(final_price) > 0 else None,
         "currency": str(final_currency).upper()[:10] if final_currency else "USD",
         "rating": float(metadata["rating"]) if metadata.get("rating") not in (None, "") else None,
         "reviews_count": int(float(metadata["reviews_count"])) if metadata.get("reviews_count") not in (None, "") else 0,
@@ -294,6 +277,8 @@ def import_url(
         "source_metadata": {
             "import_method": "product_url",
             "metadata_source": metadata.get("metadata_source") or "open_graph+jsonld",
+            "import_warning": metadata.get("import_warning"),
+            "draft": not bool(final_image and final_price is not None and float(final_price) > 0),
             "original_url": url,
             "resolved_url": resolved_url,
             "brand": metadata.get("brand"),
