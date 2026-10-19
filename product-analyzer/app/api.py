@@ -925,6 +925,7 @@ def import_product_from_url(payload: ProductImport, _: dict = Depends(require_ad
             price=payload.price,
             currency=payload.currency,
             image_url=payload.image_url,
+            require_image=False,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
