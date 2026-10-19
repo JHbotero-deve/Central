@@ -38,7 +38,7 @@ body:not(.auth-ready) .sh-wrap{display:none!important}#panel{display:none}.centr
 .admin-card-actions button:hover{background:#e8eee4;border-color:#dce5d7}
 #preview .sh-stage{background:linear-gradient(145deg,#fdfcf9,#f7f6f1);border-color:#e7e4dc}
 #preview .sh-stage img{filter:drop-shadow(0 10px 14px rgba(35,39,32,.12))}
-.admin-product-search{display:grid;gap:10px;padding:14px;margin:0 0 18px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}.admin-product-search h3{margin:0;font-size:14px}.admin-product-search p{margin:0;color:var(--muted);font-size:12px}.admin-product-search-controls{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}.admin-product-search-controls input{min-width:0;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--panel2);color:var(--ink);font:13px var(--font)}.admin-product-search-controls button,.admin-search-result button{padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:var(--brand);color:#fff;font:600 12px var(--font);cursor:pointer}.admin-product-search-controls button:disabled,.admin-search-result button:disabled{opacity:.55;cursor:wait}.admin-search-results{display:grid;gap:8px}.admin-search-result{display:grid;grid-template-columns:64px minmax(0,1fr);gap:10px;align-items:center;padding:9px;border:1px solid var(--line);border-radius:10px}.admin-search-result img{width:64px;height:64px;object-fit:contain;background:#f8f7f3;border-radius:7px}.admin-search-result strong{display:block;font-size:12px;line-height:1.35}.admin-search-result span{display:block;margin:4px 0;color:var(--muted);font-size:11px}.admin-search-result button{grid-column:2;justify-self:start}.admin-search-status{min-height:16px;font-size:12px;color:var(--muted)}@media(max-width:480px){.admin-product-search-controls{grid-template-columns:1fr}.admin-search-result{grid-template-columns:52px minmax(0,1fr)}.admin-search-result img{width:52px;height:52px}}</style><script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+</style><script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
 </head>
 <body><main id="auth-screen" class="central-auth"><section class="central-auth-card">
 <div class="central-auth-brand"><img src="/central-icon.svg" alt=""><div><strong>CENTRAL</strong><span>Administración segura</span></div></div>
@@ -74,7 +74,7 @@ body:not(.auth-ready) .sh-wrap{display:none!important}#panel{display:none}.centr
   <div class="ed-body" id="tab-mine" hidden><div class="ed-l">Productos</div><div class="admin-draft-tools"><span id="draftStatus" class="ed-note">Borradores locales: 0</span><button id="syncDrafts" class="primary" type="button" disabled>Sincronizar borradores</button></div><div id="syncMessage" class="ed-msg" role="status" aria-live="polite" hidden></div><div class="sh-grid admin-cards" id="mine"></div></div>
 
   <div class="ed-body" id="tab-add">
-   <section class="admin-product-search" aria-labelledby="marketSearchHeading"><h3 id="marketSearchHeading">Buscar productos en Mercado Libre</h3><p>Busca productos reales y guárdalos en el catálogo para preparar su tarjeta. La búsqueda depende del acceso disponible de Mercado Libre.</p><form id="marketSearchForm" class="admin-product-search-controls"><input id="marketSearchQuery" type="search" minlength="2" maxlength="120" placeholder="Ej.: audífonos bluetooth" autocomplete="off" required><button id="marketSearchButton" type="submit">Buscar</button></form><div id="marketSearchStatus" class="admin-search-status" role="status" aria-live="polite"></div><div id="marketSearchResults" class="admin-search-results"></div></section>
+
    <div class="ed-l" id="formHeading">NUEVO PRODUCTO</div>
    <label class="ed-l">Tipo de producto<select class="ed-in" id="productType"><option value="personal">Producto propio · compra en Central/Wompi</option></select></label>
    <div class="ed-l">O completa los datos manualmente</div>
@@ -192,47 +192,6 @@ function show(el,k,t){el.hidden=false;el.className="ed-msg "+k;el.textContent=t}
 function reportDraftStatus(kind,text){const message=$("syncMessage");message.hidden=!text;message.className="ed-msg "+kind;message.textContent=text}
 function gate(){renderVars();preview();loadMine()}
 function tab(n){["mine","add"].forEach(x=>{$("tab-"+x).hidden=x!==n});document.querySelectorAll("[data-tab]").forEach(b=>b.classList.toggle("on",b.dataset.tab===n))}
-
-let marketSearchItems=[];
-const marketSearchForm=$("marketSearchForm");
-marketSearchForm.addEventListener("submit",async event=>{
-  event.preventDefault();
-  const query=$("marketSearchQuery").value.trim(),button=$("marketSearchButton"),status=$("marketSearchStatus"),results=$("marketSearchResults");
-  if(query.length<2){status.textContent="Escribe al menos dos caracteres.";return;}
-  button.disabled=true;button.textContent="Buscando…";status.textContent="Consultando resultados reales…";results.replaceChildren();marketSearchItems=[];
-  try{
-    const data=await S.api("/mercadolibre/search?q="+encodeURIComponent(query)+"&limit=8");
-    marketSearchItems=Array.isArray(data.items)?data.items:[];
-    status.textContent=marketSearchItems.length?marketSearchItems.length+" resultados encontrados.":"Mercado Libre no devolvió productos verificables para esta búsqueda.";
-    results.innerHTML=marketSearchItems.map((item,index)=>{
-      const image=String(item.image_url||"").trim(),imageMarkup=image?'<img src="'+S.esc(S.imageSrc(image))+'" alt="" loading="lazy" referrerpolicy="no-referrer">':'<div class="admin-card-media">Sin imagen</div>';
-      const amount=S.money(Number(item.price),item.currency||"COP");
-      const importDisabled=!image||!item.product_url||!item.id;
-      return '<article class="admin-search-result">'+imageMarkup+'<div><strong>'+S.esc(item.title)+'</strong><span>'+S.esc(amount)+' · Mercado Libre</span><a href="'+S.esc(item.product_url)+'" target="_blank" rel="noopener noreferrer">Ver origen</a></div><button type="button" data-market-import="'+index+'" '+(importDisabled?'disabled title="El producto no tiene imagen, URL o identificador válido"':'')+'>Preparar tarjeta</button></article>';
-    }).join("");
-  }catch(error){
-    status.textContent=error.message||"No se pudo consultar Mercado Libre. Puedes importar una URL directa desde el panel Central.";
-  }finally{button.disabled=false;button.textContent="Buscar";}
-});
-$("marketSearchResults").addEventListener("click",async event=>{
-  const button=event.target.closest("[data-market-import]");
-  if(!button)return;
-  const item=marketSearchItems[Number(button.dataset.marketImport)];
-  if(!item)return;
-  button.disabled=true;button.textContent="Guardando…";
-  const categoryMap={zapatos:"calzado",camisetas:"ropa",electronicos:"electronica",otros:"otros"};
-  try{
-    await S.api("/products/mercadolibre",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
-      external_id:String(item.id),title:String(item.title),image_url:String(item.image_url),product_url:String(item.product_url),
-      price:Number(item.price),currency:String(item.currency||"COP"),category:categoryMap[$("category").value]||"otros"
-    })});
-    $("marketSearchStatus").textContent="Producto guardado en el catálogo. Puedes publicarlo desde la pestaña Productos.";
-    await loadMine();tab("mine");
-  }catch(error){
-    $("marketSearchStatus").textContent=error.message||"No se pudo guardar el producto. Comprueba la sesión administrativa.";
-    button.disabled=false;button.textContent="Reintentar";
-  }
-});
 
 function renderVars(){
   $("vars").innerHTML=V.map((v,i)=>{
