@@ -53,6 +53,14 @@ vars_end = editor.find("function model(){", vars_start)
 vars_fn = editor[vars_start:vars_end]
 check("ed-upload-primary" in vars_fn and vars_fn.find("ed-upload-primary") < vars_fn.find("ed-image-url"),
       "card creator presents upload before optional URL entry")
+check('id="marketSearchForm"' in editor and 'id="marketSearchButton"' in editor,
+      "card editor exposes a working Mercado Libre search form")
+check('S.api("/mercadolibre/search?q="+encodeURIComponent(query)+"&limit=8)' in editor,
+      "search button calls the existing real Mercado Libre search route")
+check('S.api("/products/mercadolibre"' in editor and 'data-market-import' in editor,
+      "search results can be saved as external catalog products without converting them into personal/Wompi items")
+check('target="_blank" rel="noopener noreferrer"' in editor,
+      "external product links open safely in a separate tab")
 check('href="/tienda">Ver tienda' in editor and 'href="/">CENTRAL' in editor,
       "editor links return to the dashboard and real public store")
 check('data-tab="theme"' not in editor and "renderThemes" not in editor,
