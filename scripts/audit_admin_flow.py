@@ -43,6 +43,17 @@ check(re.search(r'"source"\s*:\s*"/"\s*,\s*"destination"\s*:\s*"/index\.html"', 
       "root URL opens the Central dashboard")
 check(re.search(r'"source"\s*:\s*"/vitrina"\s*,\s*"destination"\s*:\s*"/tienda\.html"', routes) is not None,
       "legacy vitrina URL opens the real published store")
+check(re.search(r'"source"\s*:\s*"/tarjetas"\s*,\s*"destination"\s*:\s*"/tarjetas\.html"', routes) is not None,
+      "card editor URL resolves to the current editor")
+check(re.search(r'"source"\s*:\s*"/catalogo"\s*,\s*"destination"\s*:\s*"/catalogo\.html"', routes) is not None,
+      "active catalog URL resolves to the current catalog page")
+check(re.search(r'"source"\s*:\s*"/tienda"\s*,\s*"destination"\s*:\s*"/tienda\.html"', routes) is not None,
+      "store URL resolves to the published storefront")
+check(re.search(r'"source"\s*:\s*"/producto/:path\*"\s*,\s*"destination"\s*:\s*"/producto\.html\?slug=:path\*"', routes) is not None,
+      "product detail URLs preserve the slug query expected by the product page")
+check(re.search(r'"source"\s*:\s*"/api/v1/:path\*"\s*,\s*"destination"\s*:\s*"https://gracious-renewal-production-76df\.up\.railway\.app/api/v1/:path\*"', routes) is not None,
+      "frontend API routes point to the current Railway API")
+
 legacy = (FRONT / "vitrina.html").read_text(encoding="utf-8-sig")
 check('location.replace("/tienda"+location.search+location.hash)' in legacy,
       "direct legacy vitrina file redirects to the real published store")
@@ -59,6 +70,11 @@ check('"/mercadolibre/search?q="' in editor and 'encodeURIComponent(query)' in e
       "search button calls the existing real Mercado Libre search route")
 check('S.api("/products/mercadolibre"' in editor and 'data-market-import' in editor,
       "search results can be saved as external catalog products without converting them into personal/Wompi items")
+check('data-publish="' in editor and 'S.api("/publications"' in editor,
+      "publish buttons use the publications API")
+check('data-delete="' in editor and '"/status"' in editor,
+      "remove buttons deactivate products instead of deleting database records")
+
 check('target="_blank" rel="noopener noreferrer"' in editor,
       "external product links open safely in a separate tab")
 check('href="/tienda">Ver tienda' in editor and 'href="/">CENTRAL' in editor,
