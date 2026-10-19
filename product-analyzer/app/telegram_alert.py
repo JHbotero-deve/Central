@@ -177,6 +177,7 @@ def _top_products(limit=5):
                   AND p.is_blocked = FALSE
                   AND p.current_price > 0
                   AND (p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW())
+                  AND pl.name IN ('personal', 'amazon', 'tiktok', 'aliexpress')
                 ORDER BY COALESCE(s.opportunity_score, 0) DESC, p.updated_at DESC
                 LIMIT %s
                 """,
