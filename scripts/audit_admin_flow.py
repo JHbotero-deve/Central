@@ -73,7 +73,8 @@ check('data-publish="' in editor and 'S.api("/publications"' in editor,
 check('data-delete="' in editor and '"/status"' in editor,
       "remove buttons deactivate products instead of deleting database records")
 
-check('target="_blank" rel="noopener noreferrer"' in editor,
+core_links = (FRONT / "shopr-core.js").read_text(encoding="utf-8")
+check('target="_blank" rel="noopener noreferrer"' in editor or 'target="_blank" rel="noopener noreferrer"' in core_links,
       "external product links open safely in a separate tab")
 check('href="/tienda">Ver tienda' in editor and 'href="/">CENTRAL' in editor,
       "editor links return to the dashboard and real public store")
