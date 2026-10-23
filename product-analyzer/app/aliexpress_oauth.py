@@ -35,14 +35,14 @@ def _env(name: str, default: str = "") -> str:
 
 def _encryption_key() -> str:
     # Reuse Central's existing Fernet key when a dedicated key has not been set.
-    return _env("ALIEXPRESS_TOKEN_ENCRYPTION_KEY") or _env("MELI_TOKEN_ENCRYPTION_KEY")
+    return _env("ALIEXPRESS_TOKEN_ENCRYPTION_KEY") or _env("TOKEN_ENCRYPTION_KEY")
 
 
 def _cipher() -> Fernet:
     key = _encryption_key()
     if not key:
         raise RuntimeError(
-            "Falta ALIEXPRESS_TOKEN_ENCRYPTION_KEY o MELI_TOKEN_ENCRYPTION_KEY "
+            "Falta ALIEXPRESS_TOKEN_ENCRYPTION_KEY o TOKEN_ENCRYPTION_KEY "
             "para guardar los tokens de forma cifrada."
         )
     try:
