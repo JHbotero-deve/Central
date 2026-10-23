@@ -189,6 +189,29 @@ class AmazonAffiliateUrlTests(unittest.TestCase):
         self.assertEqual(product["affiliate_url"], url)
         self.assertEqual(product["source_metadata"]["metadata_source"], "amazon_creators_api")
 
+    def test_amazon_creators_api_failure_falls_back_to_public_metadata(self):
+        url = "https://www.amazon.com/dp/B0HJB69GJL"
+        page = {
+            "resolved_url": url,
+            "title": "Auriculares desde metadatos",
+            "description": "Descripción pública",
+            "price": 79.99,
+            "currency": "USD",
+            "image_url": "https://images.example.com/headphones.jpg",
+            "gallery_urls": ["https://images.example.com/headphones.jpg"],
+            "metadata_source": "open_graph+jsonld",
+        }
+        with patch("url_import._public_url"), patch(
+            "url_import.creators_api_configured", return_value=True
+        ), patch(
+            "url_import.fetch_amazon_product_by_asin", side_effect=RuntimeError("API no disponible")
+        ), patch("url_import._metadata", return_value=page) as scraper:
+            product = import_url(url, "electronica")
+        scraper.assert_called_once_with(url)
+        self.assertEqual(product["title"], "Auriculares desde metadatos")
+        self.assertEqual(product["price"], 79.99)
+        self.assertIn("API no disponible", product["source_metadata"]["import_warning"])
+
     def test_amazon_503_without_creators_api_preserves_url_as_draft(self):
         response = requests.Response()
         response.status_code = 503
@@ -199,7 +222,7 @@ class AmazonAffiliateUrlTests(unittest.TestCase):
             product = import_url("https://www.amazon.com/dp/B0HJB69GJL", "electronica")
         self.assertEqual(product["platform"], "amazon")
         self.assertTrue(product["source_metadata"]["draft"])
-        self.assertIn("bloqueó la lectura automática", product["source_metadata"]["import_warning"])
+        self.assertIn("No se pudieron leer los metadatos de la página", product["source_metadata"]["import_warning"])
         self.assertEqual(product["product_url"], "https://www.amazon.com/dp/B0HJB69GJL")
 
     def test_mercado_libre_urls_are_rejected_as_disabled_source(self):
