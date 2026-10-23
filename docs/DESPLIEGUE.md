@@ -36,10 +36,6 @@ Documento operativo para levantar Central cuando haya presupuesto (Railway Hobby
 | `CENTRAL_API_BASE` | URL base de la API (para el bot y proxies de imagen) |
 | `MONGO_URL` | Si se usa almacenamiento de imágenes en Mongo |
 | `MONGO_DB_NAME` | Nombre de la base Mongo |
-| `MELI_CLIENT_ID` | Mercado Libre OAuth |
-| `MELI_CLIENT_SECRET` | Mercado Libre OAuth |
-| `MELI_TOKEN_ENCRYPTION_KEY` | Clave Fernet para tokens Melí |
-| `MELI_REDIRECT_URI` | `https://gracious-renewal-production-76df.up.railway.app/api/v1/meli/oauth/callback`; debe coincidir con la URI de la aplicación |
 | `CATALOG_SYNC_INTERVAL_SECONDS` | Intervalo del Worker en segundos (por defecto 7200) |
 | `CATALOG_AUTO_SYNC_ENABLED` | Ingresa automáticamente en segundo plano; por defecto `false`, por lo que se requiere `/inyectar` |
 | `CATALOG_SYNC_MAX_PRODUCTS` | Máximo combinado por ciclo, limitado en código a 200 |
@@ -51,7 +47,8 @@ Documento operativo para levantar Central cuando haya presupuesto (Railway Hobby
 | `ALIEXPRESS_APP_KEY` | AliExpress Open Platform |
 | `ALIEXPRESS_APP_SECRET` | AliExpress Open Platform |
 | `ALIEXPRESS_CALLBACK_URL` | Por defecto: `https://central-7ykr.vercel.app/api/v1/aliexpress/oauth/callback` |
-| `ALIEXPRESS_TOKEN_ENCRYPTION_KEY` | Opcional; si falta reutiliza `MELI_TOKEN_ENCRYPTION_KEY` |
+| `TOKEN_ENCRYPTION_KEY` | Clave genérica para cifrado de tokens OAuth |
+| `ALIEXPRESS_TOKEN_ENCRYPTION_KEY` | Opcional; si falta reutiliza `TOKEN_ENCRYPTION_KEY` |
 | Credenciales Amazon / TikTok / Wompi | Según módulos habilitados |
 ### 2. Servicio central-telegram (bot)
 
@@ -69,7 +66,6 @@ Documento operativo para levantar Central cuando haya presupuesto (Railway Hobby
 |----------|-------------|
 | `CENTRAL_API_BASE` | URL de la API (proxy de imágenes `mongo://`) |
 | `TELEGRAM_POLL_INTERVAL` | Segundos entre polls (por defecto 3) |
-| `MELI_CLIENT_ID`, `MELI_CLIENT_SECRET`, `MELI_TOKEN_ENCRYPTION_KEY` | Necesarias para consultar/renovar Mercado Libre desde `/inyectar` |
 | `AMAZON_CREDENTIAL_ID`, `AMAZON_CREDENTIAL_SECRET`, `AMAZON_PARTNER_TAG` | Necesarias para consultar Amazon y verificar precios de referencia |
 | `AMAZON_CREDENTIAL_VERSION`, `AMAZON_MARKETPLACE` | Deben coincidir con la aplicación/credencial y Associates store donde se generó el Partner Tag |
 | `CATALOG_SYNC_MAX_PRODUCTS`, `CATALOG_MIN_DISCOUNT_PCT`, `CATALOG_EXPIRY_DAYS` | Opcionales; defaults: 200, 40 y 7 |
@@ -127,9 +123,6 @@ En Railway: **Settings → Deploy → Start Command** y pegar el comando (no dep
      TELEGRAM_CHAT_ID=6008260829
      DATABASE_URL=<misma_que_API>
      CENTRAL_API_BASE=<url_de_la_API>
-     MELI_CLIENT_ID=<id_oauth>
-     MELI_CLIENT_SECRET=<secreto_oauth>
-     MELI_TOKEN_ENCRYPTION_KEY=<misma_clave_que_API>
      AMAZON_CREDENTIAL_ID=<creators_api_id>
      AMAZON_CREDENTIAL_SECRET=<creators_api_secret>
      AMAZON_PARTNER_TAG=<tag_de_afiliado>
