@@ -289,7 +289,8 @@ class TelegramCatalogContractTests(unittest.TestCase):
 
     def test_telegram_help_lists_url_import_for_all_supported_platforms(self):
         source = Path(__file__).with_name("telegram_alert.py").read_text(encoding="utf-8")
-        self.assertIn("Amazon, Mercado Libre, TikTok Shop o AliExpress por URL", source)
+        self.assertIn("Amazon, TikTok Shop o AliExpress", source)
+        self.assertNotIn("Amazon, Mercado Libre", source)
         self.assertIn("/inyectar", source)
 
     def test_store_search_uses_only_central_publications(self):
