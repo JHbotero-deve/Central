@@ -9,7 +9,6 @@ API = (ROOT / "product-analyzer/app/api.py").read_text(encoding="utf-8-sig")
 DB = (ROOT / "product-analyzer/app/db.py").read_text(encoding="utf-8-sig")
 PUB = (ROOT / "product-analyzer/app/publications.py").read_text(encoding="utf-8-sig")
 WORKER = (ROOT / "product-analyzer/app/main.py").read_text(encoding="utf-8-sig")
-INGEST = (ROOT / "product-analyzer/app/ingest.py").read_text(encoding="utf-8-sig")
 SHOP = (ROOT / "product-analyzer/frontend/tienda.html").read_text(encoding="utf-8-sig")
 CARDS = (ROOT / "product-analyzer/frontend/tarjetas.html").read_text(encoding="utf-8-sig")
 
@@ -52,25 +51,19 @@ check("p.is_active=TRUE AND p.is_blocked=FALSE AND COALESCE(pc.sale_price,p.curr
       "la ficha pública solo sirve publicaciones activas con precio verificable")
 
 
-check("_REFRESH_RETRY_AFTER" in INGEST and "time.monotonic()" in INGEST and "reintento en 300 s" in INGEST,
-      "la renovación OAuth fallida se limita temporalmente y no satura cada búsqueda")
-check('payload.get("error") or payload.get("code")' in INGEST and "código={error_code}" in INGEST,
-      "el registro OAuth informa el código de error sin revelar tokens")
-
-
 AMAZON = (ROOT / "product-analyzer/app/amazon_api.py").read_text(encoding="utf-8-sig")
 TELEGRAM = (ROOT / "product-analyzer/app/telegram_alert.py").read_text(encoding="utf-8-sig")
 
-check("data = _public_search(query, limit)" in INGEST and "if not data.get(\"results\")" in INGEST,
-      "Mercado Libre cae a búsqueda pública cuando la API bloquea o no devuelve resultados")
+check("fetch_mercadolibre" not in API,
+      "la ingesta activa de Central no llama a Mercado Libre")
 check("if not _AUTH_FAILURE:" in AMAZON and "se continúa con búsqueda pública" in AMAZON and "return _search_amazon_web(keywords, limit)" in AMAZON,
       "Amazon conserva la búsqueda pública cuando faltan o se rechazan credenciales API")
 check("products = search_external_products(term, limit=8)" in TELEGRAM and
       "Resultados de Amazon y AliExpress para" in TELEGRAM and
       "result = _sync_store_catalog()" in TELEGRAM,
       "Telegram busca Amazon y AliExpress y reserva la ingesta para /inyectar")
-check("fetch_mercadolibre(query, limit=10)" in API and "prime_only=True" in API and
+check("search_amazon_products(" in API and "prime_only=True" in API and
       "official_only=True" in API and "min_saving_percent=int(threshold)" in API,
-      "la ingesta usa Mercado Libre y ofertas Amazon Prime verificables con descuento mínimo")
+      "la ingesta usa ofertas Amazon Prime verificables con descuento mínimo")
 
 print("[PASS] Auditoría de contrato del catálogo completada.")
