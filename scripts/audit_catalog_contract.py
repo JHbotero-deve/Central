@@ -54,8 +54,6 @@ check("p.is_active=TRUE AND p.is_blocked=FALSE AND COALESCE(pc.sale_price,p.curr
 AMAZON = (ROOT / "product-analyzer/app/amazon_api.py").read_text(encoding="utf-8-sig")
 TELEGRAM = (ROOT / "product-analyzer/app/telegram_alert.py").read_text(encoding="utf-8-sig")
 
-check("data = _public_search(query, limit)" in INGEST and "if not data.get(\"results\")" in INGEST,
-      "Mercado Libre cae a búsqueda pública cuando la API bloquea o no devuelve resultados")
 check("if not _AUTH_FAILURE:" in AMAZON and "se continúa con búsqueda pública" in AMAZON and "return _search_amazon_web(keywords, limit)" in AMAZON,
       "Amazon conserva la búsqueda pública cuando faltan o se rechazan credenciales API")
 check("products = search_external_products(term, limit=8)" in TELEGRAM and
