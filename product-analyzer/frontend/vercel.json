@@ -33,6 +33,10 @@
       "destination": "/tienda.html"
     },
     {
+      "source": "/product-studio",
+      "destination": "/product-studio.html"
+    },
+    {
       "source": "/producto/:path*",
       "destination": "/producto.html?slug=:path*"
     },
