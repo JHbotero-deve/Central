@@ -274,7 +274,7 @@ def import_url(
             if warnings:
                 metadata["import_warning"] = " ".join(warnings)
                 metadata["metadata_source"] = metadata.get("metadata_source") or "public_page_fallback"
-        except (requests.RequestException, RuntimeError, ValueError) as exc:
+        except (requests.RequestException, RuntimeError) as exc:
             warnings.append(f"No se pudieron leer los metadatos de la página: {str(exc)[:160]}")
             metadata = {
                 "resolved_url": url,
