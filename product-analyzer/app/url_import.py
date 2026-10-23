@@ -37,6 +37,8 @@ def detect_platform(url: str) -> str:
     host = (parsed.hostname or "").lower().rstrip(".")
     if parsed.scheme not in ("http", "https") or not host:
         raise ValueError("Envía una URL pública completa que comience con https:// o http://.")
+    if re.search(r"(^|\\.)mercadolibre\\.com(\\.[a-z]{2,3})?$", host) or re.search(r"(^|\\.)mercadolivre\\.com\\.br$", host):
+        raise ValueError("Mercado Libre ya no está habilitado como fuente de Central. Envía una URL de Amazon, AliExpress, TikTok Shop o una tienda propia.")
     if host == "a.co" or AMAZON_HOST_RE.search(host):
         return "amazon"
     if TIKTOK_HOST_RE.search(host):
