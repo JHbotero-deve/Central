@@ -241,10 +241,6 @@
     if(!projects.length){const p=document.createElement("p");p.className="hint";p.textContent="Aún no has guardado proyectos.";root.append(p);return;}
     projects.forEach((project,index)=>{const row=document.createElement("div");row.className="saved-item";const info=document.createElement("span");info.textContent=project.name+" · "+(project.fileName||"sin archivo");const button=document.createElement("button");button.textContent="Cargar ajustes";button.addEventListener("click",()=>{applySnapshot(project);announce("Ajustes aplicados. Si el modelo no está cargado, importa "+(project.fileName||"tu archivo GLB")+" primero.","ok");});row.append(info,button);root.append(row);});
   }
-  // Ensure the scene grid responds to its current theme without relying on a DOM ID global.
-  const orbit=document.querySelector(".orbit");
-  const originalSetScene=setScene;
-  setScene=(scene)=>{originalSetScene(scene);};
   setScene("studio");renderProjects();
   viewer.addEventListener("load",()=>{materials=Array.from(viewer.model?.materials||[]);refreshMaterialList();syncControls();});
 })();
