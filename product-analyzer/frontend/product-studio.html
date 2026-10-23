@@ -187,7 +187,7 @@
     $("viewport").style.background=selected.background;
     $("viewport").style.setProperty("--grid-color",selected.grid);
     $("viewport").style.color=selected.text;
-    $("orbit").style.borderColor=scene==="light"?"#52664a30":"#b5da8b30";
+    document.querySelector(".orbit").style.borderColor=scene==="light"?"#52664a30":"#b5da8b30";
     projectState.scene=scene;
   }
   $("sceneSelect").addEventListener("change",e=>setScene(e.target.value));
