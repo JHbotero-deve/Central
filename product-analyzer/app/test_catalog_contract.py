@@ -227,6 +227,11 @@ class AmazonAffiliateUrlTests(unittest.TestCase):
         self.assertIn("No se pudieron leer los metadatos de la página", product["source_metadata"]["import_warning"])
         self.assertEqual(product["product_url"], "https://www.amazon.com/dp/B0HJB69GJL")
 
+    def test_mercado_libre_url_is_rejected_as_disabled_source(self):
+        with patch("url_import._public_url"):
+            with self.assertRaisesRegex(ValueError, "Mercado Libre ya no está habilitado"):
+                import_url("https://articulo.mercadolibre.com.co/MCO-123456", "electronica")
+
     def test_generic_public_store_url_is_imported_as_personal_draft_or_product(self):
         page = '''
         <html><head>
