@@ -12,6 +12,7 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 
 from analysis import score_product
 from catalog_rules import discount_percentage
+from central_agents import audit_catalog, build_ad_copy
 from db import get_connection, upsert_product
 from product_search import search_external_products
 from url_import import detect_platform, import_url
@@ -612,6 +613,9 @@ def _handle(token, chat_id, text):
             "/agregar — iniciar importación manual; después envía la URL\n"
             "/publicar ID — publicar un producto con precio, imagen y enlace\n"
             "También puedes enviar una URL directamente. Si la tienda bloquea la lectura, Central guarda un borrador para completar.\n"
+            "/auditar — revisar calidad del catálogo sin modificar productos\n"
+            "/publicidad ID — generar borrador publicitario con datos guardados\n"
+            "/agentes — ver herramientas CLI disponibles\n"
             "/estado — estado del catálogo"
         ))
 
@@ -762,6 +766,69 @@ def _handle(token, chat_id, text):
         if result is None:
             return _send(token, chat_id, f"<b>No publicado</b>\n{html.escape(message)}")
         return _send(token, chat_id, f"<b>{html.escape(message)}</b>")
+
+    if command == "/agentes":
+        return _send(token, chat_id, (
+            "<b>Agentes CLI de Central</b>\\n"
+            "<code>python central_agents.py search \"término\"</code> — búsqueda en fuentes configuradas\\n"
+            "<code>python central_agents.py audit</code> — auditoría de catálogo\\n"
+            "<code>python central_agents.py ad-copy ID</code> — borrador publicitario\\n"
+            "La búsqueda respeta límites de los proveedores; no evade bloqueos ni inventa resultados."
+        ))
+
+    if command == "/auditar":
+        conn = get_connection()
+        try:
+            report = audit_catalog(conn)
+        finally:
+            conn.close()
+        counts = report.get("issue_counts") or {}
+        lines = [
+            "<b>Auditoría de catálogo Central</b>",
+            f"Productos revisados: {report['audited']}",
+            f"Sin incidencias detectadas: {report['clean']}",
+            f"Con incidencias: {report['with_issues']}",
+        ]
+        for key, count in sorted(counts.items()):
+            lines.append(f"• {html.escape(key)}: {count}")
+        if report.get("truncated"):
+            lines.append("Se muestran como máximo 100 productos con incidencias.")
+        lines.append("Auditoría de solo lectura; no se modificó ni publicó ningún producto.")
+        return _send(token, chat_id, "\\n".join(lines))
+
+    if command == "/publicidad":
+        try:
+            product_id = int(argument.strip())
+        except ValueError:
+            return _send(token, chat_id, "Uso: /publicidad ID. Genera un borrador; no publica automáticamente.")
+        conn = get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT p.id, p.title, p.description, p.current_price, p.previous_price,
+                           p.currency, p.product_url, p.affiliate_url, pl.name AS platform
+                    FROM products p JOIN platforms pl ON pl.id = p.platform_id
+                    WHERE p.id=%s AND p.is_active=TRUE AND p.is_blocked=FALSE
+                    """,
+                    (product_id,),
+                )
+                product = cur.fetchone()
+        finally:
+            conn.close()
+        if not product:
+            return _send(token, chat_id, "Producto activo no encontrado. Consulta /productos.")
+        draft = build_ad_copy(product)
+        lines = [
+            "<b>Borrador publicitario · requiere aprobación</b>",
+            f"<b>{html.escape(draft['headline'])}</b>",
+            html.escape(draft["body"]),
+            html.escape(draft["cta"]),
+            html.escape(draft["disclaimer"]),
+            f"ID: {product_id} · Fuente: {html.escape(draft['platform'])}",
+            "No se publicó automáticamente.",
+        ]
+        return _send(token, chat_id, "\\n".join(lines))
 
     if command == "/estado":
         conn = get_connection()
