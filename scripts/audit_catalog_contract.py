@@ -9,7 +9,6 @@ API = (ROOT / "product-analyzer/app/api.py").read_text(encoding="utf-8-sig")
 DB = (ROOT / "product-analyzer/app/db.py").read_text(encoding="utf-8-sig")
 PUB = (ROOT / "product-analyzer/app/publications.py").read_text(encoding="utf-8-sig")
 WORKER = (ROOT / "product-analyzer/app/main.py").read_text(encoding="utf-8-sig")
-INGEST = (ROOT / "product-analyzer/app/ingest.py").read_text(encoding="utf-8-sig")
 SHOP = (ROOT / "product-analyzer/frontend/tienda.html").read_text(encoding="utf-8-sig")
 CARDS = (ROOT / "product-analyzer/frontend/tarjetas.html").read_text(encoding="utf-8-sig")
 
@@ -52,12 +51,6 @@ check("p.is_active=TRUE AND p.is_blocked=FALSE AND COALESCE(pc.sale_price,p.curr
       "la ficha pública solo sirve publicaciones activas con precio verificable")
 
 
-check("_REFRESH_RETRY_AFTER" in INGEST and "time.monotonic()" in INGEST and "reintento en 300 s" in INGEST,
-      "la renovación OAuth fallida se limita temporalmente y no satura cada búsqueda")
-check('payload.get("error") or payload.get("code")' in INGEST and "código={error_code}" in INGEST,
-      "el registro OAuth informa el código de error sin revelar tokens")
-
-
 AMAZON = (ROOT / "product-analyzer/app/amazon_api.py").read_text(encoding="utf-8-sig")
 TELEGRAM = (ROOT / "product-analyzer/app/telegram_alert.py").read_text(encoding="utf-8-sig")
 
@@ -69,8 +62,13 @@ check("products = search_external_products(term, limit=8)" in TELEGRAM and
       "Resultados de Amazon y AliExpress para" in TELEGRAM and
       "result = _sync_store_catalog()" in TELEGRAM,
       "Telegram busca Amazon y AliExpress y reserva la ingesta para /inyectar")
-check("fetch_mercadolibre(query, limit=10)" in API and "prime_only=True" in API and
+check("search_amazon_products(" in API and "prime_only=True" in API and
       "official_only=True" in API and "min_saving_percent=int(threshold)" in API,
-      "la ingesta usa Mercado Libre y ofertas Amazon Prime verificables con descuento mínimo")
+      "la ingesta activa usa ofertas Amazon Prime verificables con descuento mínimo")
+URL_IMPORT = (ROOT / "product-analyzer/app/url_import.py").read_text(encoding="utf-8-sig")
+check("fetch_amazon_product_by_asin(asin, category)" in URL_IMPORT and "metadata = _metadata(url)" in URL_IMPORT,
+      "la importación por URL de Amazon usa Creators API y fallback a metadatos públicos")
+check("Amazon, TikTok Shop, AliExpress o una tienda propia" in TELEGRAM and "def _ingest_telegram_url" in TELEGRAM,
+      "Telegram lee y captura URLs de producto sin depender de Mercado Libre")
 
 print("[PASS] Auditoría de contrato del catálogo completada.")
