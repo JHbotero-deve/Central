@@ -1,6 +1,7 @@
 import base64
 import html
 import io
+import json
 import os
 import re
 import threading
@@ -819,6 +820,30 @@ def _handle(token, chat_id, text):
         if not product:
             return _send(token, chat_id, "Producto activo no encontrado. Consulta /productos.")
         draft = build_ad_copy(product)
+        # Persistimos el borrador en los metadatos compartidos del producto para
+        # que el flujo administrativo pueda recuperarlo; no se publica aquí.
+        save_conn = get_connection()
+        try:
+            with save_conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE products
+                    SET source_metadata = COALESCE(source_metadata, '{}'::jsonb)
+                        || jsonb_build_object(
+                            'marketing_draft', %s::jsonb,
+                            'marketing_draft_updated_at', NOW()::text
+                        ),
+                        updated_at = NOW()
+                    WHERE id = %s
+                    """,
+                    (json.dumps(draft, ensure_ascii=False), product_id),
+                )
+            save_conn.commit()
+        except Exception:
+            save_conn.rollback()
+            raise
+        finally:
+            save_conn.close()
         lines = [
             "<b>Borrador publicitario · requiere aprobación</b>",
             f"<b>{html.escape(draft['headline'])}</b>",
