@@ -65,6 +65,7 @@ def audit_catalog(conn, limit: int = 1000) -> dict:
             SELECT p.id, p.title, p.current_price, p.previous_price, p.currency,
                    p.image_url, p.product_url, p.affiliate_url, p.is_active,
                    p.is_blocked, p.catalog_expires_at, pl.name AS platform,
+                   (p.catalog_expires_at IS NOT NULL AND p.catalog_expires_at <= NOW()) AS expired,
                    (pc.id IS NOT NULL AND pc.is_published = TRUE) AS published
             FROM products p
             JOIN platforms pl ON pl.id = p.platform_id
@@ -108,9 +109,8 @@ def audit_catalog(conn, limit: int = 1000) -> dict:
             seen_urls[url_key] = product_id
         if row.get("is_blocked"):
             checks.append("product_blocked")
-        if row.get("catalog_expires_at") is not None and not row.get("published") and row.get("is_active"):
-            # Expiry is handled by SQL in normal storefront queries; report the field for manual review.
-            pass
+        if row.get("expired"):
+            checks.append("catalog_entry_expired")
         if row.get("published") and checks:
             checks.append("published_record_needs_review")
         for issue in checks:
