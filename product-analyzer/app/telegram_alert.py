@@ -428,7 +428,7 @@ def _ingest_telegram_url(url, context="", image_url=None):
     try:
         platform = detect_platform(url)
         if currency is None:
-            currency = "COP" if platform in {"mercadolibre", "aliexpress"} else "USD"
+            currency = "USD"
         product = import_url(
             url,
             category,
@@ -467,13 +467,28 @@ def _ingest_telegram_url(url, context="", image_url=None):
             else "Pendiente de completar"
         )
         score_display = f"{float(score):.1f}/100" if score is not None else "Pendiente (borrador)"
+        description = re.sub(r"\\s+", " ", str(product.get("description") or "")).strip()
+        brand = str(product.get("brand") or "").strip()
+        product_url = str(product.get("product_url") or url).strip()
+        image = str(product.get("image_url") or "").strip()
+        detail_lines = []
+        if brand:
+            detail_lines.append(f"Marca: {html.escape(brand[:120])}")
+        if description:
+            detail_lines.append(f"Descripción: {html.escape(description[:500])}")
+        if image.startswith(("https://", "http://")):
+            detail_lines.append(f'<a href="{html.escape(image, quote=True)}">Ver imagen del producto</a>')
+        if product_url.startswith(("https://", "http://")):
+            detail_lines.append(f'<a href="{html.escape(product_url, quote=True)}">Abrir página original</a>')
         message = (
             f"<b>Producto capturado</b> · ID {product_id}\n"
             f"{html.escape(product['title'])}\n"
             f"Fuente: {html.escape(product['platform'])}\n"
+            f"Categoría: {html.escape(category)}\n"
             f"Precio: {price_display}\n"
-            f"Score: {score_display}\n"
-            f"{next_step}"
+            + ("\n".join(detail_lines) + "\n" if detail_lines else "")
+            + f"Score: {score_display}\n"
+            + f"{next_step}"
         )
         return product_id, message
     except Exception as exc:
