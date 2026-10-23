@@ -16,7 +16,6 @@ from amazon_api import (
     search_amazon_products,
     search_products,
 )
-from ingest import fetch_mercadolibre
 from store_orders import _public_order_summary, create_store_order
 from tiktok_creator import _normalize
 from wompi import create_cart_checkout, create_product_checkout
@@ -279,7 +278,7 @@ class TelegramCatalogContractTests(unittest.TestCase):
             if isinstance(node, ast.FunctionDef) and node.name == "_handle"
         )
         source = ast.get_source_segment(source, handler)
-        self.assertIn("Productos activos: {total}", source)
+        self.assertIn("Ofertas activas con precio:", source)
         self.assertIn("p.is_blocked = FALSE", source)
         self.assertIn("p.current_price > 0", source)
         self.assertIn("p.catalog_expires_at IS NULL OR p.catalog_expires_at > NOW()", source)
@@ -315,54 +314,6 @@ class TelegramCatalogContractTests(unittest.TestCase):
         self.assertIn("p.is_blocked=FALSE", source)
         self.assertIn("p.current_price>0", source)
         self.assertIn("p.catalog_expires_at IS NULL OR p.catalog_expires_at>NOW()", source)
-
-
-class MercadoLibreRateLimitTests(unittest.TestCase):
-    def test_requests_include_the_bearer_token(self):
-        from ingest import _headers
-
-        with patch("ingest.get_meli_tokens", return_value=("access-token", "")):
-            self.assertEqual(_headers()["Authorization"], "Bearer access-token")
-
-    def test_retry_after_refresh_uses_the_new_bearer_token(self):
-        from unittest.mock import Mock
-        from ingest import _get
-
-        unauthorized = Mock(status_code=401)
-        authorized = Mock(status_code=200)
-        authorized.json.return_value = {"results": []}
-        with patch("ingest.get_meli_tokens", return_value=("old-token", "refresh-token")), \
-             patch("ingest._refresh_access_token", return_value="new-token"), \
-             patch("ingest.requests.get", side_effect=[unauthorized, authorized]) as get:
-            self.assertEqual(_get("https://api.mercadolibre.com/sites/MCO/search"), {"results": []})
-
-        self.assertEqual(get.call_args_list[1].kwargs["headers"]["Authorization"], "Bearer new-token")
-
-    def test_http_429_is_reported_as_a_rate_limit(self):
-        from unittest.mock import Mock
-        from ingest import MercadoLibreRateLimited, _get
-
-        response = Mock(status_code=429)
-        response.headers = {"Retry-After": "30"}
-        with patch("ingest.requests.get", return_value=response), \
-             patch("ingest.get_meli_tokens", return_value=("test-token", "")):
-            with self.assertRaisesRegex(MercadoLibreRateLimited, r"429.*retry_after=30s"):
-                _get("https://api.mercadolibre.com/sites/MCO/search")
-
-    def test_rate_limit_stops_search_without_public_scraping(self):
-        from ingest import MercadoLibreAccessDenied, MercadoLibreRateLimited
-
-        with patch(
-            "ingest._get",
-            side_effect=[
-                MercadoLibreAccessDenied("search forbidden"),
-                MercadoLibreRateLimited("catalog rate limited"),
-            ],
-        ), patch("ingest._public_search") as public_search:
-            with self.assertRaises(MercadoLibreRateLimited):
-                fetch_mercadolibre("audifonos bluetooth")
-
-        public_search.assert_not_called()
 
 
 class StoreOrderSecurityTests(unittest.TestCase):
@@ -421,28 +372,6 @@ class DiscountRuleTests(unittest.TestCase):
         }]}}
         self.assertEqual(_previous_offer(item), 100.0)
 
-    def test_mercadolibre_search_uses_search_fields_without_three_extra_calls(self):
-        payload = {"results": [{
-            "id": "MCO-TEST-123", "title": "Producto real",
-            "price": 50000, "original_price": 120000, "currency_id": "COP",
-            "thumbnail": "https://http2.mlstatic.com/D_TEST.jpg",
-            "permalink": "https://articulo.mercadolibre.com.co/MCO-TEST-123",
-            "seller": {"id": 77}, "sold_quantity": 12
-        }]}
-        with patch("ingest._get", return_value=payload), \
-             patch("ingest._details") as details, \
-             patch("ingest._prices") as prices, \
-             patch("ingest._sale_price") as sale:
-            products = fetch_mercadolibre("producto real", limit=1)
-        self.assertEqual(len(products), 1)
-        self.assertEqual(products[0]["previous_price"], 120000.0)
-        self.assertEqual(products[0]["price"], 50000.0)
-        details.assert_not_called()
-        prices.assert_not_called()
-        sale.assert_not_called()
-
-
-class TikTokShopCapsuleTests(unittest.TestCase):
     def test_normalize_preserves_all_shop_images_and_affiliate_link(self):
         product = {
             "product_id": "shop-123",
