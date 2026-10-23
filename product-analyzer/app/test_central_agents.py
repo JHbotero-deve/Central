@@ -15,6 +15,10 @@ class CentralAgentTests(unittest.TestCase):
         self.assertIn("ahorra hasta 20%", draft["headline"])
         self.assertTrue(draft["discount_verified"])
         self.assertIn("https://www.amazon.com/dp/example", draft["cta"])
+        self.assertTrue(draft["seo_title"])
+        self.assertLessEqual(len(draft["meta_description"]), 155)
+        self.assertIn("audífonos", draft["keywords"])
+        self.assertTrue(draft["social_caption"])
         self.assertFalse(draft.get("approved_for_publication", False))
 
     def test_ad_copy_does_not_invent_discount_without_reference_price(self):
