@@ -172,7 +172,7 @@ def main(argv=None) -> int:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT p.id, p.title, p.description, p.current_price, p.previous_price,
+                SELECT p.id, p.title, p.description, p.category, p.current_price, p.previous_price,
                        p.currency, p.product_url, p.affiliate_url, pl.name AS platform
                 FROM products p JOIN platforms pl ON pl.id = p.platform_id
                 WHERE p.id = %s AND p.is_active = TRUE AND p.is_blocked = FALSE
