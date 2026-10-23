@@ -343,7 +343,7 @@ def _context_title(context):
         value = re.sub(r"(?i)^/?agregar\s+", "", value).strip(" \t•-:|")
         value = re.sub(r"(?i)^mira lo que encontré[!,:\s-]*", "", value)
         value = re.sub(r"(?i)\s*(?:[-–—]\s*)?\$\s*[0-9][0-9.,]*\s*(?:COP|USD|EUR)?", "", value)
-        value = re.sub(r"(?i)\s*(?:en Mercado Libre|en Amazon|en TikTok Shop)?\.?\s*(?:Entra aquí|Ver aquí|Compra aquí)\s*:?\s*$", "", value)
+        value = re.sub(r"(?i)\s*(?:en Amazon|en TikTok Shop|en AliExpress)?\.?\s*(?:Entra aquí|Ver aquí|Compra aquí)\s*:?\s*$", "", value)
         value = re.sub(r"\s+", " ", value).strip(" \t•-:|.")
         if len(value) < 5 or len(value) > 500:
             continue
@@ -429,7 +429,7 @@ def _ingest_telegram_url(url, context="", image_url=None):
     try:
         platform = detect_platform(url)
         if currency is None:
-            currency = "COP" if platform in {"mercadolibre", "aliexpress"} else "USD"
+            currency = "USD" if platform in {"amazon", "aliexpress"} else "COP"
         product = import_url(
             url,
             category,
