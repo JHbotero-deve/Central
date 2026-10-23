@@ -240,6 +240,12 @@ def import_url(
     _public_url(url)
     platform = detect_platform(url)
     asin = _asin(url) if platform == "amazon" else None
+    metadata = None
+    warnings = []
+
+    # La API oficial de Amazon es preferida cuando está disponible, pero no
+    # bloquea la importación por URL si devuelve error: se intenta leer el HTML
+    # público y sus metadatos Open Graph / JSON-LD como alternativa.
     if platform == "amazon" and asin and creators_api_configured():
         try:
             amazon_product = fetch_amazon_product_by_asin(asin, category)
@@ -250,8 +256,8 @@ def import_url(
                     "description": amazon_product.get("description"),
                     "sku": asin,
                     "brand": amazon_product.get("brand"),
-                    "price": amazon_product["price"],
-                    "currency": amazon_product["currency"],
+                    "price": amazon_product.get("price"),
+                    "currency": amazon_product.get("currency"),
                     "image_url": amazon_product.get("image_url"),
                     "gallery_urls": amazon_product.get("gallery_urls") or [],
                     "rating": amazon_product.get("rating"),
@@ -260,23 +266,23 @@ def import_url(
                     "metadata_source": "amazon_creators_api",
                 }
             else:
-                raise ValueError(f"Amazon Creators API no encontró una oferta disponible para el ASIN {asin}.")
+                warnings.append("Amazon Creators API no devolvió datos del producto.")
         except (requests.RequestException, RuntimeError, ValueError) as exc:
-            metadata = {
-                "resolved_url": url,
-                "gallery_urls": [],
-                "metadata_source": "manual_draft",
-                "import_warning": f"Amazon no entregó metadatos automáticamente: {str(exc)[:180]}",
-            }
-    else:
+            warnings.append(f"Amazon Creators API no disponible: {str(exc)[:160]}")
+
+    if metadata is None:
         try:
             metadata = _metadata(url)
-        except requests.RequestException as exc:
+            if warnings:
+                metadata["import_warning"] = " ".join(warnings)
+                metadata["metadata_source"] = metadata.get("metadata_source") or "public_page_fallback"
+        except (requests.RequestException, RuntimeError) as exc:
+            warnings.append(f"No se pudieron leer los metadatos de la página: {str(exc)[:160]}")
             metadata = {
                 "resolved_url": url,
                 "gallery_urls": [],
                 "metadata_source": "manual_draft",
-                "import_warning": f"La tienda bloqueó la lectura automática: {str(exc)[:180]}",
+                "import_warning": " ".join(warnings),
             }
     resolved_url = metadata.get("resolved_url") or url
     external_id = _asin(resolved_url) if platform == "amazon" else None
