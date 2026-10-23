@@ -807,7 +807,7 @@ def _handle(token, chat_id, text):
                 cur.execute(
                     """
                     SELECT p.id, p.title, p.description, p.current_price, p.previous_price,
-                           p.currency, p.product_url, p.affiliate_url, pl.name AS platform
+                           p.currency, p.product_url, p.affiliate_url, p.category, pl.name AS platform
                     FROM products p JOIN platforms pl ON pl.id = p.platform_id
                     WHERE p.id=%s AND p.is_active=TRUE AND p.is_blocked=FALSE
                     """,
@@ -824,6 +824,10 @@ def _handle(token, chat_id, text):
             f"<b>{html.escape(draft['headline'])}</b>",
             html.escape(draft["body"]),
             html.escape(draft["cta"]),
+            "<b>SEO title</b>: " + html.escape(draft["seo_title"]),
+            "<b>Meta description</b>: " + html.escape(draft["meta_description"]),
+            "<b>Palabras clave</b>: " + html.escape(", ".join(draft["keywords"])),
+            "<b>Texto social</b>: " + html.escape(draft["social_caption"]),
             html.escape(draft["disclaimer"]),
             f"ID: {product_id} · Fuente: {html.escape(draft['platform'])}",
             "No se publicó automáticamente.",
