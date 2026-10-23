@@ -611,7 +611,7 @@ def _handle(token, chat_id, text):
             "/modelar plataforma|categoría|id|título|precio|url|rating|reseñas|ventas|imagen — registrar producto con datos completos\n"
             "/agregar — iniciar importación manual; después envía la URL\n"
             "/publicar ID — publicar un producto con precio, imagen y enlace\n"
-            "También puedes enviar una URL directamente. Si la tienda bloquea la lectura, Central guarda un borrador para completar.\n"
+            "También puedes enviar una URL de Amazon, TikTok Shop, AliExpress o una tienda propia. Central lee los metadatos públicos y guarda un borrador si la página bloquea la lectura.\n"
             "/estado — estado del catálogo"
         ))
 
