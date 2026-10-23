@@ -342,7 +342,7 @@ def _context_title(context):
         value = re.sub(r"(?i)^/?agregar\s+", "", value).strip(" \t•-:|")
         value = re.sub(r"(?i)^mira lo que encontré[!,:\s-]*", "", value)
         value = re.sub(r"(?i)\s*(?:[-–—]\s*)?\$\s*[0-9][0-9.,]*\s*(?:COP|USD|EUR)?", "", value)
-        value = re.sub(r"(?i)\s*(?:en Mercado Libre|en Amazon|en TikTok Shop)?\.?\s*(?:Entra aquí|Ver aquí|Compra aquí)\s*:?\s*$", "", value)
+        value = re.sub(r"(?i)\s*(?:en Amazon|en TikTok Shop)?\.?\s*(?:Entra aquí|Ver aquí|Compra aquí)\s*:?\s*$", "", value)
         value = re.sub(r"\s+", " ", value).strip(" \t•-:|.")
         if len(value) < 5 or len(value) > 500:
             continue
@@ -581,7 +581,7 @@ def _model_product(argument):
             "external_id": parts[2],
             "title": parts[3],
             "price": float(parts[4]),
-            "currency": "COP" if platform in {"mercadolibre", "aliexpress"} else "USD",
+            "currency": "USD",
             "product_url": parts[5],
             "rating": float(parts[6]) if parts[6] else None,
             "reviews_count": int(parts[7] or 0),
