@@ -342,7 +342,7 @@ def _context_title(context):
         value = re.sub(r"(?i)^/?agregar\s+", "", value).strip(" \t•-:|")
         value = re.sub(r"(?i)^mira lo que encontré[!,:\s-]*", "", value)
         value = re.sub(r"(?i)\s*(?:[-–—]\s*)?\$\s*[0-9][0-9.,]*\s*(?:COP|USD|EUR)?", "", value)
-        value = re.sub(r"(?i)\s*(?:en Mercado Libre|en Amazon|en TikTok Shop)?\.?\s*(?:Entra aquí|Ver aquí|Compra aquí)\s*:?\s*$", "", value)
+        value = re.sub(r"(?i)\s*(?:en Amazon|en TikTok Shop)?\.?\s*(?:Entra aquí|Ver aquí|Compra aquí)\s*:?\s*$", "", value)
         value = re.sub(r"\s+", " ", value).strip(" \t•-:|.")
         if len(value) < 5 or len(value) > 500:
             continue
@@ -428,7 +428,7 @@ def _ingest_telegram_url(url, context="", image_url=None):
     try:
         platform = detect_platform(url)
         if currency is None:
-            currency = "COP" if platform in {"mercadolibre", "aliexpress"} else "USD"
+            currency = "USD"
         product = import_url(
             url,
             category,
@@ -467,13 +467,28 @@ def _ingest_telegram_url(url, context="", image_url=None):
             else "Pendiente de completar"
         )
         score_display = f"{float(score):.1f}/100" if score is not None else "Pendiente (borrador)"
+        description = re.sub(r"\\s+", " ", str(product.get("description") or "")).strip()
+        brand = str(product.get("brand") or "").strip()
+        product_url = str(product.get("product_url") or url).strip()
+        image = str(product.get("image_url") or "").strip()
+        detail_lines = []
+        if brand:
+            detail_lines.append(f"Marca: {html.escape(brand[:120])}")
+        if description:
+            detail_lines.append(f"Descripción: {html.escape(description[:500])}")
+        if image.startswith(("https://", "http://")):
+            detail_lines.append(f'<a href="{html.escape(image, quote=True)}">Ver imagen del producto</a>')
+        if product_url.startswith(("https://", "http://")):
+            detail_lines.append(f'<a href="{html.escape(product_url, quote=True)}">Abrir página original</a>')
         message = (
             f"<b>Producto capturado</b> · ID {product_id}\n"
             f"{html.escape(product['title'])}\n"
             f"Fuente: {html.escape(product['platform'])}\n"
+            f"Categoría: {html.escape(category)}\n"
             f"Precio: {price_display}\n"
-            f"Score: {score_display}\n"
-            f"{next_step}"
+            + ("\n".join(detail_lines) + "\n" if detail_lines else "")
+            + f"Score: {score_display}\n"
+            + f"{next_step}"
         )
         return product_id, message
     except Exception as exc:
@@ -566,7 +581,7 @@ def _model_product(argument):
             "external_id": parts[2],
             "title": parts[3],
             "price": float(parts[4]),
-            "currency": "COP" if platform in {"mercadolibre", "aliexpress"} else "USD",
+            "currency": "USD",
             "product_url": parts[5],
             "rating": float(parts[6]) if parts[6] else None,
             "reviews_count": int(parts[7] or 0),
@@ -611,7 +626,7 @@ def _handle(token, chat_id, text):
             "/modelar plataforma|categoría|id|título|precio|url|rating|reseñas|ventas|imagen — registrar producto con datos completos\n"
             "/agregar — iniciar importación manual; después envía la URL\n"
             "/publicar ID — publicar un producto con precio, imagen y enlace\n"
-            "También puedes enviar una URL directamente. Si la tienda bloquea la lectura, Central guarda un borrador para completar.\n"
+            "También puedes enviar una URL de Amazon, TikTok Shop, AliExpress o una tienda propia. Central lee los metadatos públicos y guarda un borrador si la página bloquea la lectura.\n"
             "/estado — estado del catálogo"
         ))
 

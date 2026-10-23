@@ -26,7 +26,7 @@
 - No inventar productos, precios, descuentos, valoraciones ni enlaces. La tolerancia a datos incompletos significa mostrar lo disponible, no falsificar información.
 
 ## Errores y recuperación
-- Un 403 de Mercado Libre indica rechazo de un recurso o permisos/token; no significa que el catálogo guardado deba ocultarse ni que otras fuentes deban detenerse.
+- Si Amazon bloquea la lectura de una URL, intentar primero los metadatos públicos disponibles y guardar un borrador si no hay datos suficientes.
 - Si una fuente falla, registrar fuente, consulta, código HTTP y causa; continuar con las fuentes independientes y conservar productos ya guardados.
 - No declarar que Amazon, TikTok o AliExpress importan correctamente sin verificar credenciales, permiso y respuesta real.
 - Los productos caducados, publicados y borradores deben distinguirse según el contrato de la API; no despublicar en masa como efecto secundario de un fallo temporal.

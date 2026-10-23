@@ -5,15 +5,15 @@
 - Frontend estático en Vercel desde `product-analyzer/frontend`.
 - API, worker y bot en Railway desde `product-analyzer/app`.
 - PostgreSQL de Railway como persistencia única.
-- Mercado Libre y Amazon como fuentes de ofertas verificadas por orden explícita; AliExpress y TikTok Shop se importan por URL hasta habilitar sus APIs de precios/afiliados.
+- Amazon como fuente de ofertas verificadas mediante Creators API; AliExpress, TikTok Shop y tiendas propias se capturan mediante URL. Mercado Libre queda fuera del flujo activo.
 - Telegram para consultas y alertas.
 - Wompi para pagos de productos propios.
 
 ## Flujo
 
-Telegram `/inyectar` → búsquedas reales de Mercado Libre y Amazon → verificación de precio actual y original (mínimo 40%) → PostgreSQL → publicaciones con caducidad a 7 días → API → Vercel. La ingesta automática del Worker queda apagada por defecto para que no busque fuentes externas sin una orden explícita; se puede habilitar con `CATALOG_AUTO_SYNC_ENABLED=true`.
+Telegram `/inyectar` → búsqueda oficial de ofertas Amazon → verificación de precio actual y original (mínimo 40%) → PostgreSQL → publicaciones con caducidad a 7 días → API → Vercel. La ingesta automática del Worker queda apagada por defecto para que no busque fuentes externas sin una orden explícita; se puede habilitar con `CATALOG_AUTO_SYNC_ENABLED=true`.
 
-AliExpress y TikTok Shop se agregan por URL desde el bot de Telegram con `/agregar categoría|URL`. Si la tienda bloquea la lectura automática, completa los datos reales: `/agregar categoría|URL|PRECIO|TÍTULO|IMAGEN_URL|MONEDA`. Amazon también admite importación por URL; las ofertas Amazon solo entran en `/inyectar` cuando Creators API devuelve precio actual y precio de referencia.
+AliExpress y TikTok Shop se agregan por URL desde el bot de Telegram con `/agregar categoría|URL`. Si la tienda bloquea la lectura automática, completa los datos reales: `/agregar categoría|URL|PRECIO|TÍTULO|IMAGEN_URL|MONEDA`. Amazon también admite importación por URL: primero usa Creators API si está disponible y, si falla, lee los metadatos públicos de la URL. Si no puede verificar precio o imagen, guarda un borrador en lugar de inventar datos.
 
 `/buscar término` consulta Amazon y AliExpress, no el catálogo de la tienda Central; los resultados son informativos y no se guardan ni publican automáticamente. `/inyectar` inicia explícitamente una búsqueda/importación de hasta 200 ofertas reales por ciclo, publica solo ofertas Amazon con precio de referencia verificable y descuento mínimo del 40%, y limita su vigencia automática a 7 días. Requiere credenciales vigentes de Amazon Creators API y puede no importar resultados si no hay ofertas elegibles. AliExpress sigue disponible para importaciones directas por URL, sin inventar ni inferir precios originales; no se inyecta automáticamente hasta contar con una API que verifique precio de referencia.
 
@@ -48,7 +48,7 @@ After AliExpress creates the application and assigns credentials, configure thes
 - `ALIEXPRESS_APP_KEY`: the App Key issued by AliExpress.
 - `ALIEXPRESS_APP_SECRET`: the App Secret issued by AliExpress (keep private).
 - `ALIEXPRESS_CALLBACK_URL`: the exact callback URL above. If omitted, Central uses this default.
-- `ALIEXPRESS_TOKEN_ENCRYPTION_KEY`: optional dedicated Fernet key. When omitted, Central reuses the existing `MELI_TOKEN_ENCRYPTION_KEY` to encrypt AliExpress tokens.
+- `ALIEXPRESS_TOKEN_ENCRYPTION_KEY`: optional dedicated Fernet key. When omitted, Central reuses the existing `TOKEN_ENCRYPTION_KEY` to encrypt AliExpress tokens.
 
 After the API redeploys, sign into Central as admin and open `/api/v1/aliexpress/oauth/start`. The route creates a random, single-use state that expires after 25 minutes and redirects to AliExpress. On return, Central exchanges the code on the server and stores access/refresh tokens encrypted in PostgreSQL; tokens are never returned to the browser. Check admin-only status at `/api/v1/aliexpress/oauth/status`.
 

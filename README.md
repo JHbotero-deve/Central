@@ -7,7 +7,7 @@ Central es el sistema de gestión de oportunidades y catálogo de productos real
 - Vercel: interfaz web pública y panel Central.
 - Railway: API, worker y bot de Telegram.
 - PostgreSQL de Railway: catálogo, publicaciones, pedidos y métricas.
-- Amazon, Mercado Libre y TikTok Shop: fuentes comerciales según las credenciales disponibles.
+- Amazon: fuente de ofertas verificadas mediante Creators API. AliExpress, TikTok Shop y tiendas propias se capturan mediante URL.
 - Wompi: pagos de productos propios.
 
 ## Rutas públicas
