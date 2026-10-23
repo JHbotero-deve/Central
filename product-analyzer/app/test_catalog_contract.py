@@ -190,6 +190,31 @@ class AmazonAffiliateUrlTests(unittest.TestCase):
         self.assertEqual(product["affiliate_url"], url)
         self.assertEqual(product["source_metadata"]["metadata_source"], "amazon_creators_api")
 
+    def test_amazon_creators_api_failure_falls_back_to_public_page_metadata(self):
+        url = "https://www.amazon.com/dp/B0HJB69GJL"
+        page = {
+            "resolved_url": url,
+            "title": "Auriculares desde la página",
+            "description": "Descripción pública",
+            "price": "79.99",
+            "currency": "USD",
+            "image_url": "https://images.example.com/headphones.jpg",
+            "gallery_urls": ["https://images.example.com/headphones.jpg"],
+            "metadata_source": "open_graph+jsonld",
+        }
+        with patch("url_import._public_url"), patch(
+            "url_import.creators_api_configured", return_value=True
+        ), patch(
+            "url_import.fetch_amazon_product_by_asin", side_effect=RuntimeError("API no disponible")
+        ), patch("url_import._metadata", return_value=page) as scraper:
+            product = import_url(url, "electronica")
+
+        scraper.assert_called_once_with(url)
+        self.assertEqual(product["title"], "Auriculares desde la página")
+        self.assertEqual(product["price"], 79.99)
+        self.assertEqual(product["image_url"], "https://images.example.com/headphones.jpg")
+        self.assertIn("API no disponible", product["source_metadata"]["import_warning"])
+
     def test_amazon_503_without_creators_api_preserves_url_as_draft(self):
         response = requests.Response()
         response.status_code = 503
@@ -200,7 +225,7 @@ class AmazonAffiliateUrlTests(unittest.TestCase):
             product = import_url("https://www.amazon.com/dp/B0HJB69GJL", "electronica")
         self.assertEqual(product["platform"], "amazon")
         self.assertTrue(product["source_metadata"]["draft"])
-        self.assertIn("bloqueó la lectura automática", product["source_metadata"]["import_warning"])
+        self.assertIn("No se pudieron leer los metadatos de la página", product["source_metadata"]["import_warning"])
         self.assertEqual(product["product_url"], "https://www.amazon.com/dp/B0HJB69GJL")
 
     def test_generic_public_store_url_is_imported_as_personal_draft_or_product(self):
@@ -286,7 +311,8 @@ class TelegramCatalogContractTests(unittest.TestCase):
 
     def test_telegram_help_lists_url_import_for_all_supported_platforms(self):
         source = Path(__file__).with_name("telegram_alert.py").read_text(encoding="utf-8")
-        self.assertIn("Amazon, Mercado Libre, TikTok Shop o AliExpress por URL", source)
+        self.assertIn("Amazon, TikTok Shop, AliExpress o una tienda propia", source)
+        self.assertNotIn("Amazon, Mercado Libre", source)
         self.assertIn("/inyectar", source)
 
     def test_store_search_uses_only_central_publications(self):
