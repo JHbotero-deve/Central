@@ -6,7 +6,7 @@ import requests
 from pathlib import Path
 
 from api import _sync_store_catalog
-from url_import import import_url
+from url_import import detect_platform, import_url
 
 from catalog_rules import discount_percentage
 from amazon_api import (
@@ -201,6 +201,10 @@ class AmazonAffiliateUrlTests(unittest.TestCase):
         self.assertTrue(product["source_metadata"]["draft"])
         self.assertIn("bloqueó la lectura automática", product["source_metadata"]["import_warning"])
         self.assertEqual(product["product_url"], "https://www.amazon.com/dp/B0HJB69GJL")
+
+    def test_mercado_libre_urls_are_rejected_as_disabled_source(self):
+        with self.assertRaisesRegex(ValueError, "Mercado Libre ya no está habilitado"):
+            detect_platform("https://articulo.mercadolibre.com.co/MCO-123456")
 
     def test_generic_public_store_url_is_imported_as_personal_draft_or_product(self):
         page = '''
