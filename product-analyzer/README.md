@@ -53,3 +53,19 @@ After AliExpress creates the application and assigns credentials, configure thes
 After the API redeploys, sign into Central as admin and open `/api/v1/aliexpress/oauth/start`. The route creates a random, single-use state that expires after 25 minutes and redirects to AliExpress. On return, Central exchanges the code on the server and stores access/refresh tokens encrypted in PostgreSQL; tokens are never returned to the browser. Check admin-only status at `/api/v1/aliexpress/oauth/status`.
 
 The OAuth callback and seller authorization do not automatically grant affiliate-program permissions. AliExpress must separately approve the API groups needed for the intended Dropshipping or Affiliate use case.
+
+## Agentes CLI de Central
+
+Desde `product-analyzer/app`, con el entorno Python y `DATABASE_URL` configurados:
+
+```bash
+python central_agents.py search "audifonos bluetooth" --limit 8
+python central_agents.py audit --limit 1000
+python central_agents.py ad-copy 123
+```
+
+- `search`: consulta las fuentes de búsqueda que estén configuradas y devuelve JSON con la procedencia disponible. Respeta los límites del proveedor; no intenta eludir bloqueos ni fabrica productos.
+- `audit`: auditoría de solo lectura para detectar precio, imagen, título, URL y duplicados potenciales.
+- `ad-copy`: genera un borrador con los datos guardados. Solo menciona descuentos si existe un precio anterior superior al actual; requiere aprobación humana y no publica automáticamente.
+
+Comandos de Telegram: `/auditar`, `/publicidad ID` y `/agentes`. La integración usa el catálogo PostgreSQL existente. No sustituye la verificación de disponibilidad ni garantiza posicionamiento en buscadores.
