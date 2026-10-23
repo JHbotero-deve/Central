@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#10130f">
+<title>Product Studio | Central</title>
+<link rel="stylesheet" href="/central.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+<style>
+:root{color-scheme:dark;--studio-bg:#0c0f0d;--studio-panel:#141815;--studio-line:#2b322c;--studio-text:#eef2eb;--studio-muted:#9ba69b;--studio-accent:#c4f36b}
+*{box-sizing:border-box}body{margin:0;background:var(--studio-bg);color:var(--studio-text);font:13px/1.5 Inter,system-ui,sans-serif}button,input,select{font:inherit}button{cursor:pointer}a{color:inherit;text-decoration:none}.top{height:68px;display:flex;align-items:center;justify-content:space-between;padding:0 24px;border-bottom:1px solid var(--studio-line);background:#101310}.brand{font:800 15px "Space Grotesk";letter-spacing:.16em}.brand span{color:var(--studio-accent)}.top-actions{display:flex;gap:8px;align-items:center}.btn{border:1px solid var(--studio-line);background:#1b211b;color:var(--studio-text);border-radius:9px;padding:9px 12px;font-size:11px;font-weight:700}.btn.primary{background:var(--studio-accent);color:#10140b;border-color:var(--studio-accent)}.btn:disabled{opacity:.5;cursor:not-allowed}.layout{display:grid;grid-template-columns:250px minmax(0,1fr) 290px;min-height:calc(100vh - 68px)}.panel{min-width:0;background:var(--studio-panel);padding:18px;border-right:1px solid var(--studio-line)}.right{border-right:0;border-left:1px solid var(--studio-line)}.eyebrow{font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--studio-muted);font-weight:800}.panel h2{font:600 17px "Space Grotesk";margin:5px 0 16px}.field{display:grid;gap:6px;margin:13px 0}.field label,.label{font-size:10px;color:var(--studio-muted);font-weight:700}.input,select{width:100%;min-width:0;border:1px solid var(--studio-line);background:#0e120f;color:var(--studio-text);border-radius:8px;padding:10px}.drop{display:grid;place-items:center;text-align:center;min-height:128px;border:1px dashed #53644b;border-radius:12px;padding:14px;background:#101610}.drop strong{display:block;font-size:12px}.drop p{margin:5px 0 10px;color:var(--studio-muted);font-size:10px}.drop input{display:none}.hint{font-size:10px;color:var(--studio-muted);line-height:1.55}.divider{height:1px;background:var(--studio-line);margin:20px 0}.stage-wrap{min-width:0;display:flex;flex-direction:column;background:#0d100e}.stage-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 16px;border-bottom:1px solid var(--studio-line)}.stage-head strong{font:600 12px "Space Grotesk"}.status{font-size:10px;color:var(--studio-muted)}.viewport{position:relative;min-height:440px;flex:1;overflow:hidden;background:radial-gradient(ellipse at 50% 40%,#202820 0,#121712 38%,#0b0e0c 78%)}.viewport:before{content:"";position:absolute;inset:0;background-image:linear-gradient(#83927b12 1px,transparent 1px),linear-gradient(90deg,#83927b12 1px,transparent 1px);background-size:36px 36px;mask-image:linear-gradient(to bottom,black,transparent 90%);pointer-events:none}.orbit{position:absolute;width:min(54%,430px);aspect-ratio:1;border:1px solid #b5da8b30;border-radius:50%;left:50%;top:48%;transform:translate(-50%,-50%) rotateX(67deg) rotateZ(-18deg);pointer-events:none}.empty{position:absolute;inset:0;display:grid;place-content:center;text-align:center;padding:28px;pointer-events:none}.empty .cube{font-size:60px;color:#a9d77a;margin-bottom:12px}.empty strong{font:600 17px "Space Grotesk"}.empty p{max-width:330px;color:var(--studio-muted);font-size:11px}.empty.hidden{display:none}.model{position:absolute;inset:0;width:100%;height:100%;--poster-color:transparent;background:transparent;outline:none}.stage-footer{display:flex;gap:7px;flex-wrap:wrap;padding:12px 16px;border-top:1px solid var(--studio-line)}.chip{border:1px solid var(--studio-line);background:#141914;color:var(--studio-muted);border-radius:7px;padding:7px 9px;font-size:10px}.chip.active{border-color:var(--studio-accent);color:var(--studio-accent)}.swatches{display:flex;gap:9px;align-items:center;flex-wrap:wrap}.swatch{width:28px;height:28px;border:2px solid #ffffff22;border-radius:50%;padding:0}.swatch.active{outline:2px solid var(--studio-accent);outline-offset:2px}.color-row{display:flex;gap:10px;align-items:center}.color-row input[type=color]{width:42px;height:36px;padding:2px;border:1px solid var(--studio-line);border-radius:8px;background:#0e120f}.color-row .input{flex:1}.range-row{display:flex;align-items:center;justify-content:space-between;gap:10px}.range-row output{color:var(--studio-accent);font:700 10px ui-monospace,monospace}.range{width:100%;accent-color:var(--studio-accent)}.material-list{display:grid;gap:6px;margin-top:10px}.material-item{text-align:left;border:1px solid var(--studio-line);border-radius:8px;background:#101410;color:var(--studio-muted);padding:9px;font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.material-item.active{border-color:var(--studio-accent);color:var(--studio-text);background:#1c2519}.notice{display:none;margin-top:12px;padding:10px;border:1px solid var(--studio-line);border-radius:8px;font-size:10px;overflow-wrap:anywhere}.notice.show{display:block}.notice.error{color:#ff9b94;border-color:#75423e}.notice.ok{color:var(--studio-accent);border-color:#52673c}.saved-list{display:grid;gap:7px;margin-top:10px}.saved-item{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px;border:1px solid var(--studio-line);border-radius:8px}.saved-item span{font-size:10px;overflow-wrap:anywhere}.saved-item button{border:0;background:transparent;color:var(--studio-accent);font-size:10px}.footnote{font-size:9px;color:var(--studio-muted);line-height:1.6}.mobile-section{display:none}
+@media(max-width:1050px){.layout{grid-template-columns:220px minmax(0,1fr)}.right{grid-column:1/-1;border-left:0;border-top:1px solid var(--studio-line);display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0}.right .divider{display:none}.right .right-block{padding:0 12px}.right .right-block:first-child{padding-left:0}.right .right-block:last-child{padding-right:0}}
+@media(max-width:700px){.top{padding:0 14px}.top-actions .btn:not(.primary){display:none}.layout{display:flex;flex-direction:column}.panel{border-right:0;border-bottom:1px solid var(--studio-line)}.left{padding:14px}.left .drop{min-height:90px}.left .field{margin:9px 0}.left .divider{margin:12px 0}.viewport{min-height:56vh}.right{display:block;padding:16px}.right .right-block{padding:0!important;margin-bottom:18px}.stage-head{padding:12px}.stage-footer{padding:10px}.mobile-section{display:block}}
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="/">CENTRAL<span> /</span> PRODUCT STUDIO</a>
+  <div class="top-actions">
+    <a class="btn" href="/tienda">Volver a la tienda</a>
+    <button class="btn" id="exportBtn">Exportar configuración</button>
+    <button class="btn primary" id="saveBtn">Guardar proyecto</button>
+  </div>
+</header>
+<main class="layout">
+  <aside class="panel left">
+    <div class="eyebrow">01 / Proyecto</div><h2>Tu producto</h2>
+    <div class="field"><label for="productName">Nombre del proyecto</label><input class="input" id="productName" maxlength="100" value="Nuevo producto"></div>
+    <label class="drop" for="modelFile" id="dropZone">
+      <strong>Importar modelo 3D</strong><p>Arrastra aquí o selecciona un archivo GLB / glTF</p><span class="btn">Elegir archivo</span>
+      <input id="modelFile" type="file" accept=".glb,.gltf,model/gltf-binary,model/gltf+json">
+    </label>
+    <p class="hint">GLB es la opción más sencilla porque normalmente incluye geometría, materiales y texturas en un solo archivo.</p>
+    <div class="divider"></div>
+    <div class="eyebrow">02 / Presentación</div><h2>Escena</h2>
+    <div class="field"><label for="sceneSelect">Fondo</label><select id="sceneSelect" class="input"><option value="studio">Estudio oscuro</option><option value="light">Estudio claro</option><option value="green">Verde editorial</option></select></div>
+    <div class="field"><label for="exposure">Exposición <span id="exposureValue">1.0</span></label><input class="range" id="exposure" type="range" min="0.5" max="2" step="0.1" value="1"></div>
+    <div class="field"><label for="shadow">Intensidad de sombra <span id="shadowValue">0.8</span></label><input class="range" id="shadow" type="range" min="0" max="1" step="0.1" value="0.8"></div>
+    <div class="field"><label for="turntable">Giro automático</label><button class="btn" id="turntable">Activar giro</button></div>
+    <div class="divider"></div>
+    <p class="footnote">Los cambios de escena y materiales se aplican a la vista previa. El archivo 3D original no se modifica.</p>
+  </aside>
+  <section class="stage-wrap">
+    <div class="stage-head"><strong>VISTA 3D · INTERACTIVA</strong><span class="status" id="modelStatus">Sin modelo cargado</span></div>
+    <div class="viewport" id="viewport">
+      <div class="orbit"></div>
+      <model-viewer class="model" id="modelViewer" camera-controls touch-action="pan-y" shadow-intensity="0.8" exposure="1" environment-image="neutral" interaction-prompt="auto" loading="eager" reveal="auto" style="display:none"></model-viewer>
+      <div class="empty" id="emptyState"><div class="cube">◇</div><strong>El espacio de producto está listo</strong><p>Importa un archivo GLB o glTF para empezar a personalizar sus materiales, iluminación y presentación.</p></div>
+    </div>
+    <div class="stage-footer">
+      <button class="chip" id="resetView">Restablecer vista</button><button class="chip" id="autoFrame">Encuadrar producto</button><button class="chip" id="fullscreen">Pantalla completa</button><span class="status" style="margin-left:auto">Arrastra para orbitar · rueda para zoom</span>
+    </div>
+  </section>
+  <aside class="panel right">
+    <section class="right-block">
+      <div class="eyebrow">03 / Apariencia</div><h2>Materiales</h2>
+      <p class="hint" id="materialHint">Carga un modelo para detectar y editar sus materiales PBR.</p>
+      <div class="field"><label>Material seleccionado</label><div id="materialList" class="material-list"><div class="hint">Todavía no hay materiales.</div></div></div>
+      <div class="field"><label for="materialColor">Color base</label><div class="color-row"><input type="color" id="materialColor" value="#b6f23a" aria-label="Color base del material"><input class="input" id="colorHex" value="#B6F23A" maxlength="7" aria-label="Código hexadecimal"></div></div>
+      <div class="swatches" id="swatches">
+        <button class="swatch active" data-color="#b6f23a" style="background:#b6f23a" aria-label="Verde lima"></button>
+        <button class="swatch" data-color="#e7e5df" style="background:#e7e5df" aria-label="Marfil"></button>
+        <button class="swatch" data-color="#232b35" style="background:#232b35" aria-label="Grafito"></button>
+        <button class="swatch" data-color="#c78c54" style="background:#c78c54" aria-label="Bronce"></button>
+        <button class="swatch" data-color="#8ca9bd" style="background:#8ca9bd" aria-label="Azul acero"></button>
+      </div>
+      <div class="field"><div class="range-row"><label for="metalness">Metallicidad</label><output id="metalnessValue">0.0</output></div><input class="range" id="metalness" type="range" min="0" max="1" step="0.05" value="0"></div>
+      <div class="field"><div class="range-row"><label for="roughness">Rugosidad</label><output id="roughnessValue">0.7</output></div><input class="range" id="roughness" type="range" min="0" max="1" step="0.05" value="0.7"></div>
+      <div class="field"><label for="applyScope">Aplicar color</label><select class="input" id="applyScope"><option value="selected">Solo material seleccionado</option><option value="all">Todos los materiales</option></select></div>
+      <div id="notice" class="notice" role="status" aria-live="polite"></div>
+    </section>
+    <div class="divider"></div>
+    <section class="right-block">
+      <div class="eyebrow">04 / Proyectos</div><h2>Guardados en este navegador</h2>
+      <p class="hint">Se guarda el nombre y la configuración de presentación localmente. Conserva tu archivo GLB original para volver a cargarlo.</p>
+      <div id="savedProjects" class="saved-list"><p class="hint">Aún no has guardado proyectos.</p></div>
+    </section>
+    <div class="divider"></div>
+    <p class="footnote">Esta primera versión es un editor de presentación 3D. No es un CAD: no deforma geometría ni crea piezas nuevas.</p>
+  </aside>
+</main>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const viewer = $("modelViewer");
+  const STORAGE_KEY = "central.productStudio.projects.v1";
+  let objectUrl = "";
+  let selectedMaterial = 0;
+  let materials = [];
+  let currentFileName = "";
+  let autoRotate = false;
+  let projectState = {name:"Nuevo producto",fileName:"",scene:"studio",exposure:1,shadow:0.8,autoRotate:false,materials:[]};
+
+  function announce(message, type="ok") {
+    const el=$("notice"); el.textContent=message; el.className="notice show "+type;
+  }
+  function readProjects() {
+    try { const value=JSON.parse(localStorage.getItem(STORAGE_KEY)||"[]"); return Array.isArray(value)?value:[]; }
+    catch { return []; }
+  }
+  function currentMaterial() { return materials[selectedMaterial] || null; }
+  function hexFromFactor(factor) {
+    if (!factor || factor.length<3) return "#ffffff";
+    return "#"+factor.slice(0,3).map(v=>Math.round(Math.max(0,Math.min(1,v))*255).toString(16).padStart(2,"0")).join("");
+  }
+  function factorFromHex(hex) {
+    const clean=String(hex).replace("#","");
+    if(!/^[0-9a-f]{6}$/i.test(clean)) return [1,1,1,1];
+    return [0,2,4].map(i=>parseInt(clean.slice(i,i+2),16)/255).concat(1);
+  }
+  function refreshMaterialList() {
+    const root=$("materialList"); root.replaceChildren();
+    if (!materials.length) { root.innerHTML='<div class="hint">Este modelo no expone materiales editables.</div>'; return; }
+    materials.forEach((material,index)=>{
+      const button=document.createElement("button");
+      button.type="button"; button.className="material-item"+(index===selectedMaterial?" active":"");
+      button.textContent=(index+1)+". "+(material.name||("Material "+(index+1)));
+      button.title=button.textContent;
+      button.addEventListener("click",()=>selectMaterial(index));
+      root.append(button);
+    });
+  }
+  function syncControls() {
+    const material=currentMaterial();
+    if (!material) return;
+    const pbr=material.pbrMetallicRoughness;
+    const color=hexFromFactor(pbr.baseColorFactor);
+    $("materialColor").value=color; $("colorHex").value=color.toUpperCase();
+    $("metalness").value=String(pbr.metallicFactor ?? 0);
+    $("roughness").value=String(pbr.roughnessFactor ?? 1);
+    $("metalnessValue").value=Number($("metalness").value).toFixed(2);
+    $("roughnessValue").value=Number($("roughness").value).toFixed(2);
+    document.querySelectorAll(".swatch").forEach(b=>b.classList.toggle("active",b.dataset.color.toLowerCase()===color.toLowerCase()));
+  }
+  function selectMaterial(index) { selectedMaterial=index; refreshMaterialList(); syncControls(); }
+  function applyMaterial(property,value) {
+    if(!materials.length) { announce("Carga un modelo con materiales PBR para editar su apariencia.","error"); return; }
+    const targets=$("applyScope").value==="all"?materials:[currentMaterial()];
+    targets.filter(Boolean).forEach(material=>{
+      const pbr=material.pbrMetallicRoughness;
+      if(property==="color") pbr.setBaseColorFactor(factorFromHex(value));
+      if(property==="metallic") pbr.setMetallicFactor(Number(value));
+      if(property==="roughness") pbr.setRoughnessFactor(Number(value));
+    });
+    syncControls();
+  }
+  function snapshot() {
+    return {
+      name:$("productName").value.trim()||"Producto sin nombre",
+      fileName:currentFileName,
+      scene:$("sceneSelect").value,
+      exposure:Number($("exposure").value),
+      shadow:Number($("shadow").value),
+      autoRotate,
+      materials:materials.map(m=>({name:m.name||"",color:hexFromFactor(m.pbrMetallicRoughness.baseColorFactor),metallic:Number(m.pbrMetallicRoughness.metallicFactor??0),roughness:Number(m.pbrMetallicRoughness.roughnessFactor??1)})),
+      savedAt:new Date().toISOString()
+    };
+  }
+  function applySnapshot(data) {
+    $("productName").value=data.name||"Nuevo producto";
+    $("sceneSelect").value=data.scene||"studio";
+    $("exposure").value=String(data.exposure??1); $("exposureValue").textContent=Number($("exposure").value).toFixed(1);
+    $("shadow").value=String(data.shadow??0.8); $("shadowValue").textContent=Number($("shadow").value).toFixed(1);
+    viewer.exposure=Number($("exposure").value); viewer.shadowIntensity=Number($("shadow").value);
+    setScene(data.scene||"studio");
+    autoRotate=Boolean(data.autoRotate); viewer.autoRotate=autoRotate; $("turntable").textContent=autoRotate?"Desactivar giro":"Activar giro";
+    if(Array.isArray(data.materials) && materials.length) {
+      data.materials.forEach((saved,index)=>{
+        const material=materials[index]; if(!material) return;
+        material.pbrMetallicRoughness.setBaseColorFactor(factorFromHex(saved.color||"#ffffff"));
+        material.pbrMetallicRoughness.setMetallicFactor(Number(saved.metallic??0));
+        material.pbrMetallicRoughness.setRoughnessFactor(Number(saved.roughness??1));
+      });
+      syncControls();
+    }
+  }
+  function setScene(scene) {
+    const styles={
+      studio:{background:"radial-gradient(ellipse at 50% 40%,#202820 0,#121712 38%,#0b0e0c 78%)",grid:"#83927b12",text:"#eef2eb"},
+      light:{background:"radial-gradient(ellipse at 50% 40%,#ffffff 0,#e8ece7 48%,#cbd4cc 100%)",grid:"#52664a16",text:"#1d241e"},
+      green:{background:"radial-gradient(ellipse at 50% 40%,#354a31 0,#1d2c20 50%,#101810 100%)",grid:"#c4f36b14",text:"#eef2eb"}
+    };
+    const selected=styles[scene]||styles.studio;
+    $("viewport").style.background=selected.background;
+    $("viewport").style.setProperty("--grid-color",selected.grid);
+    $("viewport").style.color=selected.text;
+    $("orbit").style.borderColor=scene==="light"?"#52664a30":"#b5da8b30";
+    projectState.scene=scene;
+  }
+  $("sceneSelect").addEventListener("change",e=>setScene(e.target.value));
+  $("exposure").addEventListener("input",e=>{viewer.exposure=Number(e.target.value);$("exposureValue").textContent=Number(e.target.value).toFixed(1);});
+  $("shadow").addEventListener("input",e=>{viewer.shadowIntensity=Number(e.target.value);$("shadowValue").textContent=Number(e.target.value).toFixed(1);});
+  $("turntable").addEventListener("click",()=>{autoRotate=!autoRotate;viewer.autoRotate=autoRotate;$("turntable").textContent=autoRotate?"Desactivar giro":"Activar giro";});
+  $("materialColor").addEventListener("input",e=>{const hex=e.target.value; $("colorHex").value=hex.toUpperCase();applyMaterial("color",hex);});
+  $("colorHex").addEventListener("change",e=>{let value=e.target.value.trim();if(!value.startsWith("#"))value="#"+value;if(/^#[0-9a-f]{6}$/i.test(value)){ $("materialColor").value=value;applyMaterial("color",value); }else announce("Escribe un color hexadecimal válido, por ejemplo #B6F36B.","error");});
+  $("metalness").addEventListener("input",e=>{$("metalnessValue").value=Number(e.target.value).toFixed(2);applyMaterial("metallic",e.target.value);});
+  $("roughness").addEventListener("input",e=>{$("roughnessValue").value=Number(e.target.value).toFixed(2);applyMaterial("roughness",e.target.value);});
+  $("swatches").addEventListener("click",e=>{const button=e.target.closest("[data-color]");if(!button)return;$("materialColor").value=button.dataset.color;$("colorHex").value=button.dataset.color.toUpperCase();applyMaterial("color",button.dataset.color);});
+  $("modelFile").addEventListener("change",e=>loadFile(e.target.files?.[0]));
+  async function loadFile(file) {
+    if(!file)return;
+    if(!/\.(glb|gltf)$/i.test(file.name)){announce("Formato no válido. Selecciona un archivo .glb o .gltf.","error");return;}
+    if(file.size>150*1024*1024){announce("El archivo supera 150 MB. Optimiza el modelo antes de importarlo.","error");return;}
+    if(objectUrl)URL.revokeObjectURL(objectUrl);
+    currentFileName=file.name; objectUrl=URL.createObjectURL(file);
+    viewer.style.display="block";$("emptyState").classList.add("hidden");
+    $("modelStatus").textContent="Cargando "+file.name;
+    viewer.src=objectUrl;
+    viewer.addEventListener("load",()=>{
+      materials=Array.from(viewer.model?.materials||[]);selectedMaterial=0;
+      refreshMaterialList();syncControls();
+      $("modelStatus").textContent=file.name+" · "+materials.length+" materiales";
+      $("materialHint").textContent=materials.length?"Selecciona un material y ajusta color, metallicidad y rugosidad.":"El modelo se cargó, pero no contiene materiales PBR editables.";
+      $("resetView").click();
+      announce("Modelo cargado correctamente. Los cambios se aplican a la vista previa.","ok");
+    },{once:true});
+    viewer.addEventListener("error",()=>{ $("modelStatus").textContent="No se pudo cargar el modelo";announce("No se pudo leer el modelo. Si es .gltf, verifica que sus texturas y archivos asociados estén disponibles; prueba exportarlo como GLB.","error");},{once:true});
+  }
+  $("dropZone").addEventListener("dragover",e=>{e.preventDefault();$("dropZone").style.borderColor="var(--studio-accent)";});
+  $("dropZone").addEventListener("dragleave",()=>{$("dropZone").style.borderColor="";});
+  $("dropZone").addEventListener("drop",e=>{e.preventDefault();$("dropZone").style.borderColor="";loadFile(e.dataTransfer.files?.[0]);});
+  $("resetView").addEventListener("click",()=>{viewer.cameraOrbit="0deg 75deg auto";viewer.cameraTarget="auto";viewer.fieldOfView="auto";});
+  $("autoFrame").addEventListener("click",()=>{viewer.updateFraming();announce("Encuadre del producto actualizado.");});
+  $("fullscreen").addEventListener("click",async()=>{try{if(!document.fullscreenElement)await $("viewport").requestFullscreen();else await document.exitFullscreen();}catch{announce("La pantalla completa no está disponible en este navegador.","error");}});
+  $("saveBtn").addEventListener("click",()=>{
+    const state=snapshot(); if(!state.fileName){announce("Importa un modelo 3D antes de guardar el proyecto.","error");return;}
+    const projects=readProjects(); const index=projects.findIndex(p=>p.name===state.name);
+    if(index>=0)projects[index]=state;else projects.unshift(state);
+    try{localStorage.setItem(STORAGE_KEY,JSON.stringify(projects.slice(0,20)));renderProjects();announce("Configuración guardada en este navegador. Para publicarla en la tienda falta conectar la persistencia del servidor.","ok");}
+    catch{announce("El navegador no pudo guardar la configuración. Exporta el archivo JSON como respaldo.","error");}
+  });
+  $("exportBtn").addEventListener("click",()=>{
+    const state=snapshot();const blob=new Blob([JSON.stringify({schema:"central-product-studio/v1",project:state},null,2)],{type:"application/json"});
+    const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=(state.name||"central-producto").toLowerCase().replace(/[^a-z0-9]+/g,"-")+".json";a.click();URL.revokeObjectURL(url);announce("Configuración exportada como JSON. El archivo 3D se conserva por separado.");
+  });
+  function renderProjects(){
+    const root=$("savedProjects");root.replaceChildren();const projects=readProjects();
+    if(!projects.length){const p=document.createElement("p");p.className="hint";p.textContent="Aún no has guardado proyectos.";root.append(p);return;}
+    projects.forEach((project,index)=>{const row=document.createElement("div");row.className="saved-item";const info=document.createElement("span");info.textContent=project.name+" · "+(project.fileName||"sin archivo");const button=document.createElement("button");button.textContent="Cargar ajustes";button.addEventListener("click",()=>{applySnapshot(project);announce("Ajustes aplicados. Si el modelo no está cargado, importa "+(project.fileName||"tu archivo GLB")+" primero.","ok");});row.append(info,button);root.append(row);});
+  }
+  // Ensure the scene grid responds to its current theme without relying on a DOM ID global.
+  const orbit=document.querySelector(".orbit");
+  const originalSetScene=setScene;
+  setScene=(scene)=>{originalSetScene(scene);};
+  setScene("studio");renderProjects();
+  viewer.addEventListener("load",()=>{materials=Array.from(viewer.model?.materials||[]);refreshMaterialList();syncControls();});
+})();
+</script>
+</body>
+</html>
