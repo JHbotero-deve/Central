@@ -13,7 +13,7 @@ Documento operativo para levantar Central cuando haya presupuesto (Railway Hobby
 | **Vercel** | Frontend público y panel | Automático desde `product-analyzer/frontend` |
 
 > El bot de Telegram **debe** ser un servicio separado (o un proceso dedicado). Los Dockerfiles actuales arrancan solo la API (`uvicorn`). Si el servicio `central-telegram` usa el mismo Dockerfile, sobrescribe el **Start Command** en Railway.
-> API y Worker deben compartir `DATABASE_URL` y `MELI_TOKEN_ENCRYPTION_KEY` si se activa la ingesta programada. Telegram también necesita la misma base de datos y las credenciales de proveedores que use `/inyectar`, porque el comando ejecuta la ingesta en el servicio del bot.
+> API, Worker y Telegram deben compartir `DATABASE_URL`. Telegram necesita las credenciales de Amazon Creators API para búsquedas oficiales; la importación por URL intenta leer los metadatos públicos de la página si la API no responde.
 
 ---
 
@@ -161,14 +161,6 @@ Al importar una URL de Amazon con ASIN, si esas credenciales están configuradas
 
 La cuenta debe estar completamente aceptada en Amazon Associates del marketplace objetivo, tener acceso aprobado a Creators API y sus credenciales vigentes (Credential ID, Secret y Version). Amazon indica como requisito de acceso actual al menos 10 ventas calificadas en los últimos 30 días. `AMAZON_PARTNER_TAG` debe ser el tracking/store ID del mismo marketplace de `AMAZON_MARKETPLACE`; la credencial-version debe copiarse exactamente desde Associates Central, no adivinarse. Referencias: [requisitos e introducción](https://affiliate-program.amazon.com/creatorsapi/docs/en-us/introduction), [registro/credenciales](https://affiliate-program.amazon.com/creatorsapi/docs/en-us/onboarding/register-for-creators-api), [SearchItems y filtros Prime/ahorro](https://affiliate-program.amazon.com/creatorsapi/docs/en-us/api-reference/operations/search-items), [marketplace y Partner Tag](https://affiliate-program.amazon.com/creatorsapi/docs/en-us/concepts/common-request-headers-and-parameters).
 
-### Diagnóstico de Mercado Libre 403
-
-En la aplicación de Mercado Libre, conserva la redirect URI exacta `https://gracious-renewal-production-76df.up.railway.app/api/v1/meli/oauth/callback`; corrige la URL de notificaciones a `https://central-production-c644.up.railway.app/api/v1/meli/notifications` (sin `z` final). Mantén habilitado OAuth Authorization Code y el acceso de usuario requerido. Para el Worker y Telegram, verifica que `DATABASE_URL` y `MELI_TOKEN_ENCRYPTION_KEY` correspondan a la misma base y clave que usa el callback OAuth.
-
-No agregues scopes de publicaciones, mensajes, ventas o pagos para intentar quitar el 403 de lectura: son permisos distintos y no arreglan por sí solos el endpoint de catálogo. Después de reconectar, con el mismo token y sin compartirlo, prueba `GET https://api.mercadolibre.com/users/me` y luego `GET https://api.mercadolibre.com/sites/MCO/search?q=audifonos%20bluetooth&limit=1`. Si `/users/me` responde 200 pero la búsqueda sigue devolviendo 403, comparte con soporte/desarrolladores de Mercado Libre el `x-request-id`, hora UTC, aplicación/client ID y ruta del recurso; pide que confirmen si la aplicación tiene habilitado acceso a búsqueda de publicaciones (`/sites/MCO/search`). No publiques el access token. El 403 observado desde Railway no se corrige cambiando scopes al azar ni se resuelve desde el código si Mercado Libre deniega el recurso.
-
----
-
 ## Verificación rápida
 
 | Prueba | Resultado esperado |
@@ -180,7 +172,7 @@ No agregues scopes de publicaciones, mensajes, ventas o pagos para intentar quit
 | `/publicar ID` | Tarjeta publicada |
 | `/tienda` en Vercel | Tarjetas visibles |
 
-Con `CATALOG_AUTO_SYNC_ENABLED=false` (predeterminado), el Worker registra `catalog_auto_sync_disabled` y no busca productos externamente. `/estado` solo consulta PostgreSQL; no inicia una búsqueda. `/buscar término` consulta solo los productos persistidos en Central. `/inyectar` solicita explícitamente una ingesta en segundo plano de hasta 200 ofertas por ciclo. Solo se importan y publican productos con imagen/enlace reales, precio actual y precio original verificables, descuento mínimo del 40% y vigencia de 7 días. Los lotes pueden tener menos de 200 productos. `/top` y `/productos` muestran los datos ya guardados. Si Mercado Libre devuelve `403` o `429`, revisar permisos OAuth y esperar el límite antes de reintentar. Amazon requiere Creators API/Partner Tag para verificar precio actual y de referencia; la elegibilidad Prime no se infiere. AliExpress se mantiene en importación por URL hasta tener API afiliada autorizada que entregue ambos precios. TikTok Shop también se incorpora mediante URL. Para volver a la ejecución programada, habilitar `CATALOG_AUTO_SYNC_ENABLED=true`.
+Con `CATALOG_AUTO_SYNC_ENABLED=false` (predeterminado), el Worker registra `catalog_auto_sync_disabled` y no busca productos externamente. `/estado` solo consulta PostgreSQL; no inicia una búsqueda. `/buscar término` consulta solo los productos persistidos en Central. `/inyectar` solicita explícitamente una ingesta en segundo plano de hasta 200 ofertas por ciclo. Solo se importan y publican productos con imagen/enlace reales, precio actual y precio original verificables, descuento mínimo del 40% y vigencia de 7 días. Los lotes pueden tener menos de 200 productos. `/top` y `/productos` muestran los datos ya guardados. Amazon requiere Creators API/Partner Tag para verificar precio actual y de referencia; la elegibilidad Prime no se infiere. AliExpress se mantiene en importación por URL hasta tener API afiliada autorizada que entregue ambos precios. TikTok Shop también se incorpora mediante URL. Para volver a la ejecución programada, habilitar `CATALOG_AUTO_SYNC_ENABLED=true`.
 
 ---
 
