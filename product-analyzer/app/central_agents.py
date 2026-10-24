@@ -46,9 +46,9 @@ def build_ad_copy(product: dict) -> dict:
     facts = [item for item in (description[:240], price_text) if item]
     body = " ".join(facts) or "Consulta la ficha para conocer los detalles disponibles."
     cta = f"Consulta el producto: {url}" if urlparse(url).scheme in {"http", "https"} and urlparse(url).netloc else "Revisa los detalles antes de comprar."
-    category = re.sub(r"\\s+", " ", str(product.get("category") or "")).strip()
+    category = re.sub(r"\s+", " ", str(product.get("category") or "")).strip()
     seo_title = headline[:65]
-    meta_description = re.sub(r"\\s+", " ", f"{title}. {body}").strip()[:155]
+    meta_description = re.sub(r"\s+", " ", f"{title}. {body}").strip()[:155]
     stop_words = {"para", "desde", "con", "una", "uno", "unos", "unas", "del", "por", "los", "las", "que", "the", "and", "with"}
     words = re.findall(r"[a-záéíóúñ0-9]{3,}", title.lower())
     keywords = list(dict.fromkeys(word for word in words if word not in stop_words))[:8]
